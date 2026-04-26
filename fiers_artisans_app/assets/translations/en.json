@@ -1,0 +1,253 @@
+{
+  "app": {
+    "name": "Fiers Artisans",
+    "tagline": "Trust is their craft"
+  },
+  "theme": {
+    "dark": "Dark",
+    "light": "Light",
+    "select": "Choose your theme"
+  },
+  "language": {
+    "fr": "Français",
+    "en": "English",
+    "select": "Choose your language"
+  },
+  "onboarding": {
+    "step1_title": "Find the right craftsman",
+    "step1_subtitle": "Verified, certified and near you",
+    "step2_title": "Contact directly",
+    "step2_subtitle": "Chat, call or WhatsApp — instant communication",
+    "step3_title": "Trust the reviews",
+    "step3_subtitle": "Real ratings from real clients",
+    "next": "Next",
+    "skip": "Skip",
+    "get_started": "Get Started"
+  },
+  "auth": {
+    "welcome": "Welcome to Fiers Artisans",
+    "login": "Log in",
+    "register": "Sign up",
+    "phone": "Phone number",
+    "phone_required": "Phone number is required.",
+    "phone_invalid": "Enter a complete phone number.",
+    "pin": "PIN code",
+    "pin_required": "PIN code is required.",
+    "confirm_pin": "Confirm PIN code",
+    "pin_5_digits": "PIN must be exactly 5 digits.",
+    "pin_mismatch": "PIN codes do not match.",
+    "password": "Password",
+    "confirm_password": "Confirm password",
+    "first_name": "First name",
+    "last_name": "Last name",
+    "email": "Email (optional)",
+    "city": "City",
+    "commune": "District",
+    "forgot_password": "Forgot password?",
+    "no_account": "Don't have an account?",
+    "has_account": "Already have an account?",
+    "register_as": "Register as",
+    "artisan": "Craftsman",
+    "client": "Client",
+    "profession": "Profession",
+    "business_name": "Business name (optional)",
+    "business_name_hint": "Example: Diop Services Workshop",
+    "activity_section": "Your activity",
+    "category_required": "Please select a category.",
+    "profession_required": "Please select a trade.",
+    "select_category_first": "Choose a category first.",
+    "categories_load_error": "Unable to load categories.",
+    "no_categories_available": "No categories are available at the moment.",
+    "no_professions_available": "No trades are available for this category.",
+    "experience_years": "Years of experience",
+    "description": "Description",
+    "pin_setup": {
+      "title": "Set up your PIN",
+      "subtitle": "Your account still uses the legacy method. Enter the OTP sent to {phone}, then define your 5-digit PIN.",
+      "otp_label": "OTP code",
+      "otp_6_digits": "OTP must be exactly 6 digits.",
+      "cta": "Enable my PIN"
+    },
+    "otp": {
+      "title": "Verification",
+      "subtitle": "Enter the code sent to {phone}",
+      "sent": "Code sent on WhatsApp to {phone}",
+      "resend": "Resend code",
+      "resend_in": "Resend in {seconds}s",
+      "verify": "Verify",
+      "invalid": "Invalid code. Please try again.",
+      "expired": "Code expired. Please request a new one.",
+      "unavailable": "Service currently unavailable. Please try again later.",
+      "verified_login": "Phone verified! Please log in again."
+    }
+  },
+  "home": {
+    "greeting": "Hello, {name} 👋",
+    "search_hint": "Plumber, Electrician...",
+    "categories": "Categories",
+    "nearby": "Nearby craftsmen",
+    "top_rated": "Top rated",
+    "see_all": "See all"
+  },
+  "dashboard": {
+    "artisan": {
+      "subtitle": "Craftsman dashboard",
+      "performance": "Performance",
+      "profile_views": "Profile views",
+      "unread_messages": "Unread messages",
+      "avg_rating": "Average rating",
+      "total_reviews": "Total reviews",
+      "reviews_history_title": "Reviews history",
+      "quick_actions": "Quick actions",
+      "inbox": "Inbox"
+    },
+    "client": {
+      "urgent_mode": "Urgent mode ⚡",
+      "urgent_subtitle": "Available craftsmen nearby",
+      "favorites": "My favorites",
+      "favorites_empty": "Add craftsmen to favorites to find them easily.",
+      "favorite_added": "Added to favorites.",
+      "favorite_removed": "Removed from favorites.",
+      "inbox": "Recent messages",
+      "recently_viewed": "Recently viewed"
+    }
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Plumber, Electrician...",
+    "radius": "Radius: {km} km",
+    "results": "{count} craftsman(s) found",
+    "no_results": "No craftsmen found in this area",
+    "filter": "Filter",
+    "all_categories": "All categories",
+    "all_trades": "All trades",
+    "select_category_for_trade": "Choose a category first to filter by trade.",
+    "sort_by": "Sort by",
+    "distance": "Distance",
+    "rating": "Rating",
+    "verified_only": "Verified only",
+    "top_rated": "Top rated",
+    "top_rated_desc": "Sort by highest rating",
+    "available_only": "Available now",
+    "available_only_desc": "Show only available craftsmen",
+    "apply_filters": "Apply"
+  },
+  "artisan": {
+    "verified": "Verified",
+    "certified": "Certified",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "business_name": "Business",
+    "portfolio": "Portfolio",
+    "reviews": "Reviews",
+    "about": "About",
+    "experience": "{years} years of experience",
+    "contact": {
+      "whatsapp": "Contact on WhatsApp",
+      "call": "Call",
+      "chat": "Send a message"
+    },
+    "verification": {
+      "title": "Verification",
+      "upload_id": "Upload your ID",
+      "upload_diploma": "Upload your diplomas",
+      "pending": "Pending verification",
+      "approved": "Verified ✓",
+      "rejected": "Rejected",
+      "not_submitted": "Not submitted",
+      "rejection_reason": "Reason for rejection",
+      "resubmit": "Fix and resubmit",
+      "select_type": "Select document type",
+      "upload_success": "Document submitted successfully",
+      "upload_error": "Failed to upload document",
+      "submitting": "Submitting…",
+      "submit_document": "Submit document"
+    }
+  },
+  "portfolio": {
+    "title": "My Portfolio",
+    "add": "Add a project",
+    "item_title": "Title",
+    "item_description": "Description",
+    "item_price": "Price (FCFA)",
+    "item_images": "Photos",
+    "empty": "Your portfolio is empty. Add your projects!",
+    "images_required": "Add at least one photo.",
+    "add_error": "Error adding item. Try again.",
+    "delete_confirm_title": "Delete",
+    "delete_confirm": "Delete this project from your portfolio?",
+    "delete_error": "Error deleting item."
+  },
+  "subscription": {
+    "title": "Subscription",
+    "amount": "5,000 FCFA / month",
+    "pay": "Pay with Wave",
+    "active": "Active subscription",
+    "expires_in": "Expires in {days} days",
+    "expired": "Subscription expired",
+    "renew": "Renew",
+    "renew_available_in": "Renewal available in {days} day(s).",
+    "error_open_wave": "Unable to open Wave. Please check the app is installed.",
+    "error_payment": "Error initiating payment."
+  },
+  "review": {
+    "title": "Reviews",
+    "leave": "Leave a review",
+    "reply_action": "Reply",
+    "reply_dialog_title": "Reply to this review",
+    "reply_dialog_hint": "Write your reply to the client...",
+    "reply_success": "Reply sent.",
+    "reply_already_exists": "A reply already exists for this review.",
+    "artisan_reply_label": "Artisan reply",
+    "your_rating": "Your rating",
+    "tap_again_to_clear": "Tap the same star again to clear your rating.",
+    "your_comment": "Your comment",
+    "submit": "Submit",
+    "submitted_success": "Review submitted successfully.",
+    "already_done": "You have already reviewed this craftsman.",
+    "empty": "No reviews yet",
+    "no_comment": "No comment"
+  },
+  "chat": {
+    "title": "Messages",
+    "empty": "No conversations",
+    "type_message": "Type a message...",
+    "send": "Send",
+    "online": "Online",
+    "offline": "Offline"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "profile": "My profile",
+    "about": "About",
+    "logout": "Log out",
+    "logout_confirm": "Are you sure you want to log out?",
+    "version": "Version {version}"
+  },
+  "error": {
+    "generic": "An error occurred. Please try again.",
+    "no_internet": "No internet connection.",
+    "timeout": "Request timed out.",
+    "unauthorized": "Session expired. Please log in again.",
+    "server": "Server error. Please try again later.",
+    "validation": "Please check the entered information."
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK"
+  }
+}

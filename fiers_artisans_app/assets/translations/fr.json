@@ -1,0 +1,253 @@
+{
+  "app": {
+    "name": "Fiers Artisans",
+    "tagline": "La confiance, c'est leur métier"
+  },
+  "theme": {
+    "dark": "Sombre",
+    "light": "Clair",
+    "select": "Choisissez votre thème"
+  },
+  "language": {
+    "fr": "Français",
+    "en": "English",
+    "select": "Choisissez votre langue"
+  },
+  "onboarding": {
+    "step1_title": "Trouvez l'artisan qu'il vous faut",
+    "step1_subtitle": "Vérifiés, certifiés et proches de chez vous",
+    "step2_title": "Contactez directement",
+    "step2_subtitle": "Chat, appel ou WhatsApp — communication instantanée",
+    "step3_title": "Faites confiance aux avis",
+    "step3_subtitle": "Des évaluations réelles par de vrais clients",
+    "next": "Suivant",
+    "skip": "Passer",
+    "get_started": "Commencer"
+  },
+  "auth": {
+    "welcome": "Bienvenue sur Fiers Artisans",
+    "login": "Se connecter",
+    "register": "S'inscrire",
+    "phone": "Numéro de téléphone",
+    "phone_required": "Le numéro de téléphone est requis.",
+    "phone_invalid": "Entrez un numéro de téléphone complet.",
+    "pin": "Code PIN",
+    "pin_required": "Le code PIN est requis.",
+    "confirm_pin": "Confirmer le code PIN",
+    "pin_5_digits": "Le code PIN doit contenir 5 chiffres.",
+    "pin_mismatch": "Les codes PIN ne correspondent pas.",
+    "password": "Mot de passe",
+    "confirm_password": "Confirmer le mot de passe",
+    "first_name": "Prénom",
+    "last_name": "Nom",
+    "email": "Email (optionnel)",
+    "city": "Ville",
+    "commune": "Commune",
+    "forgot_password": "Mot de passe oublié ?",
+    "no_account": "Pas encore de compte ?",
+    "has_account": "Déjà un compte ?",
+    "register_as": "S'inscrire en tant que",
+    "artisan": "Artisan",
+    "client": "Client",
+    "profession": "Profession",
+    "business_name": "Nom de l'entreprise (optionnel)",
+    "business_name_hint": "Ex: Atelier Diop Services",
+    "activity_section": "Votre activité",
+    "category_required": "Veuillez choisir une catégorie.",
+    "profession_required": "Veuillez choisir un métier.",
+    "select_category_first": "Choisissez d'abord une catégorie.",
+    "categories_load_error": "Impossible de charger les catégories.",
+    "no_categories_available": "Aucune catégorie disponible pour le moment.",
+    "no_professions_available": "Aucun métier disponible pour cette catégorie.",
+    "experience_years": "Années d'expérience",
+    "description": "Description",
+    "pin_setup": {
+      "title": "Configurer votre code PIN",
+      "subtitle": "Votre compte utilise l'ancienne méthode. Entrez le code OTP reçu au {phone} puis définissez un PIN à 5 chiffres.",
+      "otp_label": "Code OTP",
+      "otp_6_digits": "Le code OTP doit contenir 6 chiffres.",
+      "cta": "Activer mon PIN"
+    },
+    "otp": {
+      "title": "Vérification",
+      "subtitle": "Entrez le code envoyé au {phone}",
+      "sent": "Code envoyé sur WhatsApp au {phone}",
+      "resend": "Renvoyer le code",
+      "resend_in": "Renvoyer dans {seconds}s",
+      "verify": "Vérifier",
+      "invalid": "Code invalide. Veuillez réessayer.",
+      "expired": "Code expiré. Veuillez en demander un nouveau.",
+      "unavailable": "Service actuellement indisponible. Veuillez réessayer plus tard.",
+      "verified_login": "Téléphone vérifié ! Reconnectez-vous."
+    }
+  },
+  "home": {
+    "greeting": "Bonjour, {name} 👋",
+    "search_hint": "Plombier, Électricien...",
+    "categories": "Catégories",
+    "nearby": "Artisans à proximité",
+    "top_rated": "Les mieux notés",
+    "see_all": "Voir tout"
+  },
+  "dashboard": {
+    "artisan": {
+      "subtitle": "Tableau de bord artisan",
+      "performance": "Performance",
+      "profile_views": "Vues du profil",
+      "unread_messages": "Messages non lus",
+      "avg_rating": "Note moyenne",
+      "total_reviews": "Total avis",
+      "reviews_history_title": "Historique des avis",
+      "quick_actions": "Actions rapides",
+      "inbox": "Messagerie"
+    },
+    "client": {
+      "urgent_mode": "Mode urgence ⚡",
+      "urgent_subtitle": "Artisans disponibles à proximité",
+      "favorites": "Mes favoris",
+      "favorites_empty": "Ajoutez des artisans en favoris pour les retrouver facilement.",
+      "favorite_added": "Ajoute aux favoris.",
+      "favorite_removed": "Retire des favoris.",
+      "inbox": "Messages récents",
+      "recently_viewed": "Consultés récemment"
+    }
+  },
+  "search": {
+    "title": "Recherche",
+    "placeholder": "Plombier, Électricien...",
+    "radius": "Rayon : {km} km",
+    "results": "{count} artisan(s) trouvé(s)",
+    "no_results": "Aucun artisan trouvé dans ce rayon",
+    "filter": "Filtrer",
+    "all_categories": "Toutes les catégories",
+    "all_trades": "Tous les métiers",
+    "select_category_for_trade": "Choisissez d'abord une catégorie pour filtrer par métier.",
+    "sort_by": "Trier par",
+    "distance": "Distance",
+    "rating": "Note",
+    "verified_only": "Vérifiés uniquement",
+    "top_rated": "Mieux notés",
+    "top_rated_desc": "Trier par note décroissante",
+    "available_only": "Disponibles",
+    "available_only_desc": "Afficher uniquement les artisans disponibles",
+    "apply_filters": "Appliquer"
+  },
+  "artisan": {
+    "verified": "Vérifié",
+    "certified": "Certifié",
+    "available": "Disponible",
+    "unavailable": "Indisponible",
+    "business_name": "Entreprise",
+    "portfolio": "Portfolio",
+    "reviews": "Avis",
+    "about": "À propos",
+    "experience": "{years} ans d'expérience",
+    "contact": {
+      "whatsapp": "Contacter sur WhatsApp",
+      "call": "Appeler",
+      "chat": "Envoyer un message"
+    },
+    "verification": {
+      "title": "Vérification",
+      "upload_id": "Télécharger votre pièce d'identité",
+      "upload_diploma": "Télécharger vos diplômes",
+      "pending": "En attente de vérification",
+      "approved": "Vérifié ✓",
+      "rejected": "Rejeté",
+      "not_submitted": "Non soumis",
+      "rejection_reason": "Motif du rejet",
+      "resubmit": "Corriger et renvoyer",
+      "select_type": "Sélectionner le type de document",
+      "upload_success": "Document soumis avec succès",
+      "upload_error": "Échec de l'envoi du document",
+      "submitting": "Envoi en cours…",
+      "submit_document": "Envoyer le dossier"
+    }
+  },
+  "portfolio": {
+    "title": "Mon Portfolio",
+    "add": "Ajouter une réalisation",
+    "item_title": "Titre",
+    "item_description": "Description",
+    "item_price": "Prix (FCFA)",
+    "item_images": "Photos",
+    "empty": "Votre portfolio est vide. Ajoutez vos réalisations !",
+    "images_required": "Ajoutez au moins une photo.",
+    "add_error": "Erreur lors de l'ajout. Réessayez.",
+    "delete_confirm_title": "Supprimer",
+    "delete_confirm": "Supprimer cette réalisation de votre portfolio ?",
+    "delete_error": "Erreur lors de la suppression."
+  },
+  "subscription": {
+    "title": "Abonnement",
+    "amount": "5 000 FCFA / mois",
+    "pay": "Payer avec Wave",
+    "active": "Abonnement actif",
+    "expires_in": "Expire dans {days} jours",
+    "expired": "Abonnement expiré",
+    "renew": "Renouveler",
+    "renew_available_in": "Renouvellement disponible dans {days} jour(s).",
+    "error_open_wave": "Impossible d'ouvrir Wave. Vérifiez que l'application est installée.",
+    "error_payment": "Erreur lors de l'initiation du paiement."
+  },
+  "review": {
+    "title": "Avis",
+    "leave": "Laisser un avis",
+    "reply_action": "Répondre",
+    "reply_dialog_title": "Répondre à cet avis",
+    "reply_dialog_hint": "Écrivez votre réponse au client...",
+    "reply_success": "Réponse envoyée.",
+    "reply_already_exists": "Une réponse existe déjà pour cet avis.",
+    "artisan_reply_label": "Réponse de l'artisan",
+    "your_rating": "Votre note",
+    "tap_again_to_clear": "Touchez la même étoile pour annuler la note.",
+    "your_comment": "Votre commentaire",
+    "submit": "Soumettre",
+    "submitted_success": "Avis envoyé avec succès.",
+    "already_done": "Vous avez déjà laissé un avis pour cet artisan.",
+    "empty": "Aucun avis pour le moment",
+    "no_comment": "Aucun commentaire"
+  },
+  "chat": {
+    "title": "Messages",
+    "empty": "Aucune conversation",
+    "type_message": "Écrire un message...",
+    "send": "Envoyer",
+    "online": "En ligne",
+    "offline": "Hors ligne"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "Aucune notification"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "theme": "Thème",
+    "profile": "Mon profil",
+    "about": "À propos",
+    "logout": "Se déconnecter",
+    "logout_confirm": "Voulez-vous vraiment vous déconnecter ?",
+    "version": "Version {version}"
+  },
+  "error": {
+    "generic": "Une erreur est survenue. Veuillez réessayer.",
+    "no_internet": "Pas de connexion internet.",
+    "timeout": "La requête a pris trop de temps.",
+    "unauthorized": "Session expirée. Veuillez vous reconnecter.",
+    "server": "Erreur serveur. Veuillez réessayer plus tard.",
+    "validation": "Veuillez vérifier les informations saisies."
+  },
+  "common": {
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "loading": "Chargement...",
+    "retry": "Réessayer",
+    "yes": "Oui",
+    "no": "Non",
+    "ok": "OK"
+  }
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fiers Artisans — Network Security Config (debug/dev)
+  Autorise le trafic HTTP cleartext pour le développement local,
+  même si l'IP LAN du PC change.
+
+  En production (HTTPS), remplacer par une politique restrictive.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

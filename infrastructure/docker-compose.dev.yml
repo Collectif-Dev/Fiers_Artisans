@@ -1,0 +1,84 @@
+# Fiers Artisans - Override Developpement Local
+# Usage depuis infrastructure/ :
+#   docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Ne JAMAIS utiliser en production
+
+services:
+  api:
+    build:
+      target: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../backend/src:/app/src
+    environment:
+      - NODE_ENV=development
+      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-localhost}
+      - MINIO_PUBLIC_PORT=${MINIO_PUBLIC_PORT:-9002}
+      - MINIO_PUBLIC_USE_SSL=${MINIO_PUBLIC_USE_SSL:-false}
+    command: npm run start:dev
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  # Admin Web en mode developpement avec hot reload
+  admin-web:
+    build:
+      target: development
+    ports:
+      - "3002:3002"
+    volumes:
+      - ../admin-web:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      # Vide en dev pour conserver la resolution automatique selon l'hote courant.
+      - NEXT_PUBLIC_API_URL=
+      - NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT:-3000}
+      - NEXT_PUBLIC_API_BASE_PATH=${NEXT_PUBLIC_API_BASE_PATH:-/api/v1}
+      - NEXT_PUBLIC_DEFAULT_LOCALE=${NEXT_PUBLIC_DEFAULT_LOCALE:-fr}
+    command: npm run dev
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  minio:
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+
+  postgres:
+    ports:
+      - "5434:5432"
+
+  mongodb:
+    ports:
+      - "27018:27017"
+
+  redis:
+    ports:
+      - "6380:6379"
+
+  grafana:
+    ports:
+      - "3001:3000"
+
+  # Desactiver Nginx en dev (acces direct a l'API et a l'admin web)
+  nginx:
+    profiles:
+      - prod-only
