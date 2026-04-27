@@ -1,4 +1,4 @@
-# Fiers Artisans TESTÉ - Source de verite projet
+# Fiers Artisans - Source de verite projet
 
 Ce `README.md` est l'unique source de verite documentaire du depot.
 
