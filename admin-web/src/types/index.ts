@@ -24,7 +24,7 @@ export interface AuthResponse {
 }
 
 export interface DashboardStats {
-  totalUsers: number;
+  totalClients: number;
   totalArtisans: number;
   activeSubscriptions: number;
   totalRevenueFcfa: number;

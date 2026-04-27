@@ -85,8 +85,8 @@ export default function DashboardPage() {
       {/* KPI Grid */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
-          title={t('total_users')}
-          value={stats?.totalUsers ?? 0}
+          title={t('total_clients')}
+          value={stats?.totalClients ?? 0}
           icon={Users}
           loading={loading}
         />

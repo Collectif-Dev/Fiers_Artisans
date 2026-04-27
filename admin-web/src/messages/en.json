@@ -37,7 +37,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "total_users": "Users",
+    "total_clients": "Clients",
     "total_artisans": "Artisans",
     "active_subscriptions": "Active subscriptions",
     "total_revenue": "Revenue (FCFA)",

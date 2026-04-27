@@ -74,6 +74,7 @@ export class AnalyticsService {
         this.activityLogModel.countDocuments({
           action: 'LOGIN',
           timestamp: { $gte: thirtyDaysAgo },
+          'metadata.role': { $ne: 'ADMIN' },
         }),
       ]);
 

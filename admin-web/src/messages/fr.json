@@ -37,7 +37,7 @@
   },
   "dashboard": {
     "title": "Tableau de bord",
-    "total_users": "Utilisateurs",
+    "total_clients": "Clients",
     "total_artisans": "Artisans",
     "active_subscriptions": "Abonnements actifs",
     "total_revenue": "Revenus (FCFA)",

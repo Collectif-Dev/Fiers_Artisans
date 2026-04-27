@@ -42,14 +42,17 @@ export class AdminService {
 
   async getDashboardStats() {
     const [
-      totalUsers,
+      totalClients,
       totalArtisans,
       activeSubscriptions,
       totalRevenue,
       pendingVerifications,
       totalReviews,
     ] = await Promise.all([
-      this.userRepository.count(),
+      this.userRepository
+        .createQueryBuilder('u')
+        .where('u.role = :role', { role: 'CLIENT' })
+        .getCount(),
       this.artisanProfileRepository.count(),
       this.subscriptionRepository.count({
         where: { status: SubscriptionStatus.ACTIVE },
@@ -65,7 +68,7 @@ export class AdminService {
     ]);
 
     return {
-      totalUsers,
+      totalClients,
       totalArtisans,
       activeSubscriptions,
       totalRevenueFcfa: totalRevenue,
