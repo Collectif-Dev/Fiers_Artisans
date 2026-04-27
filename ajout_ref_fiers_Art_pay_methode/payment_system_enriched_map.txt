@@ -1,0 +1,282 @@
+Système de paiement manuel — Wave / Mobile Money (Côte d’Ivoire)
+Map technique complète · Architecture produit + backend + UX + anti-fraude
+
+1. Vue d’ensemble
+Architecture
+    • Wave API (optionnel / futur) : désactivé temporairement 
+    • Paiement manuel (actif) : principal système 
+    • Les deux coexistent sur la page paiement 
+Objectif
+Valider des paiements mobiles (Wave / Orange Money / MTN / Moov) via :
+    • preuve utilisateur (capture écran) 
+    • validation admin 
+    • contrôle anti-fraude automatisé 
+
+2. Paramètres système
+Élément
+Valeur
+Abonnement
+5 000 FCFA / mois
+Délai admin
+48 à 72 heures
+Upload max preuve
+3 tentatives
+Hash image
+SHA-256 (déduplication globale)
+
+3. Flow complet A → Z
+1. Création transaction
+POST /api/transactions
+{
+  "transaction_id": "TX-A4F2C9B1",
+  "status": "PENDING",
+  "created_at": "2025-07-01T10:00:00Z",
+  "expires_at_admin": "2025-07-03T10:00:00Z"
+}
+
+2. Paiement hors système
+L’utilisateur :
+    • ouvre Wave / Orange Money / MTN / Moov 
+    • envoie 5 000 FCFA + frais opérateur 
+    • conserve la capture écran 
+
+3. Soumission preuve
+POST /api/transactions/:id/proof
+Content-Type: multipart/form-data
+{
+  "image": "[file]",
+  "sender_number": "0701234567",
+  "declared_time": "10h15"
+}
+Retour :
+{
+  "proof_id": "PRF-XXX",
+  "submitted_at": "2025-07-01T10:35:00Z",
+  "image_hash": "a3f9..."
+}
+
+4. Validations backend (bloquantes)
+    1. Transaction existe 
+    2. Status = PENDING 
+    3. Non expirée 
+    4. Hash image unique 
+    5. sender_number valide (CI) 
+Si OK → stockage preuve
+
+5. Traitement admin
+L’admin voit :
+    • image 
+    • sender_number 
+    • timestamp 
+    • métadonnées EXIF 
+Actions :
+    • Valider 
+    • Rejeter (avec motif) 
+
+6A. Validation
+PATCH /api/transactions/:id/validate
+{
+  "status": "COMPLETED",
+  "validated_at": "2025-07-01T14:20:00Z"
+}
+→ abonnement activé
+
+6B. Rejet
+PATCH /api/transactions/:id/reject
+{
+  "reason": "Montant insuffisant"
+}
+→ status = REJECTED
+
+6C. Expiration automatique
+Cron (chaque heure) :
+UPDATE transactions
+SET status = 'EXPIRED',
+    refund_required = true
+WHERE status = 'PENDING'
+AND expires_at_admin < NOW()
+AND proof EXISTS;
+
+4. Scénarios métiers
+✔ Cas normal
+    • paiement correct 
+    • validation admin 
+    • statut COMPLETED 
+
+⚠ Frais opérateur oubliés
+    • montant reçu < 5000 FCFA 
+    • rejet admin 
+    • nouvelle tentative client 
+
+⚠ Admin absent
+    • dépasse 72h 
+    • passage EXPIRED 
+    • remboursement manuel 
+
+🚨 Réutilisation image
+    • hash déjà existant 
+    • rejet automatique immédiat 
+
+🚨 Image modifiée / suspecte
+    • EXIF Photoshop / Canva 
+    • score IA élevé 
+    • rejet ou flag admin 
+
+⚠ 3 tentatives upload dépassées
+    • blocage 429 
+    • support requis 
+
+5. Frontend (structure logique)
+États paiement
+    • PENDING → en attente validation 
+    • COMPLETED → abonnement actif 
+    • REJECTED → paiement refusé 
+    • EXPIRED → délai dépassé 
+
+Champs formulaire preuve
+    • image (jpg/png/webp) 
+    • sender_number (obligatoire) 
+    • declared_time (optionnel) 
+    • compteur tentative (max 3) 
+
+Règles UI
+    • Wave API visible mais désactivé 
+    • paiement manuel actif 
+    • confirmation obligatoire avant envoi 
+
+6. Backend API
+Endpoint
+Rôle
+POST /transactions
+créer transaction
+GET /transactions/:id
+statut client
+POST /transactions/:id/proof
+upload preuve
+PATCH /validate
+validation admin
+PATCH /reject
+rejet admin
+GET /admin/transactions
+dashboard
+PATCH /refund-done
+remboursement
+
+7. Modèle de données
+transactions
+    • id (TX-XXXX) 
+    • user_id 
+    • amount = 5000 
+    • status (PENDING / COMPLETED / REJECTED / EXPIRED) 
+    • created_at 
+    • expires_at_admin 
+    • validated_at 
+    • rejected_at 
+    • rejection_reason 
+    • refund_required 
+    • refund_done 
+
+payment_proofs
+    • id 
+    • transaction_id 
+    • image_url 
+    • image_hash (UNIQUE) 
+    • sender_number 
+    • submitted_at 
+    • declared_payment_time 
+    • upload_attempt 
+    • file_type 
+    • file_size 
+    • exif_data 
+    • ai_suspicion_score 
+    • is_suspicious 
+
+8. Sécurité
+Bloquants
+    • hash image doublon → rejet immédiat 
+    • sender_number invalide → 400 
+    • fichier > 5MB → 413 
+    • format interdit → 415 
+    • 3 uploads max → 429 
+
+Anti-fraude
+    • détection EXIF Photoshop 
+    • score IA suspicion 
+    • comparaison dates EXIF vs transaction 
+    • tracking global hash image 
+
+Accès
+    • client → uniquement ses transactions 
+    • admin → endpoints protégés 
+    • images → URL signée (expiration 1h) 
+
+9. Gestion des erreurs
+Code
+Cas
+Message
+400
+numéro invalide
+numéro CI requis
+403
+accès interdit
+non autorisé
+404
+transaction inconnue
+introuvable
+409
+déjà traité
+transaction déjà validée
+413
+fichier trop lourd
+max 5MB
+415
+format invalide
+JPG/PNG/WEBP uniquement
+429
+trop de tentatives
+support requis
+500
+erreur serveur
+retry sécurisé
+
+10. Cron système
+-- toutes les heures
+SELECT * FROM transactions
+WHERE status = 'PENDING'
+AND expires_at_admin < NOW();
+Actions :
+    • EXPIRED 
+    • refund_required = true 
+    • notification admin 
+
+11. Dashboard admin
+Colonnes
+    • TX ID 
+    • Client 
+    • Montant 
+    • Proof 
+    • sender_number 
+    • Status 
+    • délai restant 
+    • actions 
+
+Onglets transaction
+    • résumé 
+    • preuve 
+    • métadonnées EXIF 
+    • remboursement 
+
+12. Règles critiques
+    • image_hash = UNIQUE global 
+    • une seule preuve active par transaction 
+    • aucune modification après statut final 
+    • remboursement obligatoire si EXPIRED + preuve 
+    • logs admin obligatoires 
+
+13. Points techniques importants
+    • EXIF peut être absent (iOS) 
+    • hash calculé AVANT stockage S3 
+    • polling recommandé (30s) ou SSE 
+    • sender_number doit rester brut (format exact) 
+    • Wave API conservée mais inactive
+

@@ -1,0 +1,294 @@
+﻿Système de paiement manuel — Wave / Mobile Money (CI)
+Modélisation MVP · Côte d'Ivoire uniquement · prêt à évoluer
+
+Vue d’ensemble
+    • Mode actif : Paiement manuel (Wave / Orange Money / MTN / Moov) 
+    • Statut Wave API : configuré mais indisponible (fallback manuel) 
+    • Abonnement : 5 000 FCFA / mois 
+    • Validation : 100% humaine (admin) 
+    • Délai de traitement : 48 à 72 heures (admin) 
+
+1. Flow complet
+Étapes du système
+1. Création de transaction
+    • Le client clique sur “Payer par Mobile Money” 
+    • Génération d’un identifiant : 
+        ◦ TX-XXXXXXXX 
+    • Statut initial : PENDING 
+    • Affichage : 
+        ◦ numéro destinataire 
+        ◦ montant exact (5 000 FCFA) 
+        ◦ instructions 
+
+2. Paiement externe
+    • Le client effectue le paiement hors système : 
+        ◦ Wave 
+        ◦ Orange Money 
+        ◦ MTN Money 
+        ◦ Moov Money 
+    • Le client doit : 
+        ◦ conserver la capture d’écran 
+        ◦ noter le numéro expéditeur 
+
+3. Soumission de preuve
+Champs obligatoires :
+    • capture écran du paiement 
+    • numéro expéditeur 
+    • (optionnel) heure déclarée du paiement 
+Traitement backend :
+    • hash SHA-256 de l’image 
+    • stockage metadata 
+    • timestamp submitted_at 
+
+4. Vérifications automatiques
+Contrôles :
+    • transaction existante 
+    • statut = PENDING 
+    • image unique (anti-doublon) 
+    • sender_number valide 
+    • transaction non expirée 
+Résultat :
+    • OK → en attente admin 
+    • KO → rejet automatique 
+
+5. Validation admin
+L’admin vérifie :
+    • montant réel 
+    • cohérence preuve 
+    • numéro expéditeur 
+    • metadata image 
+Décision :
+    • valider 
+    • rejeter (avec motif) 
+
+6. Résultats finaux
+A. COMPLETED
+    • abonnement activé 
+    • notification client 
+B. REJECTED
+    • motif affiché 
+    • retour à l’étape paiement 
+C. EXPIRED
+    • délai dépassé (48–72h) 
+    • statut EXPIRED 
+    • flag REFUND_REQUIRED 
+
+Règle critique montant
+    • Montant attendu : 5 000 FCFA nets reçus 
+    • Si frais opérateur réduisent le montant : 
+        ◦ rejet automatique 
+        ◦ remboursement manuel 
+    • Message obligatoire avant paiement 
+
+2. Structure des données
+Transaction
+Champ
+Type
+Description
+id
+string
+TX-XXXXXXXX
+user_id
+uuid
+utilisateur
+amount
+integer
+montant FCFA
+status
+enum
+PENDING / COMPLETED / REJECTED / EXPIRED
+created_at
+timestamp
+création
+expires_at_admin
+timestamp
+deadline admin
+validated_at
+timestamp
+validation
+rejected_at
+timestamp
+rejet
+rejection_reason
+string
+motif
+refund_required
+boolean
+remboursement requis
+
+Payment Proof
+Champ
+Type
+Description
+transaction_id
+string
+lien transaction
+image_url
+string
+capture
+image_hash
+string
+SHA-256
+sender_number
+string
+numéro expéditeur
+submitted_at
+timestamp
+date soumission
+declared_payment_time
+timestamp
+optionnel
+file_type
+string
+jpg/png/webp
+file_size_kb
+int
+taille
+resolution
+string
+ex: 1080x1920
+exif_capture_date
+timestamp
+EXIF
+exif_modified_date
+timestamp
+EXIF
+exif_device
+string
+appareil
+ai_suspicion_score
+float
+0–1
+upload_attempt
+int
+max 3
+
+Transitions de statut
+    • PENDING → COMPLETED (validation admin) 
+    • PENDING → REJECTED (fraude / erreur) 
+    • PENDING → EXPIRED (timeout admin) 
+Règle :
+    • COMPLETED et REJECTED sont définitifs 
+
+3. Frontend client
+Page paiement
+Bloc Wave API
+    • déjà existant 
+    • désactivé visuellement 
+    • affiché comme “indisponible” 
+
+Bloc paiement manuel
+    • visible sous Wave 
+    • méthodes : 
+        ◦ Wave manuel 
+        ◦ Orange Money 
+        ◦ MTN Money 
+        ◦ Moov Money 
+
+Informations obligatoires
+Avant paiement :
+    • numéro destinataire 
+    • montant exact : 5 000 FCFA 
+    • frais opérateur inclus 
+    • délai 48–72h 
+    • preuve obligatoire 
+
+Formulaire preuve
+Champs :
+    • numéro expéditeur (obligatoire) 
+    • capture écran (obligatoire) 
+    • heure paiement (optionnel) 
+Contraintes :
+    • format image : jpg / png / webp 
+    • max 3 tentatives 
+
+États client
+PENDING
+“Votre preuve est en cours de vérification (48–72h)”
+COMPLETED
+“Paiement validé, abonnement actif”
+REJECTED
+“Paiement rejeté + motif”
+EXPIRED
+“Délai dépassé, remboursement en cours”
+
+Message de sécurité
+    • utiliser numéro officiel uniquement 
+    • envoyer 5 000 FCFA nets 
+    • conserver capture 
+    • noter numéro expéditeur 
+    • remboursement si erreur montant 
+    • délai max 72h 
+
+4. Dashboard admin
+Tableau principal
+    • transaction_id 
+    • user (nom + email) 
+    • amount 
+    • created_at 
+    • submitted_at 
+    • sender_number 
+    • status 
+    • temps écoulé 
+    • actions (valider / rejeter) 
+
+Détails image
+    • aperçu image 
+    • type fichier 
+    • taille 
+    • résolution 
+    • EXIF (date, device) 
+    • SHA-256 hash 
+    • score IA suspicion 
+    • détection doublons 
+
+Filtres
+    • PENDING 
+    • COMPLETED 
+    • REJECTED 
+    • EXPIRED 
+    • REFUND_REQUIRED 
+
+Remboursement
+Si EXPIRED + preuve soumise :
+    • afficher sender_number 
+    • afficher montant 
+    • action manuelle de remboursement 
+
+5. Sécurité
+Anti-fraude
+    • SHA-256 unique par image 
+    • sender_number obligatoire 
+    • max 3 uploads 
+    • expiration automatique 48–72h 
+    • validation humaine obligatoire 
+    • extraction EXIF 
+    • détection doublons 
+
+Limites système
+    • pas de validation automatique Wave (phase 1) 
+    • pas de bypass admin 
+    • pas de modification après décision finale 
+
+6. Règles métier
+Règles fondamentales
+    1. 1 transaction = 1 paiement 
+    2. aucune validation sans preuve 
+    3. statuts finaux immuables 
+    4. EXPIRED + preuve = remboursement obligatoire 
+    5. montant exact obligatoire (5 000 FCFA nets) 
+    6. sender_number obligatoire 
+    7. pas de contrainte côté client pour soumission 
+    8. système limité à la Côte d’Ivoire uniquement 
+
+Roadmap
+Phase 1 — actuelle
+    • système manuel complet 
+    • validation admin 
+Phase 2
+    • intégration API Wave 
+    • vérification automatique hybride 
+Phase 3
+    • automatisation partielle 
+    • détection intelligente des paiements
+
