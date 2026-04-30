@@ -33,4 +33,43 @@ describe('ExifExtractorService', () => {
 
     expect(suspicious).toBe(true);
   });
+
+  it('extracts software, dates and device from structured EXIF tags', async () => {
+    const withExif = await sharp({
+      create: {
+        width: 900,
+        height: 700,
+        channels: 3,
+        background: { r: 120, g: 90, b: 80 },
+      },
+    })
+      .jpeg()
+      .withExif({
+        IFD0: {
+          Make: 'Apple',
+          Model: 'iPhone 14',
+          Software: 'Adobe Photoshop 2025',
+          DateTime: '2026:04:30 11:12:13',
+        },
+        EXIF: {
+          DateTimeOriginal: '2026:04:30 10:11:12',
+          DateTimeDigitized: '2026:04:30 10:11:13',
+        },
+      })
+      .toBuffer();
+
+    const exif = await service.extract(withExif);
+
+    expect(exif.hasExif).toBe(true);
+    expect(exif.device).toContain('Apple');
+    expect(exif.device).toContain('iPhone 14');
+    expect(exif.software).toContain('Photoshop');
+    expect(
+      exif.captureDate === null || exif.captureDate instanceof Date,
+    ).toBe(true);
+    expect(
+      exif.modifiedDate === null || exif.modifiedDate instanceof Date,
+    ).toBe(true);
+    expect(service.detectSuspiciousSoftware(exif)).toBe(true);
+  });
 });

@@ -16,6 +16,7 @@ import { PaymentManualService } from '../services/payment-manual.service';
 import { RejectProofDto } from '../dto/reject-proof.dto';
 import { ValidateProofDto } from '../dto/validate-proof.dto';
 import { AdminFilterDto } from '../dto/admin-filter.dto';
+import { ReopenProofDto } from '../dto/reopen-proof.dto';
 import { AdminRealtimeService } from '../../../common/realtime/admin-realtime.service';
 import type { Observable } from 'rxjs';
 
@@ -55,6 +56,16 @@ export class PaymentManualAdminController {
     @Body() dto: RejectProofDto,
   ) {
     await this.paymentManualService.rejectProof(id, adminId, dto.reason);
+    return { success: true };
+  }
+
+  @Patch('payment-proofs/:id/reopen')
+  async reopen(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: ReopenProofDto,
+  ) {
+    await this.paymentManualService.reopenProof(id, adminId, dto.reason);
     return { success: true };
   }
 

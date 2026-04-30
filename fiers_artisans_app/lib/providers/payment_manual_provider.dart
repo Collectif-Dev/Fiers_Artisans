@@ -11,12 +11,14 @@ class PaymentManualState {
   final bool isLoading;
   final String? error;
   final bool hasSubmittedProof;
+  final String? transientMessage;
 
   const PaymentManualState({
     this.currentTransaction,
     this.isLoading = false,
     this.error,
     this.hasSubmittedProof = false,
+    this.transientMessage,
   });
 
   PaymentManualState copyWith({
@@ -25,12 +27,17 @@ class PaymentManualState {
     String? error,
     bool clearError = false,
     bool? hasSubmittedProof,
+    String? transientMessage,
+    bool clearTransientMessage = false,
   }) {
     return PaymentManualState(
       currentTransaction: currentTransaction ?? this.currentTransaction,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       hasSubmittedProof: hasSubmittedProof ?? this.hasSubmittedProof,
+      transientMessage: clearTransientMessage
+          ? null
+          : (transientMessage ?? this.transientMessage),
     );
   }
 }
@@ -41,19 +48,24 @@ final paymentManualProvider =
 });
 
 class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
-  final PaymentManualRepository _repository = PaymentManualRepository();
-  final ChatRealtimeService _realtime = ChatRealtimeService();
+  final PaymentManualRepositoryContract _repository;
+  final Stream<ChatRealtimeEvent> _domainEvents;
+  final Duration pollingInterval;
 
   Timer? _pollingTimer;
   StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
-  PaymentManualNotifier() : super(const PaymentManualState()) {
-    _realtimeSub = _realtime.domainEvents.listen((event) {
+  PaymentManualNotifier({
+    PaymentManualRepositoryContract? repository,
+    ChatRealtimeService? realtime,
+    Stream<ChatRealtimeEvent>? domainEvents,
+    this.pollingInterval = const Duration(seconds: 30),
+  })  : _repository = repository ?? PaymentManualRepository(),
+        _domainEvents = domainEvents ?? (realtime ?? ChatRealtimeService()).domainEvents,
+        super(const PaymentManualState()) {
+    _realtimeSub = _domainEvents.listen((event) {
       if (event.event == 'manualPaymentUpdated') {
-        final txId = event.payload['transactionId']?.toString();
-        if (txId != null && txId == state.currentTransaction?.transactionId) {
-          fetchStatus();
-        }
+        unawaited(_handleManualPaymentUpdated(event.payload));
       }
     });
   }
@@ -86,12 +98,57 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
     try {
       final tx = await _repository.fetchStatus(transactionId: txId);
-      state = state.copyWith(currentTransaction: tx);
+      state = state.copyWith(
+        currentTransaction: tx,
+        hasSubmittedProof: tx.status == 'REJECTED' ? false : state.hasSubmittedProof,
+      );
       if (tx.isCompleted) {
         _pollingTimer?.cancel();
       }
     } catch (e) {
       state = state.copyWith(error: e.toString());
+    }
+  }
+
+  Future<void> _handleManualPaymentUpdated(Map<String, dynamic> payload) async {
+    final txId = payload['transactionId']?.toString();
+    final previousStatus = state.currentTransaction?.status;
+    final payloadStatus = payload['status']?.toString();
+    final payloadReason = payload['rejectionReason']?.toString();
+    final payloadRefundDone = payload['refundDone'] == true;
+    final payloadRefundRequired = payload['refundRequired'] == true;
+
+    if (txId != null && txId.isNotEmpty) {
+      try {
+        final latest = await _repository.fetchStatus(transactionId: txId);
+        final statusChanged = previousStatus == null || previousStatus != latest.status;
+        state = state.copyWith(
+          currentTransaction: latest,
+          hasSubmittedProof: latest.status == 'REJECTED' ? false : state.hasSubmittedProof,
+          transientMessage: statusChanged
+              ? _statusMessage(
+                  latest.status,
+                  rejectionReason: latest.rejectionReason ?? payloadReason,
+                  refundDone: payloadRefundDone,
+                  refundRequired: latest.refundRequired,
+                )
+              : null,
+        );
+        return;
+      } catch (_) {
+        // Fallback to payload-only status message when API refresh fails.
+      }
+    }
+
+    if (payloadStatus != null && payloadStatus.isNotEmpty) {
+      state = state.copyWith(
+        transientMessage: _statusMessage(
+          payloadStatus,
+          rejectionReason: payloadReason,
+          refundDone: payloadRefundDone,
+          refundRequired: payloadRefundRequired,
+        ),
+      );
     }
   }
 
@@ -127,10 +184,45 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     state = const PaymentManualState();
   }
 
+  void clearTransientMessage() {
+    state = state.copyWith(clearTransientMessage: true);
+  }
+
   void _startPolling() {
     _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _pollingTimer = Timer.periodic(pollingInterval, (_) {
       fetchStatus();
     });
+  }
+
+  String _statusMessage(
+    String status, {
+    String? rejectionReason,
+    required bool refundDone,
+    required bool refundRequired,
+  }) {
+    if (refundDone) {
+      return 'Un remboursement a ete effectue.';
+    }
+
+    switch (status) {
+      case 'COMPLETED':
+        return 'Votre paiement a ete valide. Abonnement actif.';
+      case 'REJECTED':
+        if (rejectionReason != null && rejectionReason.trim().isNotEmpty) {
+          return 'Preuve rejetee : ${rejectionReason.trim()}';
+        }
+        return 'Votre preuve a ete rejetee.';
+      case 'EXPIRED':
+        return refundRequired
+            ? 'Votre demande a expire. Un remboursement est necessaire.'
+            : 'Votre demande a expire.';
+      case 'PENDING_ADMIN':
+        return 'Votre demande de paiement est en attente de validation par nos equipes.';
+      case 'PENDING':
+        return 'Transaction initiee - veuillez soumettre votre preuve.';
+      default:
+        return 'Statut de paiement mis a jour.';
+    }
   }
 }

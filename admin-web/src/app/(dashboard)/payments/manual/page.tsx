@@ -7,6 +7,7 @@ import {
   getManualPaymentDetails,
   validateManualPayment,
   rejectManualPayment,
+  reopenManualPayment,
   markManualPaymentRefunded,
   fetchFileBlob,
 } from '@/lib/api';
@@ -80,6 +81,7 @@ export default function PaymentManualPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
+  const [proofZoomOpen, setProofZoomOpen] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -144,10 +146,11 @@ export default function PaymentManualPage() {
     setProofPreviewUrl(null);
     setSelected(null);
     setRejectReason('');
+    setProofZoomOpen(false);
     setDetailsOpen(false);
   };
 
-  const applyAction = async (action: 'validate' | 'reject' | 'refund') => {
+  const applyAction = async (action: 'validate' | 'reject' | 'refund' | 'reopen') => {
     if (!selected) return;
     if (action === 'reject' && rejectReason.trim().length < 5) {
       toast.error(t('reason'));
@@ -160,6 +163,11 @@ export default function PaymentManualPage() {
         await validateManualPayment(selected.id);
       } else if (action === 'reject') {
         await rejectManualPayment(selected.id, rejectReason.trim());
+      } else if (action === 'reopen') {
+        await reopenManualPayment(
+          selected.id,
+          rejectReason.trim().length >= 5 ? rejectReason.trim() : undefined,
+        );
       } else {
         await markManualPaymentRefunded(selected.id);
       }
@@ -251,6 +259,7 @@ export default function PaymentManualPage() {
                       <TableHead>{t('client')}</TableHead>
                       <TableHead>{t('amount')}</TableHead>
                       <TableHead>{t('provider')}</TableHead>
+                      <TableHead>{t('sender_number')}</TableHead>
                       <TableHead>{t('submitted_at')}</TableHead>
                       <TableHead>{t('status')}</TableHead>
                       <TableHead className="text-right">{t('actions')}</TableHead>
@@ -267,6 +276,7 @@ export default function PaymentManualPage() {
                           {item.amount_fcfa.toLocaleString(locale === 'fr' ? 'fr-FR' : 'en-US')} FCFA
                         </TableCell>
                         <TableCell>{formatProvider(item.provider)}</TableCell>
+                        <TableCell>{item.sender_number || '—'}</TableCell>
                         <TableCell>
                           {new Date(item.created_at).toLocaleString(locale === 'fr' ? 'fr-FR' : 'en-US')}
                         </TableCell>
@@ -311,7 +321,7 @@ export default function PaymentManualPage() {
       </Card>
 
       <Dialog open={detailsOpen} onOpenChange={(open) => (!open ? closeDetails() : setDetailsOpen(true))}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('details')}</DialogTitle>
             <DialogDescription>
@@ -322,11 +332,21 @@ export default function PaymentManualPage() {
           {detailsLoading || !selected ? (
             <Skeleton className="h-64 w-full" />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="space-y-3">
                 {proofPreviewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={proofPreviewUrl} alt="proof" className="w-full rounded border max-h-[340px] object-contain" />
+                  <button
+                    type="button"
+                    className="w-full rounded border bg-black/20"
+                    onClick={() => setProofZoomOpen(true)}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={proofPreviewUrl}
+                      alt="proof"
+                      className="w-full rounded max-h-[70vh] object-contain"
+                    />
+                  </button>
                 ) : (
                   <div className="h-[240px] rounded border flex items-center justify-center text-muted-foreground text-sm">
                     {t('proofs')}
@@ -345,6 +365,7 @@ export default function PaymentManualPage() {
                 <p><strong>{t('status')}:</strong> {selected.status}</p>
                 <p><strong>{t('amount')}:</strong> {selected.amount_fcfa} FCFA</p>
                 <p><strong>{t('provider')}:</strong> {formatProvider(selected.provider)}</p>
+                <p><strong>{t('sender_number')}:</strong> {selected.sender_number || '—'}</p>
                 <p><strong>{t('proofs')}:</strong> {selected.proofs?.length || 0}</p>
                 <p><strong>{t('timeline')}:</strong> {selected.timeline?.length || 0}</p>
 
@@ -357,7 +378,7 @@ export default function PaymentManualPage() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={closeDetails} disabled={actionLoading}>
               {tApp('cancel')}
             </Button>
@@ -378,7 +399,30 @@ export default function PaymentManualPage() {
             >
               {t('mark_refunded')}
             </Button>
+            <Button
+              variant="secondary"
+              onClick={() => void applyAction('reopen')}
+              disabled={actionLoading || !selected || !['REJECTED', 'EXPIRED'].includes(selected.status)}
+            >
+              {t('reopen')}
+            </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={proofZoomOpen} onOpenChange={setProofZoomOpen}>
+        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('proofs')}</DialogTitle>
+          </DialogHeader>
+          {proofPreviewUrl ? (
+            <div className="w-full rounded border bg-black/20 p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={proofPreviewUrl} alt="proof-large" className="w-full max-h-[82vh] object-contain" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('no_data')}</p>
+          )}
         </DialogContent>
       </Dialog>
     </div>

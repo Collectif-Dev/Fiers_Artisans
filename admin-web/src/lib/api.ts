@@ -324,6 +324,10 @@ export async function rejectManualPayment(id: string, reason: string): Promise<v
   await api.patch(`/admin/payment-proofs/${id}/reject`, { reason });
 }
 
+export async function reopenManualPayment(id: string, reason?: string): Promise<void> {
+  await api.patch(`/admin/payment-proofs/${id}/reopen`, { reason });
+}
+
 export async function markManualPaymentRefunded(id: string): Promise<void> {
   await api.patch(`/admin/payment-proofs/${id}/mark-refunded`);
 }

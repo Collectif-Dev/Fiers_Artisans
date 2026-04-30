@@ -33,6 +33,10 @@ describe('PaymentManualService', () => {
     findOne: jest.fn(),
   } as unknown as Repository<any>;
 
+  const userRepository = {
+    find: jest.fn(),
+  } as unknown as Repository<any>;
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -41,6 +45,7 @@ describe('PaymentManualService', () => {
       paymentProofRepository,
       subscriptionRepository,
       artisanProfileRepository,
+      userRepository,
       {
         uploadRaw: jest.fn(),
         getSignedUrl: jest.fn(),
@@ -74,6 +79,10 @@ describe('PaymentManualService', () => {
           if (key === 'PAYMENT_MANUAL_AMOUNT_FCFA') return 5000;
           if (key === 'PAYMENT_MANUAL_EXPIRY_HOURS') return 72;
           if (key === 'minio.buckets.paymentProofs') return 'payment-proofs';
+          if (key === 'PAYMENT_MANUAL_UPLOADS_PER_DAY_LIMIT') return 12;
+          if (key === 'PAYMENT_MANUAL_SUBMIT_BURST_LIMIT') return 5;
+          if (key === 'PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS') return 300;
+          if (key === 'PAYMENT_MANUAL_DISABLE_REDIS_RATE_LIMIT') return 'true';
           return undefined;
         }),
       } as any,
@@ -114,5 +123,18 @@ describe('PaymentManualService', () => {
 
     expect(result.id).toBe('pm-1');
     expect(paymentManualRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('returns operator-specific recipient numbers', () => {
+    expect(service.getRecipientNumberForProvider(PaymentProviderManual.ORANGE_MONEY)).toBe('0703063570');
+    expect(service.getRecipientNumberForProvider(PaymentProviderManual.MTN_MOMO)).toBe('0503265984');
+    expect(service.getRecipientNumberForProvider(PaymentProviderManual.WAVE)).toBe('0703063570');
+    expect(service.getRecipientNumberForProvider(PaymentProviderManual.MOOV_MONEY)).toBeNull();
+  });
+
+  it('rejects initiation when provider is unavailable', async () => {
+    await expect(
+      service.initiatePayment('user-1', PaymentProviderManual.MOOV_MONEY),
+    ).rejects.toBeInstanceOf(BusinessException);
   });
 });

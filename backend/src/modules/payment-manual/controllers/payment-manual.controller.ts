@@ -33,13 +33,15 @@ export class PaymentManualController {
     @Body() dto: CreatePaymentManualDto,
   ) {
     const payment = await this.paymentManualService.initiatePayment(userId, dto.provider);
+    const recipientNumber = this.paymentManualService.getRecipientNumberForProvider(payment.provider);
     return {
       transaction_id: payment.transaction_id,
       provider: payment.provider,
       amount_fcfa: payment.amount_fcfa,
       status: payment.status,
       expires_at_admin: payment.expires_at_admin,
-      recipient_number: process.env.PAYMENT_MANUAL_RECIPIENT_NUMBER || process.env.WAVE_MERCHANT_ID || 'N/A',
+      recipient_number: recipientNumber,
+      provider_available: this.paymentManualService.isProviderAvailable(payment.provider),
     };
   }
 
@@ -49,7 +51,11 @@ export class PaymentManualController {
     @CurrentUser('id') userId: string,
   ) {
     const payment = await this.paymentManualService.getStatus(transactionId, userId);
-    return payment;
+    return {
+      ...payment,
+      recipient_number: this.paymentManualService.getRecipientNumberForProvider(payment.provider),
+      provider_available: this.paymentManualService.isProviderAvailable(payment.provider),
+    };
   }
 
   @Post(':transactionId/submit-proof')

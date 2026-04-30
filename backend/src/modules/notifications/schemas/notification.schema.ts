@@ -16,6 +16,12 @@ export class Notification extends Document {
       'DOCUMENT_APPROVED',
       'DOCUMENT_REJECTED',
       'PAYMENT_SUCCESS',
+      'PAYMENT_MANUAL_VALIDATED',
+      'PAYMENT_MANUAL_REJECTED',
+      'PAYMENT_MANUAL_REOPENED',
+      'PAYMENT_MANUAL_EXPIRED',
+      'PAYMENT_MANUAL_INTEGRITY_ALERT',
+      'REFUND_PROCESSED',
     ],
   })
   type: string;

@@ -4,15 +4,19 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  HttpStatus,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { randomBytes, createHash, randomUUID } from 'node:crypto';
+import Redis from 'ioredis';
 import { PaymentManual, PaymentManualStatus, PaymentProviderManual } from '../entities/payment-manual.entity';
 import { PaymentProof } from '../entities/payment-proof.entity';
 import { Subscription, SubscriptionStatus } from '../../subscription/entities/subscription.entity';
 import { ArtisanProfile } from '../../users/entities/artisan-profile.entity';
+import { User, UserRole } from '../../users/entities/user.entity';
 import { MediaService } from '../../media/media.service';
 import { SubscriptionService } from '../../subscription/subscription.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -30,13 +34,25 @@ interface AdminListFilters {
   sort?: 'asc' | 'desc' | string;
 }
 
+const MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER: Record<PaymentProviderManual, string | null> = {
+  [PaymentProviderManual.ORANGE_MONEY]: '0703063570',
+  [PaymentProviderManual.MTN_MOMO]: '0503265984',
+  [PaymentProviderManual.WAVE]: '0703063570',
+  [PaymentProviderManual.MOOV_MONEY]: null,
+};
+
 @Injectable()
-export class PaymentManualService {
+export class PaymentManualService implements OnModuleDestroy {
   private readonly logger = new Logger(PaymentManualService.name);
   private readonly amountFcfa: number;
   private readonly expiryHours: number;
   private readonly bucket: string;
-  private readonly recipientNumber: string;
+  private readonly dailyUploadLimit: number;
+  private readonly submitBurstLimit: number;
+  private readonly submitBurstTtlSeconds: number;
+  private readonly maxExpireBatchLoops: number;
+  private readonly disableRedisRateLimit: boolean;
+  private rateLimitRedis: Redis | null = null;
 
   constructor(
     @InjectRepository(PaymentManual)
@@ -47,6 +63,8 @@ export class PaymentManualService {
     private readonly subscriptionRepository: Repository<Subscription>,
     @InjectRepository(ArtisanProfile)
     private readonly artisanProfileRepository: Repository<ArtisanProfile>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly mediaService: MediaService,
     private readonly subscriptionService: SubscriptionService,
     private readonly notificationsService: NotificationsService,
@@ -63,13 +81,41 @@ export class PaymentManualService {
       this.configService.get<string>('minio.buckets.paymentProofs') ||
       this.configService.get<string>('MINIO_PAYMENT_PROOF_BUCKET') ||
       'payment-proofs';
-    this.recipientNumber =
-      this.configService.get<string>('PAYMENT_MANUAL_RECIPIENT_NUMBER') ||
-      this.configService.get<string>('WAVE_MERCHANT_ID') ||
-      'N/A';
+    this.dailyUploadLimit = Math.max(
+      1,
+      Number(this.configService.get('PAYMENT_MANUAL_UPLOADS_PER_DAY_LIMIT') || 12),
+    );
+    this.submitBurstLimit = Math.max(
+      1,
+      Number(this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_LIMIT') || 5),
+    );
+    this.submitBurstTtlSeconds = Math.max(
+      30,
+      Number(this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS') || 300),
+    );
+    this.maxExpireBatchLoops = Math.max(
+      1,
+      Number(this.configService.get('PAYMENT_MANUAL_EXPIRE_BATCH_LOOPS') || 30),
+    );
+    this.disableRedisRateLimit =
+      String(this.configService.get('PAYMENT_MANUAL_DISABLE_REDIS_RATE_LIMIT') || 'false') === 'true';
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.rateLimitRedis) {
+      await this.rateLimitRedis.quit().catch(() => null);
+      this.rateLimitRedis = null;
+    }
   }
 
   async initiatePayment(userId: string, provider: PaymentProviderManual): Promise<PaymentManual> {
+    if (!this.isProviderAvailable(provider)) {
+      throw new BusinessException(
+        'PAYMENT_MANUAL_PROVIDER_UNAVAILABLE',
+        'Le paiement manuel via Moov Money n\'est pas encore disponible.',
+      );
+    }
+
     const artisanProfile = await this.artisanProfileRepository.findOne({
       where: { user_id: userId },
       select: ['id', 'user_id', 'is_subscription_active'],
@@ -201,8 +247,10 @@ export class PaymentManualService {
       throw new BusinessException(
         'PAYMENT_MANUAL_MAX_ATTEMPTS',
         'Limite de 3 tentatives atteinte pour cette transaction.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+    await this.enforceProofSubmissionRateLimit(params.userId);
 
     const validation = await this.proofValidationService.validateImage(params.file);
     const imageHash = createHash('sha256').update(params.file.buffer).digest('hex');
@@ -407,7 +455,7 @@ export class PaymentManualService {
         userId: artisanUserId,
         type: 'PAYMENT_MANUAL_REJECTED',
         title: 'Preuve rejetee',
-        body: 'Votre preuve de paiement a ete rejetee. Vous pouvez en soumettre une nouvelle.',
+        body: `Preuve rejetee : ${reason}`,
         data: {
           paymentId: payment.id,
           transactionId: payment.transaction_id,
@@ -430,68 +478,162 @@ export class PaymentManualService {
       paymentId: payment.id,
       transactionId: payment.transaction_id,
       status: payment.status,
+      rejectionReason: reason,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async reopenProof(paymentId: string, adminId: string, reason?: string): Promise<void> {
+    const payment = await this.paymentManualRepository.findOne({
+      where: { id: paymentId, deleted_at: IsNull() },
+      relations: ['subscription', 'subscription.artisan_profile'],
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Paiement manuel introuvable.');
+    }
+
+    if (![PaymentManualStatus.REJECTED, PaymentManualStatus.EXPIRED].includes(payment.status)) {
+      throw new BadRequestException('Seuls les paiements rejetes ou expires peuvent etre rouverts.');
+    }
+
+    const activeProofs = await this.paymentProofRepository.find({
+      where: {
+        payment_manual_id: payment.id,
+        deleted_at: IsNull(),
+      },
+    });
+    const now = new Date();
+    const expiresAtAdmin = new Date(now.getTime() + this.expiryHours * 60 * 60 * 1000);
+
+    if (activeProofs.length > 0) {
+      for (const proof of activeProofs) {
+        proof.deleted_at = now;
+        proof.deletion_requested = true;
+      }
+      await this.paymentProofRepository.save(activeProofs);
+    }
+
+    payment.status = PaymentManualStatus.PENDING;
+    payment.rejected_at = null;
+    payment.rejection_reason = null;
+    payment.refund_required = false;
+    payment.expires_at_admin = expiresAtAdmin;
+    payment.timeline = [
+      ...(payment.timeline || []),
+      this.timelineEvent('PAYMENT_MANUAL_REOPENED', {
+        byAdminId: adminId,
+        reason: reason || null,
+        resetAttemptsFrom: activeProofs.length,
+      }),
+    ];
+    await this.paymentManualRepository.save(payment);
+
+    const artisanUserId = payment.subscription?.artisan_profile?.user_id;
+    if (artisanUserId) {
+      await this.notificationsService.create({
+        userId: artisanUserId,
+        type: 'PAYMENT_MANUAL_REOPENED',
+        title: 'Preuve a soumettre de nouveau',
+        body: 'Votre paiement manuel a ete rouvert. Vous pouvez soumettre une nouvelle preuve.',
+        data: {
+          paymentId: payment.id,
+          transactionId: payment.transaction_id,
+        },
+      });
+    }
+
+    this.analyticsService.logActivity({
+      actorId: adminId,
+      action: 'PAYMENT_MANUAL_REOPENED',
+      targetId: payment.id,
+      metadata: {
+        transactionId: payment.transaction_id,
+        resetAttemptsFrom: activeProofs.length,
+      },
+    }).catch(() => {});
+
+    await this.paymentRealtimeService.emitPaymentUpdated({
+      userId: artisanUserId,
+      paymentId: payment.id,
+      transactionId: payment.transaction_id,
+      status: payment.status,
+      rejectionReason: null,
+      refundRequired: false,
       updatedAt: new Date().toISOString(),
     });
   }
 
   async expirePayments(): Promise<number> {
-    const now = new Date();
+    let totalExpired = 0;
 
-    const stale = await this.paymentManualRepository.find({
-      where: {
-        status: PaymentManualStatus.PENDING_ADMIN,
-        expires_at_admin: LessThan(now),
-        deleted_at: IsNull(),
-      },
-      relations: ['subscription', 'subscription.artisan_profile'],
-      take: 200,
-    });
-
-    for (const payment of stale) {
-      payment.status = PaymentManualStatus.EXPIRED;
-      payment.refund_required = true;
-      payment.attempted_refund_count = (payment.attempted_refund_count || 0) + 1;
-      payment.timeline = [
-        ...(payment.timeline || []),
-        this.timelineEvent('PAYMENT_MANUAL_EXPIRED', {
-          reason: 'PENDING_ADMIN_TIMEOUT',
-        }),
-      ];
-      await this.paymentManualRepository.save(payment);
-
-      const artisanUserId = payment.subscription?.artisan_profile?.user_id;
-      if (artisanUserId) {
-        await this.notificationsService.create({
-          userId: artisanUserId,
-          type: 'PAYMENT_MANUAL_EXPIRED',
-          title: 'Paiement expire',
-          body: 'Votre preuve n\'a pas ete traitee a temps. Un remboursement est requis.',
-          data: {
-            paymentId: payment.id,
-            transactionId: payment.transaction_id,
-            refundRequired: true,
-          },
-        });
-      }
-
-      await this.paymentRealtimeService.emitPaymentUpdated({
-        userId: artisanUserId,
-        paymentId: payment.id,
-        transactionId: payment.transaction_id,
-        status: payment.status,
-        refundRequired: true,
-        updatedAt: new Date().toISOString(),
+    for (let i = 0; i < this.maxExpireBatchLoops; i += 1) {
+      const now = new Date();
+      const stale = await this.paymentManualRepository.find({
+        where: {
+          status: PaymentManualStatus.PENDING_ADMIN,
+          expires_at_admin: LessThan(now),
+          deleted_at: IsNull(),
+        },
+        relations: ['subscription', 'subscription.artisan_profile'],
+        take: 200,
       });
 
-      this.analyticsService.logActivity({
-        actorId: 'system',
-        action: 'PAYMENT_MANUAL_EXPIRED',
-        targetId: payment.id,
-        metadata: { transactionId: payment.transaction_id },
-      }).catch(() => {});
+      if (stale.length === 0) {
+        break;
+      }
+
+      for (const payment of stale) {
+        payment.status = PaymentManualStatus.EXPIRED;
+        payment.refund_required = true;
+        payment.attempted_refund_count = (payment.attempted_refund_count || 0) + 1;
+        payment.timeline = [
+          ...(payment.timeline || []),
+          this.timelineEvent('PAYMENT_MANUAL_EXPIRED', {
+            reason: 'PENDING_ADMIN_TIMEOUT',
+          }),
+        ];
+        await this.paymentManualRepository.save(payment);
+
+        const artisanUserId = payment.subscription?.artisan_profile?.user_id;
+        if (artisanUserId) {
+          await this.notificationsService.create({
+            userId: artisanUserId,
+            type: 'PAYMENT_MANUAL_EXPIRED',
+            title: 'Paiement expire',
+            body: 'Votre preuve n\'a pas ete traitee a temps. Un remboursement est requis.',
+            data: {
+              paymentId: payment.id,
+              transactionId: payment.transaction_id,
+              refundRequired: true,
+            },
+          });
+        }
+
+        await this.paymentRealtimeService.emitPaymentUpdated({
+          userId: artisanUserId,
+          paymentId: payment.id,
+          transactionId: payment.transaction_id,
+          status: payment.status,
+          refundRequired: true,
+          updatedAt: new Date().toISOString(),
+        });
+
+        this.analyticsService.logActivity({
+          actorId: 'system',
+          action: 'PAYMENT_MANUAL_EXPIRED',
+          targetId: payment.id,
+          metadata: { transactionId: payment.transaction_id },
+        }).catch(() => {});
+      }
+
+      totalExpired += stale.length;
+      if (stale.length < 200) {
+        break;
+      }
     }
 
-    return stale.length;
+    return totalExpired;
   }
 
   async markRefundDone(paymentId: string, adminId: string): Promise<void> {
@@ -545,6 +687,7 @@ export class PaymentManualService {
       transactionId: payment.transaction_id,
       status: payment.status,
       refundRequired: false,
+      refundDone: true,
       updatedAt: new Date().toISOString(),
     });
   }
@@ -635,6 +778,7 @@ export class PaymentManualService {
     });
 
     let mismatches = 0;
+    const incidentProofIds: string[] = [];
 
     for (const proof of proofs) {
       try {
@@ -645,18 +789,147 @@ export class PaymentManualService {
 
         if (currentHash !== proof.image_hash_sha256) {
           mismatches += 1;
-          this.logger.error(`Hash mismatch for payment proof ${proof.id}`);
+          incidentProofIds.push(proof.id);
+          this.logger.error(
+            `Hash mismatch for payment proof ${proof.id}: expected=${proof.image_hash_sha256} actual=${currentHash}`,
+          );
         }
       } catch (error) {
         mismatches += 1;
+        incidentProofIds.push(proof.id);
         this.logger.error(`Hash verification failed for proof ${proof.id}: ${error}`);
       }
+    }
+
+    if (mismatches > 0) {
+      await this.notifyIntegrityAlert(proofs.length, mismatches, incidentProofIds);
     }
 
     return {
       checked: proofs.length,
       mismatches,
     };
+  }
+
+  private async enforceProofSubmissionRateLimit(userId: string): Promise<void> {
+    if (this.disableRedisRateLimit) {
+      return;
+    }
+
+    try {
+      const redis = this.getRateLimitRedis();
+      const dayKey = this.dailyUploadKey(userId);
+      const burstKey = `PAYMENT_SUBMIT_THROTTLE:${userId}`;
+
+      const dayCount = await redis.incr(dayKey);
+      if (dayCount === 1) {
+        await redis.expire(dayKey, this.secondsUntilUtcDayEnd());
+      }
+      if (dayCount > this.dailyUploadLimit) {
+        throw new BusinessException(
+          'PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT',
+          'Limite quotidienne des envois de preuve atteinte.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      const burstCount = await redis.incr(burstKey);
+      if (burstCount === 1) {
+        await redis.expire(burstKey, this.submitBurstTtlSeconds);
+      }
+      if (burstCount > this.submitBurstLimit) {
+        throw new BusinessException(
+          'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT',
+          'Trop de soumissions en peu de temps. Reessayez plus tard.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    } catch (error) {
+      if (error instanceof BusinessException) {
+        throw error;
+      }
+      this.logger.warn(
+        `Redis rate-limit unavailable for payment manual submit (user ${userId}): ${error}`,
+      );
+    }
+  }
+
+  private getRateLimitRedis(): Redis {
+    if (this.rateLimitRedis) {
+      return this.rateLimitRedis;
+    }
+
+    this.rateLimitRedis = new Redis({
+      host: this.configService.get<string>('redis.host') || 'localhost',
+      port: this.configService.get<number>('redis.port') || 6379,
+      password: this.configService.get<string>('redis.password') || undefined,
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: false,
+      retryStrategy: () => null,
+    });
+
+    this.rateLimitRedis.on('error', (err) => {
+      this.logger.warn(`Payment manual Redis rate-limit error: ${err}`);
+    });
+
+    return this.rateLimitRedis;
+  }
+
+  private dailyUploadKey(userId: string): string {
+    const now = new Date();
+    const yyyy = now.getUTCFullYear();
+    const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(now.getUTCDate()).padStart(2, '0');
+    return `PAYMENT_UPLOAD:${userId}:${yyyy}${mm}${dd}`;
+  }
+
+  private secondsUntilUtcDayEnd(): number {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(24, 0, 0, 0);
+    return Math.max(60, Math.ceil((next.getTime() - now.getTime()) / 1000));
+  }
+
+  private async notifyIntegrityAlert(
+    checked: number,
+    mismatches: number,
+    proofIds: string[],
+  ): Promise<void> {
+    const admins = await this.userRepository.find({
+      where: { role: UserRole.ADMIN, is_active: true },
+      select: ['id'],
+      take: 50,
+    });
+
+    if (admins.length === 0) {
+      return;
+    }
+
+    const sample = proofIds.slice(0, 10);
+    await Promise.all(
+      admins.map((admin) =>
+        this.notificationsService.create({
+          userId: admin.id,
+          type: 'PAYMENT_MANUAL_INTEGRITY_ALERT',
+          title: 'Alerte integrite paiement manuel',
+          body: `${mismatches} preuve(s) presentent une incoherence de hash sur ${checked} verifiees.`,
+          data: {
+            checked,
+            mismatches,
+            sampleProofIds: sample,
+          },
+        }).catch(() => null),
+      ),
+    );
+  }
+
+  getRecipientNumberForProvider(provider: PaymentProviderManual): string | null {
+    return MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER[provider] ?? null;
+  }
+
+  isProviderAvailable(provider: PaymentProviderManual): boolean {
+    return this.getRecipientNumberForProvider(provider) !== null;
   }
 
   private async findOwnedPaymentByTransactionId(

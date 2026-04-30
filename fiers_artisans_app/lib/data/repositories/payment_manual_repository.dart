@@ -4,7 +4,18 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../models/manual_payment_model.dart';
 
-class PaymentManualRepository {
+abstract class PaymentManualRepositoryContract {
+  Future<ManualPaymentModel> initiatePayment({required String provider});
+  Future<ManualPaymentModel> fetchStatus({required String transactionId});
+  Future<void> submitProof({
+    required String transactionId,
+    required String filePath,
+    required String senderNumber,
+    DateTime? declaredPaymentTime,
+  });
+}
+
+class PaymentManualRepository implements PaymentManualRepositoryContract {
   final ApiClient _api = ApiClient();
 
   Future<ManualPaymentModel> initiatePayment({required String provider}) async {

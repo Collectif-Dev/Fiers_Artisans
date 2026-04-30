@@ -20,6 +20,7 @@ export class ActivityLog extends Document {
       'PROOF_SUBMITTED',
       'PROOF_VALIDATED',
       'PAYMENT_MANUAL_REJECTED',
+      'PAYMENT_MANUAL_REOPENED',
       'PAYMENT_MANUAL_EXPIRED',
       'REFUND_PROCESSED',
     ],

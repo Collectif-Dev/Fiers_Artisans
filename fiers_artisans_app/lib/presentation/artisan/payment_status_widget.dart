@@ -13,16 +13,17 @@ class PaymentStatusWidget extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final theme = Theme.of(context);
     final status = transaction!.status;
-    final color = _colorForStatus(status, Theme.of(context));
+    final color = _colorForStatus(status, theme);
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -31,6 +32,18 @@ class PaymentStatusWidget extends StatelessWidget {
             'Statut: $status',
             style: TextStyle(fontWeight: FontWeight.w700, color: color),
           ),
+          if (transaction!.isRejected &&
+              transaction!.rejectionReason != null &&
+              transaction!.rejectionReason!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Motif du rejet: ${transaction!.rejectionReason}',
+              style: TextStyle(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 4),
           Text('Transaction: ${transaction!.transactionId}'),
           if (transaction!.expiresAtAdmin != null)

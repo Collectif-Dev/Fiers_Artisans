@@ -22,7 +22,9 @@ export class PaymentRealtimeService {
     paymentId: string;
     transactionId: string;
     status: string;
+    rejectionReason?: string | null;
     refundRequired?: boolean;
+    refundDone?: boolean;
     updatedAt: string;
   }): Promise<void> {
     this.adminRealtimeService.emit(PAYMENT_MANUAL_UPDATED, payload);
@@ -32,7 +34,9 @@ export class PaymentRealtimeService {
         paymentId: payload.paymentId,
         transactionId: payload.transactionId,
         status: payload.status,
+        rejectionReason: payload.rejectionReason ?? null,
         refundRequired: payload.refundRequired ?? false,
+        refundDone: payload.refundDone ?? false,
         updatedAt: payload.updatedAt,
       });
     }

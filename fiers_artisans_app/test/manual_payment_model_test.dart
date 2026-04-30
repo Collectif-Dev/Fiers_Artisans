@@ -9,11 +9,17 @@ void main() {
       'amount_fcfa': 5000,
       'status': 'REJECTED',
       'recipient_number': '0700000000',
+      'rejection_reason': 'Informations incoherentes',
+      'refund_required': true,
+      'provider_available': true,
     });
 
     expect(model.transactionId, 'TX-ZZZ111');
     expect(model.provider, 'MTN_MOMO');
     expect(model.amountFcfa, 5000);
     expect(model.isRejected, true);
+    expect(model.rejectionReason, 'Informations incoherentes');
+    expect(model.refundRequired, true);
+    expect(model.providerAvailable, true);
   });
 }
