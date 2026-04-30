@@ -42,6 +42,11 @@ class ApiEndpoints {
   // Subscription
   static const String subscriptionInitiate = '/subscription/initiate';
   static const String subscriptionStatus = '/subscription/status';
+  static const String manualPaymentInitiate = '/payments/manual/initiate';
+  static String manualPaymentStatus(String transactionId) =>
+      '/payments/manual/$transactionId';
+  static String manualPaymentSubmitProof(String transactionId) =>
+      '/payments/manual/$transactionId/submit-proof';
 
   // Verification
   static const String verificationSubmit = '/verification/submit';

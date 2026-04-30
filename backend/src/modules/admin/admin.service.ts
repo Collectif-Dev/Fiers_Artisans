@@ -13,6 +13,10 @@ import {
   PaymentStatus,
 } from '../subscription/entities/payment.entity';
 import { Review } from '../reviews/entities/review.entity';
+import {
+  PaymentManual,
+  PaymentManualStatus,
+} from '../payment-manual/entities/payment-manual.entity';
 import { VerificationService } from '../verification/verification.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ReviewDocumentDto } from '../verification/dto/review-document.dto';
@@ -34,6 +38,8 @@ export class AdminService {
     private readonly paymentRepository: Repository<Payment>,
     @InjectRepository(Review)
     private readonly reviewRepository: Repository<Review>,
+    @InjectRepository(PaymentManual)
+    private readonly paymentManualRepository: Repository<PaymentManual>,
     private readonly verificationService: VerificationService,
     private readonly analyticsService: AnalyticsService,
     private readonly adminRealtimeService: AdminRealtimeService,
@@ -48,6 +54,10 @@ export class AdminService {
       totalRevenue,
       pendingVerifications,
       totalReviews,
+      pendingManualPayments,
+      totalManualRevenue,
+      monthlyManualRevenue,
+      manualValidationRate,
     ] = await Promise.all([
       this.userRepository
         .createQueryBuilder('u')
@@ -65,15 +75,49 @@ export class AdminService {
         .then((r) => parseInt(r.total, 10)),
       this.verificationService.countPendingDocuments(),
       this.reviewRepository.count(),
+      this.paymentManualRepository.count({
+        where: { status: PaymentManualStatus.PENDING_ADMIN },
+      }),
+      this.paymentManualRepository
+        .createQueryBuilder('pm')
+        .select('COALESCE(SUM(pm.amount_fcfa), 0)', 'total')
+        .where('pm.status = :status', { status: PaymentManualStatus.COMPLETED })
+        .getRawOne()
+        .then((r) => parseInt(r.total, 10)),
+      this.paymentManualRepository
+        .createQueryBuilder('pm')
+        .select('COALESCE(SUM(pm.amount_fcfa), 0)', 'total')
+        .where('pm.status = :status', { status: PaymentManualStatus.COMPLETED })
+        .andWhere('DATE_TRUNC(\'month\', pm.validated_at) = DATE_TRUNC(\'month\', NOW())')
+        .getRawOne()
+        .then((r) => parseInt(r.total, 10)),
+      this.paymentManualRepository
+        .createQueryBuilder('pm')
+        .select(
+          `CASE
+             WHEN COUNT(*) = 0 THEN 0
+             ELSE ROUND((SUM(CASE WHEN pm.status = :completed THEN 1 ELSE 0 END)::numeric / COUNT(*)) * 100, 2)
+           END`,
+          'rate',
+        )
+        .where('pm.status IN (:...statuses)', {
+          statuses: [PaymentManualStatus.COMPLETED, PaymentManualStatus.REJECTED],
+          completed: PaymentManualStatus.COMPLETED,
+        })
+        .getRawOne()
+        .then((r) => parseFloat(r.rate || '0')),
     ]);
 
     return {
       totalClients,
       totalArtisans,
       activeSubscriptions,
-      totalRevenueFcfa: totalRevenue,
+      totalRevenueFcfa: totalRevenue + totalManualRevenue,
       pendingVerifications,
       totalReviews,
+      pendingManualPayments,
+      monthlyManualRevenueFcfa: monthlyManualRevenue,
+      manualValidationRate,
     };
   }
 

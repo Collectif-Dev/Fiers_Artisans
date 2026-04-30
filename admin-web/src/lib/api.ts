@@ -10,6 +10,7 @@ import type {
   ReviewRecord,
   ActivityLog,
   PaginatedResult,
+  PaymentManualRecord,
 } from '@/types';
 import { forceLogout, getUser, saveAuth } from '@/lib/auth';
 
@@ -294,6 +295,37 @@ export async function fetchFileBlob(bucket: string, objectKey: string): Promise<
     responseType: 'blob',
   });
   return response.data as Blob;
+}
+
+// Manual payments
+export async function getManualPayments(
+  page = 1,
+  limit = 20,
+  status?: string,
+): Promise<PaginatedResult<PaymentManualRecord>> {
+  const params: Record<string, string | number> = { page, limit };
+  if (status && status !== 'all') {
+    params.status = status;
+  }
+  const { data } = await api.get('/admin/payment-proofs', { params });
+  return toPaginatedResult<PaymentManualRecord>(data, page, limit);
+}
+
+export async function getManualPaymentDetails(id: string): Promise<PaymentManualRecord> {
+  const { data } = await api.get<PaymentManualRecord>(`/admin/payment-proofs/${id}/details`);
+  return data;
+}
+
+export async function validateManualPayment(id: string, notes?: string): Promise<void> {
+  await api.patch(`/admin/payment-proofs/${id}/validate`, { notes });
+}
+
+export async function rejectManualPayment(id: string, reason: string): Promise<void> {
+  await api.patch(`/admin/payment-proofs/${id}/reject`, { reason });
+}
+
+export async function markManualPaymentRefunded(id: string): Promise<void> {
+  await api.patch(`/admin/payment-proofs/${id}/mark-refunded`);
 }
 
 export { resolveApiUrl };

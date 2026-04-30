@@ -15,6 +15,13 @@ export class ActivityLog extends Document {
       'LOGIN',
       'PAYMENT_ATTEMPT',
       'REGISTRATION',
+      'SUBSCRIPTION_UPDATED',
+      'PAYMENT_MANUAL_INITIATED',
+      'PROOF_SUBMITTED',
+      'PROOF_VALIDATED',
+      'PAYMENT_MANUAL_REJECTED',
+      'PAYMENT_MANUAL_EXPIRED',
+      'REFUND_PROCESSED',
     ],
     index: true,
   })

@@ -49,3 +49,8 @@ tmp_api_check.ps1
 .env
 .env.example
 infrastructure/stack.portainer-managed.yml
+
+# Local fusion exports
+globaliste/
+Globaliste/
+Globalist/

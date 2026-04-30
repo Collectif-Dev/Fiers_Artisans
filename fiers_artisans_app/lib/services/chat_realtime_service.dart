@@ -118,6 +118,7 @@ class ChatRealtimeService {
     _bindDomainEvent(socket, 'subscriptionStatusUpdated');
     _bindDomainEvent(socket, 'artisanSubscriptionUpdated');
     _bindDomainEvent(socket, 'verificationStatusUpdated');
+    _bindDomainEvent(socket, 'manualPaymentUpdated');
   }
 
   void joinConversation(String conversationId) {

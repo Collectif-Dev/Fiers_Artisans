@@ -13,6 +13,7 @@ import {
   CreditCard,
   Star,
   FileText,
+  WalletCards,
 } from 'lucide-react';
 
 const navItems = [
@@ -22,6 +23,7 @@ const navItems = [
   { key: 'analytics', href: '/analytics', icon: BarChart3 },
   { key: 'clients', href: '/clients', icon: Users },
   { key: 'subscriptions', href: '/subscriptions', icon: CreditCard },
+  { key: 'manual_payments', href: '/payments/manual', icon: WalletCards },
   { key: 'reviews', href: '/reviews', icon: Star },
   { key: 'logs', href: '/logs', icon: FileText },
 ];

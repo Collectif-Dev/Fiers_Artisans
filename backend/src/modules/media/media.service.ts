@@ -154,6 +154,59 @@ export class MediaService {
     }
   }
 
+  async hasBucket(bucket: string): Promise<boolean> {
+    return this.minioClient.bucketExists(bucket);
+  }
+
+  async uploadRaw(
+    userId: string,
+    bucket: string,
+    file: Express.Multer.File,
+    forcedObjectKey?: string,
+  ): Promise<{
+    id: string;
+    bucket: string;
+    objectKey: string;
+    mimeType: string;
+    size: number;
+    originalName: string;
+  }> {
+    if (!file?.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('Fichier vide.');
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException('Le fichier depasse la taille maximale de 10 MB.');
+    }
+
+    const ext = file.originalname.split('.').pop() || 'bin';
+    const fileId = randomUUID();
+    const objectKey = forcedObjectKey || `${fileId}.${ext}`;
+
+    await this.minioClient.putObject(bucket, objectKey, file.buffer, file.size, {
+      'Content-Type': file.mimetype || 'application/octet-stream',
+    });
+
+    const media = (await this.mediaFileModel.create({
+      userId,
+      bucket,
+      objectKey,
+      originalName: file.originalname,
+      mimeType: file.mimetype || 'application/octet-stream',
+      size: file.size,
+      thumbnailKey: undefined,
+    })) as MediaFile & { _id: unknown };
+
+    return {
+      id: String(media._id),
+      bucket,
+      objectKey,
+      mimeType: file.mimetype || 'application/octet-stream',
+      size: file.size,
+      originalName: file.originalname,
+    };
+  }
+
   async streamFile(
     bucket: string,
     objectKey: string,

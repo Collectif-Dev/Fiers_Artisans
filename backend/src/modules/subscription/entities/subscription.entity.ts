@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { ArtisanProfile } from '../../users/entities/artisan-profile.entity';
 import { Payment } from './payment.entity';
+import { PaymentManual } from '../../payment-manual/entities/payment-manual.entity';
 
 export enum SubscriptionPlan {
   MONTHLY = 'MONTHLY',
@@ -56,4 +57,7 @@ export class Subscription {
 
   @OneToMany(() => Payment, (payment) => payment.subscription)
   payments: Payment[];
+
+  @OneToMany(() => PaymentManual, (paymentManual) => paymentManual.subscription)
+  payment_manuals: PaymentManual[];
 }

@@ -35,6 +35,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './modules/health/health.module';
 import { DevModule } from './modules/dev/dev.module';
+import { PaymentManualModule } from './modules/payment-manual/payment-manual.module';
 
 @Module({
   imports: [
@@ -108,6 +109,7 @@ import { DevModule } from './modules/dev/dev.module';
     MediaModule,
     AnalyticsModule,
     AdminModule,
+    PaymentManualModule,
 
     // ── Dev Tools (uniquement en développement) ───────────────────
     // Conditionnel : chargé seulement si NODE_ENV=development + OTP_DEV_INSPECTOR=true

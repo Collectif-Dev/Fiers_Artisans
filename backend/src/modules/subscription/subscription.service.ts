@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan } from 'typeorm';
+import { DataSource, Repository, LessThan } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   Subscription,
@@ -30,6 +30,7 @@ export class SubscriptionService {
     private readonly paymentRepository: Repository<Payment>,
     @InjectRepository(ArtisanProfile)
     private readonly artisanProfileRepository: Repository<ArtisanProfile>,
+    private readonly dataSource: DataSource,
     private readonly waveProvider: WaveProvider,
     private readonly analyticsService: AnalyticsService,
     private readonly adminRealtimeService: AdminRealtimeService,
@@ -310,6 +311,91 @@ export class SubscriptionService {
         id: key,
         label: config.label,
       }));
+  }
+
+  async activateSubscriptionFromManualPayment(
+    subscriptionId: string,
+    adminId: string,
+    paymentManualId: string,
+  ): Promise<void> {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const payload = await this.dataSource.transaction(async (manager) => {
+      const subscriptionRepository = manager.getRepository(Subscription);
+      const artisanProfileRepository = manager.getRepository(ArtisanProfile);
+
+      const subscription = await subscriptionRepository.findOne({
+        where: { id: subscriptionId },
+      });
+      if (!subscription) {
+        throw new NotFoundException('Abonnement introuvable.');
+      }
+
+      await subscriptionRepository.update(subscription.id, {
+        status: SubscriptionStatus.ACTIVE,
+        starts_at: now,
+        expires_at: expiresAt,
+      });
+
+      await artisanProfileRepository.update(subscription.artisan_profile_id, {
+        is_subscription_active: true,
+      });
+
+      const artisanProfile = await artisanProfileRepository.findOne({
+        where: { id: subscription.artisan_profile_id },
+        select: ['id', 'user_id'],
+      });
+
+      return {
+        subscriptionId: subscription.id,
+        artisanProfileId: subscription.artisan_profile_id,
+        artisanUserId: artisanProfile?.user_id || null,
+      };
+    });
+
+    this.adminRealtimeService.emit('SUBSCRIPTION_UPDATED', {
+      subscriptionId: payload.subscriptionId,
+      artisanProfileId: payload.artisanProfileId,
+      status: SubscriptionStatus.ACTIVE,
+      source: 'MANUAL_PAYMENT',
+      paymentManualId,
+    });
+
+    if (payload.artisanUserId) {
+      await this.notificationsService.create({
+        userId: payload.artisanUserId,
+        type: 'SUBSCRIPTION_UPDATED',
+        title: 'Abonnement active',
+        body: 'Votre abonnement manuel est actif pour 30 jours.',
+        data: {
+          subscriptionId: payload.subscriptionId,
+          status: SubscriptionStatus.ACTIVE,
+          source: 'MANUAL_PAYMENT',
+          paymentManualId,
+        },
+      });
+
+      this.emitSubscriptionRealtimeEvent({
+        artisanUserId: payload.artisanUserId,
+        artisanProfileId: payload.artisanProfileId,
+        subscriptionId: payload.subscriptionId,
+        subscriptionStatus: SubscriptionStatus.ACTIVE,
+        isSubscriptionActive: true,
+      }).catch(() => {});
+    }
+
+    this.analyticsService
+      .logActivity({
+        actorId: adminId,
+        action: 'SUBSCRIPTION_UPDATED',
+        targetId: payload.subscriptionId,
+        metadata: {
+          source: 'MANUAL_PAYMENT',
+          paymentManualId,
+        },
+      })
+      .catch(() => {});
   }
 
   /**

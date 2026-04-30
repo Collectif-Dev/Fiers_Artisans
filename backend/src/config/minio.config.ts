@@ -20,5 +20,6 @@ export default registerAs('minio', () => ({
     portfolio: process.env.MINIO_BUCKET_PORTFOLIO || 'portfolio',
     documents: process.env.MINIO_BUCKET_DOCUMENTS || 'documents',
     media: process.env.MINIO_BUCKET_MEDIA || 'media',
+    paymentProofs: process.env.MINIO_PAYMENT_PROOF_BUCKET || 'payment-proofs',
   },
 }));

@@ -30,6 +30,9 @@ export interface DashboardStats {
   totalRevenueFcfa: number;
   pendingVerifications: number;
   totalReviews: number;
+  pendingManualPayments?: number;
+  monthlyManualRevenueFcfa?: number;
+  manualValidationRate?: number;
 }
 
 export interface VerificationDocumentPage {
@@ -155,8 +158,75 @@ export interface ReviewRecord {
 export interface ActivityLog {
   _id: string;
   actorId: string;
-  action: 'SEARCH' | 'PROFILE_VIEW' | 'CONTACT_CLICK' | 'LOGIN' | 'PAYMENT_ATTEMPT' | 'REGISTRATION';
+  action:
+    | 'SEARCH'
+    | 'PROFILE_VIEW'
+    | 'CONTACT_CLICK'
+    | 'LOGIN'
+    | 'PAYMENT_ATTEMPT'
+    | 'REGISTRATION'
+    | 'SUBSCRIPTION_UPDATED'
+    | 'PAYMENT_MANUAL_INITIATED'
+    | 'PROOF_SUBMITTED'
+    | 'PROOF_VALIDATED'
+    | 'PAYMENT_MANUAL_REJECTED'
+    | 'PAYMENT_MANUAL_EXPIRED'
+    | 'REFUND_PROCESSED';
   targetId?: string;
   metadata?: Record<string, unknown>;
   timestamp: string;
+}
+
+export interface PaymentProofRecord {
+  id: string;
+  payment_manual_id: string;
+  image_url: string;
+  image_hash_sha256: string;
+  submitted_at: string;
+  declared_payment_time?: string | null;
+  upload_attempt_number: number;
+  file_type?: string | null;
+  file_size_kb?: number | null;
+  file_resolution?: string | null;
+  has_exif: boolean;
+  exif_capture_date?: string | null;
+  exif_modified_date?: string | null;
+  exif_device?: string | null;
+  exif_software?: string | null;
+  ai_suspicion_score: number;
+  is_suspected_fraud: boolean;
+  deletion_requested: boolean;
+}
+
+export interface PaymentManualRecord {
+  id: string;
+  transaction_id: string;
+  amount_fcfa: number;
+  provider: 'WAVE' | 'ORANGE_MONEY' | 'MTN_MOMO' | 'MOOV_MONEY';
+  status: 'PENDING' | 'PENDING_ADMIN' | 'COMPLETED' | 'REJECTED' | 'EXPIRED';
+  sender_number?: string | null;
+  created_at: string;
+  updated_at: string;
+  expires_at_admin?: string | null;
+  validated_at?: string | null;
+  rejected_at?: string | null;
+  rejection_reason?: string | null;
+  refund_required: boolean;
+  refund_done_at?: string | null;
+  attempted_refund_count: number;
+  timeline?: Array<Record<string, unknown>>;
+  subscription?: {
+    id: string;
+    artisan_profile?: {
+      id: string;
+      first_name?: string;
+      last_name?: string;
+      business_name?: string | null;
+      user?: {
+        id: string;
+        phone_number?: string;
+      };
+    };
+  };
+  proofs?: PaymentProofRecord[];
 }

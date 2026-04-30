@@ -17,6 +17,7 @@ import {
   ShieldAlert,
   Star,
   ArrowRight,
+  WalletCards,
 } from 'lucide-react';
 import type { DashboardStats } from '@/types';
 
@@ -62,6 +63,8 @@ export default function DashboardPage() {
       'REVIEW_DELETED',
       'SUBSCRIPTION_UPDATED',
       'PAYMENT_UPDATED',
+      'PAYMENT_MANUAL_NEW_PROOF',
+      'PAYMENT_MANUAL_UPDATED',
     ],
   });
 
@@ -115,6 +118,12 @@ export default function DashboardPage() {
           loading={loading}
         />
         <KpiCard
+          title={t('manual_payments_pending')}
+          value={stats?.pendingManualPayments ?? 0}
+          icon={WalletCards}
+          loading={loading}
+        />
+        <KpiCard
           title={t('total_reviews')}
           value={stats?.totalReviews ?? 0}
           icon={Star}
@@ -155,6 +164,14 @@ export default function DashboardPage() {
           >
             <Star className="mr-2 h-4 w-4" />
             {t('view_reviews')}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+          <Link
+            href="/payments/manual?status=PENDING_ADMIN"
+            className={cn(buttonVariants({ variant: 'outline' }), 'no-underline')}
+          >
+            <WalletCards className="mr-2 h-4 w-4" />
+            {t('view_manual_payments')}
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </CardContent>

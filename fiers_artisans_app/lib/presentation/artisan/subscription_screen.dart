@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../providers/subscription_provider.dart';
 import '../common/app_button.dart';
+import 'manual_payment_page.dart';
 
 class SubscriptionScreen extends ConsumerStatefulWidget {
   const SubscriptionScreen({super.key});
@@ -47,6 +48,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         SnackBar(content: Text('subscription.error_payment'.tr())),
       );
     }
+  }
+
+  void _openManualPayment() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ManualPaymentPage()),
+    );
   }
 
   @override
@@ -120,14 +127,43 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ),
-                  if (!isActive)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Wave',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        SizedBox(height: 4),
+                        Text('Temporairement desactive en Phase 1.'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AppButton(
+                    text: 'Paiement Mobile Money',
+                    icon: Icons.account_balance_wallet_outlined,
+                    isLoading: false,
+                    onPressed: _openManualPayment,
+                  ),
+                  if (!isActive) ...[
+                    const SizedBox(height: 8),
                     AppButton(
                       text: 'subscription.pay'.tr(),
                       icon: Icons.payment,
+                      isOutlined: true,
                       isLoading: subState.isLoading,
                       onPressed: _handlePayment,
-                    )
-                  else ...[
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 8),
                     AppButton(
                       text: 'subscription.renew'.tr(),
                       isOutlined: true,
