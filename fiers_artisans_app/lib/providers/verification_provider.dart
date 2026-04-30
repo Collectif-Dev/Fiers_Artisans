@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repositories/verification_repository.dart';
 import '../services/push_notification_service.dart';
+import '../services/chat_realtime_service.dart';
 
 /// Document-level status for a single document family (identity or diploma).
 enum DocFamilyStatus { none, pending, approved, rejected }
@@ -79,11 +82,26 @@ class VerificationState {
 
 class VerificationNotifier extends StateNotifier<VerificationState> {
   final VerificationRepository _repo;
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
   VerificationNotifier(this._repo) : super(const VerificationState()) {
     // Global FCM bridge: any DOCUMENT_APPROVED/REJECTED push triggers refresh
     // regardless of which screen is currently active.
     PushNotificationService().onVerificationUpdate = () => refresh();
+    _realtimeSub = _realtime.domainEvents.listen((event) {
+      if (event.event == 'verificationStatusUpdated' ||
+          (event.event == 'notificationCreated' &&
+              _isVerificationNotification(event.payload))) {
+        refresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   static const _identityTypes = {'CNI', 'PASSPORT'};
@@ -158,6 +176,15 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
       default:
         return DocFamilyStatus.none;
     }
+  }
+
+  bool _isVerificationNotification(Map<String, dynamic> payload) {
+    final notif = payload['notification'];
+    if (notif is Map<String, dynamic>) {
+      final type = notif['type']?.toString().toUpperCase();
+      return type == 'DOCUMENT_APPROVED' || type == 'DOCUMENT_REJECTED';
+    }
+    return false;
   }
 }
 

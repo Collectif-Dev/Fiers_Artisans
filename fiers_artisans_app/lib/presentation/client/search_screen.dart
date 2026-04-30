@@ -12,6 +12,7 @@ import '../../providers/search_provider.dart';
 import '../../providers/categories_provider.dart';
 import '../../data/models/category_model.dart';
 import '../../services/location_service.dart';
+import '../../services/chat_realtime_service.dart';
 import '../../services/map_visibility_realtime_service.dart';
 import '../common/app_text_field.dart';
 import '../common/artisan_card.dart';
@@ -35,8 +36,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final LocationService _locationService = LocationService();
   final MapVisibilityRealtimeService _mapRealtimeService =
       MapVisibilityRealtimeService();
+  final ChatRealtimeService _chatRealtimeService = ChatRealtimeService();
 
   StreamSubscription<Map<String, dynamic>>? _visibilitySubscription;
+  StreamSubscription<ChatRealtimeEvent>? _domainEventSubscription;
   Timer? _availabilityRefreshDebounce;
 
   String? _selectedCategoryId;
@@ -106,6 +109,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     _visibilitySubscription = _mapRealtimeService.visibilityUpdates.listen(
       _handleRealtimeVisibilityUpdate,
+    );
+    _domainEventSubscription = _chatRealtimeService.domainEvents.listen(
+      _handleDomainRealtimeEvent,
     );
   }
 
@@ -206,9 +212,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         );
   }
 
+  void _handleDomainRealtimeEvent(ChatRealtimeEvent event) {
+    final shouldRefreshSearch = switch (event.event) {
+      'artisanProfileUpdated' => true,
+      'artisanReviewsUpdated' => true,
+      'artisanPortfolioUpdated' => true,
+      'artisanSubscriptionUpdated' => true,
+      _ => false,
+    };
+
+    if (!shouldRefreshSearch) return;
+    _availabilityRefreshDebounce?.cancel();
+    _availabilityRefreshDebounce = Timer(
+      const Duration(milliseconds: 700),
+      _search,
+    );
+  }
+
   @override
   void dispose() {
     _visibilitySubscription?.cancel();
+    _domainEventSubscription?.cancel();
     _availabilityRefreshDebounce?.cancel();
     _mapRealtimeService.disconnect();
     _searchCtrl.dispose();

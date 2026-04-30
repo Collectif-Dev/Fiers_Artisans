@@ -9,9 +9,11 @@ import {
 } from './schemas/notification.schema';
 import { FcmProvider } from './providers/fcm.provider';
 import { User } from '../users/entities/user.entity';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
+    ChatModule,
     MongooseModule.forFeature([
       { name: Notification.name, schema: NotificationSchema },
     ]),

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/artisan_model.dart';
 import '../data/repositories/favorites_repository.dart';
+import '../services/chat_realtime_service.dart';
 
 class FavoritesState {
   final List<ArtisanModel> favorites;
@@ -41,8 +44,18 @@ final favoritesProvider =
 
 class FavoritesNotifier extends StateNotifier<FavoritesState> {
   final FavoritesRepository _repo = FavoritesRepository();
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
-  FavoritesNotifier() : super(const FavoritesState());
+  FavoritesNotifier() : super(const FavoritesState()) {
+    _realtimeSub = _realtime.domainEvents.listen(_onRealtimeEvent);
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
+  }
 
   Future<void> loadFavorites() async {
     state = state.copyWith(isLoading: true, error: null);
@@ -142,5 +155,34 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
       );
       return current;
     }
+  }
+
+  void _onRealtimeEvent(ChatRealtimeEvent event) {
+    if (event.event != 'favoriteStatusUpdated') {
+      return;
+    }
+    final artisanUserId = event.payload['artisanUserId']?.toString();
+    if (artisanUserId == null || artisanUserId.isEmpty) {
+      return;
+    }
+    final isFavorite = event.payload['isFavorite'] == true;
+
+    final ids = {...state.favoriteUserIds};
+    final favorites = [...state.favorites];
+
+    if (isFavorite) {
+      ids.add(artisanUserId);
+      state = state.copyWith(favoriteUserIds: ids);
+      loadFavorites();
+      return;
+    } else {
+      ids.remove(artisanUserId);
+      favorites.removeWhere((item) => item.userId == artisanUserId);
+    }
+
+    state = state.copyWith(
+      favoriteUserIds: ids,
+      favorites: favorites,
+    );
   }
 }

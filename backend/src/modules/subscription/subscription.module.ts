@@ -9,9 +9,11 @@ import { User } from '../users/entities/user.entity';
 import { WaveProvider } from './providers/wave.provider';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
+    ChatModule,
     TypeOrmModule.forFeature([Subscription, Payment, ArtisanProfile, User]),
     AnalyticsModule,
     NotificationsModule,

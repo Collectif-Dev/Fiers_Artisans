@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/repositories/notification_repository.dart';
+import '../../services/chat_realtime_service.dart';
 import '../common/empty_state.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -14,6 +17,8 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final NotificationRepository _repo = NotificationRepository();
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
   bool _hasError = false;
@@ -21,7 +26,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    _realtimeSub = _realtime.domainEvents.listen(_onRealtimeEvent);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -69,6 +81,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             .toList();
       });
     } catch (_) {}
+  }
+
+  void _onRealtimeEvent(ChatRealtimeEvent event) {
+    if (!mounted) return;
+
+    if (event.event == 'notificationCreated') {
+      final notification = event.payload['notification'];
+      if (notification is Map<String, dynamic>) {
+        final incomingId =
+            (notification['_id'] ?? notification['id'])?.toString();
+        if (incomingId == null || incomingId.isEmpty) {
+          return;
+        }
+        final exists = _notifications.any(
+          (n) => (n['_id'] ?? n['id'])?.toString() == incomingId,
+        );
+        if (!exists) {
+          setState(() {
+            _notifications = [notification, ..._notifications];
+          });
+        }
+      }
+      return;
+    }
+
+    if (event.event == 'notificationRead') {
+      final notificationId = event.payload['notificationId']?.toString();
+      if (notificationId == null || notificationId.isEmpty) return;
+      setState(() {
+        _notifications = _notifications.map((n) {
+          final id = (n['_id'] ?? n['id'])?.toString();
+          if (id != notificationId) return n;
+          return {...n, 'isRead': true};
+        }).toList();
+      });
+      return;
+    }
+
+    if (event.event == 'notificationsReadAll') {
+      setState(() {
+        _notifications = _notifications
+            .map((n) => {...n, 'isRead': true})
+            .toList();
+      });
+    }
   }
 
   IconData _iconForType(String? type) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +14,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../services/chat_realtime_service.dart';
 import '../../services/location_service.dart';
 import '../common/recent_conversation_tile.dart';
 
@@ -39,6 +42,8 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
   final ApiClient _api = ApiClient();
   final ArtisanRepository _artisanRepository = ArtisanRepository();
   final LocationService _locationService = LocationService();
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
   @override
   void initState() {
@@ -61,6 +66,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       _loadArtisanStats();
       _loadReviewMetrics();
     });
+    _realtimeSub = _realtime.domainEvents.listen(_handleRealtimeEvent);
   }
 
   Future<void> _loadAvailability() async {
@@ -193,9 +199,54 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
 
   @override
   void dispose() {
+    _realtimeSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _animController.dispose();
     super.dispose();
+  }
+
+  void _handleRealtimeEvent(ChatRealtimeEvent event) {
+    final currentUserId = ref.read(authProvider).user?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    final artisanUserId =
+        event.payload['artisanUserId']?.toString() ??
+        event.payload['artisan_user_id']?.toString();
+    final forCurrentArtisan =
+        artisanUserId != null && artisanUserId == currentUserId;
+
+    final shouldRefresh = switch (event.event) {
+      'userProfileUpdated' => true,
+      'verificationStatusUpdated' => true,
+      'subscriptionStatusUpdated' => true,
+      'artisanSubscriptionUpdated' => forCurrentArtisan,
+      'artisanReviewsUpdated' => forCurrentArtisan,
+      'artisanPortfolioUpdated' => forCurrentArtisan,
+      'artisanProfileUpdated' => forCurrentArtisan,
+      'notificationCreated' => _isArtisanDashboardNotification(event.payload),
+      _ => false,
+    };
+
+    if (!shouldRefresh) return;
+
+    _loadArtisanStats();
+    _loadReviewMetrics();
+    ref.read(subscriptionProvider.notifier).loadStatus();
+    ref.read(verificationProvider.notifier).refresh();
+  }
+
+  bool _isArtisanDashboardNotification(Map<String, dynamic> payload) {
+    final notif = payload['notification'];
+    if (notif is Map<String, dynamic>) {
+      final type = notif['type']?.toString().toUpperCase() ?? '';
+      return type == 'REVIEW_CREATED' ||
+          type == 'REVIEW_UPDATED' ||
+          type == 'SUBSCRIPTION_UPDATED' ||
+          type == 'PAYMENT_UPDATED' ||
+          type == 'DOCUMENT_APPROVED' ||
+          type == 'DOCUMENT_REJECTED';
+    }
+    return false;
   }
 
   @override

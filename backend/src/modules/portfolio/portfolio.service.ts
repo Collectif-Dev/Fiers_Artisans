@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PortfolioItem } from './schemas/portfolio-item.schema';
 import { ArtisanProfile } from '../users/entities/artisan-profile.entity';
+import { ChatGateway } from '../chat/chat.gateway';
 
 type PortfolioImageObject = { bucket: string; objectKey: string };
 
@@ -21,6 +22,7 @@ export class PortfolioService {
     @InjectRepository(ArtisanProfile)
     private readonly artisanProfileRepository: Repository<ArtisanProfile>,
     private readonly configService: ConfigService,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   async create(
@@ -45,6 +47,8 @@ export class PortfolioService {
       imageObjects,
       imageUrls: imageObjects.map((img) => this.toStorageMediaValue(img)),
     });
+
+    this.emitPortfolioUpdated(profile.user_id, profile.id).catch(() => {});
 
     return this.toResponseItem(created, requestBaseUrl);
   }
@@ -112,6 +116,7 @@ export class PortfolioService {
     }
 
     const saved = await item.save();
+    this.emitPortfolioUpdated(profile.user_id, profile.id).catch(() => {});
     return this.toResponseItem(saved, requestBaseUrl);
   }
 
@@ -128,6 +133,24 @@ export class PortfolioService {
     }
 
     await this.portfolioModel.findByIdAndDelete(itemId).exec();
+    this.emitPortfolioUpdated(profile.user_id, profile.id).catch(() => {});
+  }
+
+  private async emitPortfolioUpdated(
+    artisanUserId: string,
+    artisanProfileId: string,
+  ): Promise<void> {
+    const payload = {
+      artisanUserId,
+      artisanProfileId,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.chatGateway.emitGlobalSyncEvent('artisanPortfolioUpdated', payload);
+    await this.chatGateway.emitUserSyncEvent(
+      artisanUserId,
+      'artisanPortfolioUpdated',
+      payload,
+    );
   }
 
   private async toResponseItem(

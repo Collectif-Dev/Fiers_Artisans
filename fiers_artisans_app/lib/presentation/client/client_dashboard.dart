@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/categories_provider.dart';
 import '../../providers/favorites_provider.dart';
+import '../../services/chat_realtime_service.dart';
 import '../common/artisan_card.dart';
 import '../common/category_chip.dart';
 import '../common/recent_conversation_tile.dart';
@@ -25,6 +28,8 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
   late AnimationController _animController;
   late Animation<double> _fadeIn;
   List<String> _recentlyViewed = [];
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
   @override
   void initState() {
@@ -44,6 +49,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
         ref.read(favoritesProvider.notifier).loadFavorites(),
       ]);
     });
+    _realtimeSub = _realtime.domainEvents.listen(_onRealtimeEvent);
   }
 
   Future<void> _loadRecentlyViewed() async {
@@ -55,8 +61,24 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
 
   @override
   void dispose() {
+    _realtimeSub?.cancel();
     _animController.dispose();
     super.dispose();
+  }
+
+  void _onRealtimeEvent(ChatRealtimeEvent event) {
+    final shouldRefreshFavorites = switch (event.event) {
+      'favoriteStatusUpdated' => true,
+      'artisanProfileUpdated' => true,
+      'artisanReviewsUpdated' => true,
+      'artisanPortfolioUpdated' => true,
+      'artisanSubscriptionUpdated' => true,
+      _ => false,
+    };
+
+    if (shouldRefreshFavorites) {
+      ref.read(favoritesProvider.notifier).loadFavorites();
+    }
   }
 
   @override

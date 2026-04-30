@@ -6,6 +6,7 @@ import '../core/storage/secure_storage.dart';
 import '../data/models/conversation_model.dart';
 import '../data/models/message_model.dart';
 import '../data/repositories/chat_repository.dart';
+import '../providers/auth_provider.dart';
 import '../services/chat_realtime_service.dart';
 
 class ChatState {
@@ -61,7 +62,15 @@ class ChatState {
 }
 
 final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
-  return ChatNotifier();
+  final authSnapshot = ref.watch(
+    authProvider.select((state) => (state.status, state.user?.id)),
+  );
+  final status = authSnapshot.$1;
+  final userId = authSnapshot.$2;
+
+  return ChatNotifier(
+    bootstrapUserId: status == AuthStatus.authenticated ? userId : null,
+  );
 });
 
 class ChatNotifier extends StateNotifier<ChatState> {
@@ -71,10 +80,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
   StreamSubscription<Map<String, dynamic>>? _newMessageSub;
   StreamSubscription<Map<String, dynamic>>? _messagesReadSub;
   StreamSubscription<Map<String, dynamic>>? _participantAvailabilitySub;
+  StreamSubscription<ChatRealtimeEvent>? _domainEventSub;
   String? _currentUserId;
 
-  ChatNotifier() : super(const ChatState()) {
-    unawaited(_initializeRealtime());
+  ChatNotifier({String? bootstrapUserId}) : super(const ChatState()) {
+    unawaited(_initializeRealtime(preferredUserId: bootstrapUserId));
   }
 
   @override
@@ -82,11 +92,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _newMessageSub?.cancel();
     _messagesReadSub?.cancel();
     _participantAvailabilitySub?.cancel();
+    _domainEventSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _initializeRealtime() async {
-    _currentUserId = await SecureStorage.getUserId();
+  Future<void> _initializeRealtime({String? preferredUserId}) async {
+    _currentUserId = preferredUserId ?? await SecureStorage.getUserId();
     if (_currentUserId == null || _currentUserId!.isEmpty) {
       return;
     }
@@ -96,11 +107,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
     await _newMessageSub?.cancel();
     await _messagesReadSub?.cancel();
     await _participantAvailabilitySub?.cancel();
+    await _domainEventSub?.cancel();
 
     _newMessageSub = _realtime.newMessages.listen(_onSocketNewMessage);
     _messagesReadSub = _realtime.messagesRead.listen(_onSocketMessagesRead);
     _participantAvailabilitySub = _realtime.participantAvailabilityUpdates
         .listen(_onSocketParticipantAvailabilityUpdated);
+    _domainEventSub = _realtime.domainEvents.listen(_onSocketDomainEvent);
   }
 
   Future<void> _ensureRealtimeConnected() async {
@@ -431,5 +444,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }).toList();
 
     state = state.copyWith(conversations: updatedConversations);
+  }
+
+  void _onSocketDomainEvent(ChatRealtimeEvent event) {
+    final shouldRefreshConversations = switch (event.event) {
+      'artisanProfileUpdated' => true,
+      'artisanSubscriptionUpdated' => true,
+      'userProfileUpdated' => true,
+      _ => false,
+    };
+
+    if (shouldRefreshConversations) {
+      unawaited(loadConversations());
+    }
   }
 }

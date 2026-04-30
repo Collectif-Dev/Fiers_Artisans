@@ -6,9 +6,11 @@ import { VerificationDocument } from './entities/verification-document.entity';
 import { VerificationDocumentPage } from './entities/verification-document-page.entity';
 import { User } from '../users/entities/user.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
+    ChatModule,
     TypeOrmModule.forFeature([VerificationDocument, VerificationDocumentPage, User]),
     NotificationsModule,
   ],

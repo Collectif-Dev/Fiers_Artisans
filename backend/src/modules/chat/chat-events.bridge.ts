@@ -20,7 +20,17 @@ type UserEventPayload = {
   sourceInstanceId: string;
 };
 
-type DistributedChatEvent = ConversationEventPayload | UserEventPayload;
+type GlobalEventPayload = {
+  kind: 'global';
+  event: string;
+  payload: unknown;
+  sourceInstanceId: string;
+};
+
+type DistributedChatEvent =
+  | ConversationEventPayload
+  | UserEventPayload
+  | GlobalEventPayload;
 
 @Injectable()
 export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
@@ -107,6 +117,15 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  async publishGlobalEvent(event: string, payload: unknown): Promise<void> {
+    await this.publish({
+      kind: 'global',
+      event,
+      payload,
+      sourceInstanceId: this.instanceId,
+    });
+  }
+
   private async publish(event: DistributedChatEvent): Promise<void> {
     if (!this.enabled) {
       return;
@@ -141,10 +160,14 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
         this.server
           .to(`user:${event.userId}`)
           .emit(event.event, event.payload);
+        return;
+      }
+
+      if (event.kind === 'global' && event.event) {
+        this.server.emit(event.event, event.payload);
       }
     } catch (error) {
       this.logger.warn(`Invalid distributed chat event payload: ${error}`);
     }
   };
 }
-

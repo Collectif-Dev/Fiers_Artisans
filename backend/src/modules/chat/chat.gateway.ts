@@ -177,6 +177,27 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     }
   }
 
+  async emitUserSyncEvent(
+    userId: string,
+    event: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.server.to(`user:${userId}`).emit(event, payload);
+    this.chatEventsBridge.publishUserEvent(event, userId, payload).catch((error) => {
+      this.logger.warn(`Failed to fan-out ${event} for user ${userId}: ${error}`);
+    });
+  }
+
+  async emitGlobalSyncEvent(
+    event: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    this.server.emit(event, payload);
+    this.chatEventsBridge.publishGlobalEvent(event, payload).catch((error) => {
+      this.logger.warn(`Failed to fan-out global ${event}: ${error}`);
+    });
+  }
+
   private extractSocketToken(client: Socket): string | null {
     const authHeader = client.handshake.headers?.authorization;
     if (typeof authHeader === 'string') {

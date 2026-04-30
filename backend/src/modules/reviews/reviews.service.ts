@@ -12,6 +12,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { ReplyReviewDto } from './dto/reply-review.dto';
 import { AdminRealtimeService } from '../../common/realtime/admin-realtime.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
 export class ReviewsService {
@@ -24,6 +25,7 @@ export class ReviewsService {
     private readonly clientProfileRepository: Repository<ClientProfile>,
     private readonly adminRealtimeService: AdminRealtimeService,
     private readonly notificationsService: NotificationsService,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   async create(userId: string, dto: CreateReviewDto): Promise<Review> {
@@ -73,6 +75,23 @@ export class ReviewsService {
       },
     });
     if (artisanProfile?.user_id) {
+      this.chatGateway
+        .emitGlobalSyncEvent('artisanReviewsUpdated', {
+          artisanUserId: artisanProfile.user_id,
+          artisanProfileId: saved.artisan_id,
+          reviewId: saved.id,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch(() => {});
+      this.chatGateway
+        .emitUserSyncEvent(artisanProfile.user_id, 'artisanReviewsUpdated', {
+          artisanUserId: artisanProfile.user_id,
+          artisanProfileId: saved.artisan_id,
+          reviewId: saved.id,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch(() => {});
+
       this.notificationsService
         .create({
           userId: artisanProfile.user_id,
@@ -108,6 +127,7 @@ export class ReviewsService {
       loadEagerRelations: false,
       select: {
         id: true,
+        user_id: true,
       },
     });
 
@@ -143,6 +163,23 @@ export class ReviewsService {
       select: ['user_id'],
     });
     if (clientProfile?.user_id) {
+      this.chatGateway
+        .emitGlobalSyncEvent('artisanReviewsUpdated', {
+          artisanUserId: artisanProfile.user_id,
+          artisanProfileId: saved.artisan_id,
+          reviewId: saved.id,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch(() => {});
+      this.chatGateway
+        .emitUserSyncEvent(clientProfile.user_id, 'artisanReviewsUpdated', {
+          artisanUserId: artisanProfile.user_id,
+          artisanProfileId: saved.artisan_id,
+          reviewId: saved.id,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch(() => {});
+
       this.notificationsService
         .create({
           userId: clientProfile.user_id,

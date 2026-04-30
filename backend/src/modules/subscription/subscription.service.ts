@@ -17,6 +17,7 @@ import { WaveProvider, WaveCheckoutSession } from './providers/wave.provider';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AdminRealtimeService } from '../../common/realtime/admin-realtime.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
 export class SubscriptionService {
@@ -33,7 +34,36 @@ export class SubscriptionService {
     private readonly analyticsService: AnalyticsService,
     private readonly adminRealtimeService: AdminRealtimeService,
     private readonly notificationsService: NotificationsService,
+    private readonly chatGateway: ChatGateway,
   ) {}
+
+  private async emitSubscriptionRealtimeEvent(params: {
+    artisanUserId: string;
+    artisanProfileId: string;
+    subscriptionId: string;
+    subscriptionStatus: SubscriptionStatus;
+    paymentStatus?: PaymentStatus;
+    isSubscriptionActive: boolean;
+  }): Promise<void> {
+    const payload = {
+      artisanUserId: params.artisanUserId,
+      artisanProfileId: params.artisanProfileId,
+      subscriptionId: params.subscriptionId,
+      subscriptionStatus: params.subscriptionStatus,
+      paymentStatus: params.paymentStatus,
+      isSubscriptionActive: params.isSubscriptionActive,
+      updatedAt: new Date().toISOString(),
+    };
+    await this.chatGateway.emitUserSyncEvent(
+      params.artisanUserId,
+      'subscriptionStatusUpdated',
+      payload,
+    );
+    await this.chatGateway.emitGlobalSyncEvent(
+      'artisanSubscriptionUpdated',
+      payload,
+    );
+  }
 
   private async notifyArtisan(
     artisanProfileId: string,
@@ -96,6 +126,14 @@ export class SubscriptionService {
       artisanProfileId: subscription.artisan_profile_id,
       status: savedPayment.status,
     });
+    this.emitSubscriptionRealtimeEvent({
+      artisanUserId: profile.user_id,
+      artisanProfileId: profile.id,
+      subscriptionId: subscription.id,
+      subscriptionStatus: subscription.status,
+      paymentStatus: savedPayment.status,
+      isSubscriptionActive: profile.is_subscription_active,
+    }).catch(() => {});
 
     // Créer la session Wave
     this.analyticsService
@@ -192,6 +230,20 @@ export class SubscriptionService {
           status: SubscriptionStatus.ACTIVE,
         },
       ).catch(() => {});
+      const artisanProfile = await this.artisanProfileRepository.findOne({
+        where: { id: subscription.artisan_profile_id },
+        select: ['id', 'user_id'],
+      });
+      if (artisanProfile?.user_id) {
+        this.emitSubscriptionRealtimeEvent({
+          artisanUserId: artisanProfile.user_id,
+          artisanProfileId: artisanProfile.id,
+          subscriptionId: subscription.id,
+          subscriptionStatus: SubscriptionStatus.ACTIVE,
+          paymentStatus: PaymentStatus.SUCCESS,
+          isSubscriptionActive: true,
+        }).catch(() => {});
+      }
     } else {
       await this.paymentRepository.update(
         { subscription_id: subscription.id, status: PaymentStatus.PENDING },
@@ -213,6 +265,20 @@ export class SubscriptionService {
           status: PaymentStatus.FAILED,
         },
       ).catch(() => {});
+      const artisanProfile = await this.artisanProfileRepository.findOne({
+        where: { id: subscription.artisan_profile_id },
+        select: ['id', 'user_id', 'is_subscription_active'],
+      });
+      if (artisanProfile?.user_id) {
+        this.emitSubscriptionRealtimeEvent({
+          artisanUserId: artisanProfile.user_id,
+          artisanProfileId: artisanProfile.id,
+          subscriptionId: subscription.id,
+          subscriptionStatus: subscription.status,
+          paymentStatus: PaymentStatus.FAILED,
+          isSubscriptionActive: artisanProfile.is_subscription_active,
+        }).catch(() => {});
+      }
     }
   }
 
@@ -287,6 +353,19 @@ export class SubscriptionService {
           status: SubscriptionStatus.EXPIRED,
         },
       ).catch(() => {});
+      const artisanProfile = await this.artisanProfileRepository.findOne({
+        where: { id: sub.artisan_profile_id },
+        select: ['id', 'user_id'],
+      });
+      if (artisanProfile?.user_id) {
+        this.emitSubscriptionRealtimeEvent({
+          artisanUserId: artisanProfile.user_id,
+          artisanProfileId: artisanProfile.id,
+          subscriptionId: sub.id,
+          subscriptionStatus: SubscriptionStatus.EXPIRED,
+          isSubscriptionActive: false,
+        }).catch(() => {});
+      }
     }
 
     this.logger.log(`Cron: ${expired.length} abonnement(s) désactivé(s).`);

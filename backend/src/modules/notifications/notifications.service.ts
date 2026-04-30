@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Notification } from './schemas/notification.schema';
 import { FcmProvider } from './providers/fcm.provider';
 import { User } from '../users/entities/user.entity';
+import { ChatGateway } from '../chat/chat.gateway';
 
 @Injectable()
 export class NotificationsService {
@@ -17,6 +18,7 @@ export class NotificationsService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly fcmProvider: FcmProvider,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   async create(data: {
@@ -27,6 +29,15 @@ export class NotificationsService {
     data?: Record<string, any>;
   }): Promise<Notification> {
     const notification = await this.notificationModel.create(data);
+    const unreadCount = await this.getUnreadCount(data.userId);
+
+    this.chatGateway
+      .emitUserSyncEvent(data.userId, 'notificationCreated', {
+        notification: this.toClientNotification(notification),
+        unreadCount,
+      })
+      .catch(() => {});
+
     // Offload push dispatch outside the critical HTTP path.
     setImmediate(() => {
       this.dispatchPushNotification(data).catch((error) => {
@@ -90,6 +101,13 @@ export class NotificationsService {
       { _id: notificationId, userId },
       { isRead: true },
     );
+    const unreadCount = await this.getUnreadCount(userId);
+    this.chatGateway
+      .emitUserSyncEvent(userId, 'notificationRead', {
+        notificationId,
+        unreadCount,
+      })
+      .catch(() => {});
   }
 
   async markAllAsRead(userId: string): Promise<void> {
@@ -97,6 +115,11 @@ export class NotificationsService {
       { userId, isRead: false },
       { isRead: true },
     );
+    this.chatGateway
+      .emitUserSyncEvent(userId, 'notificationsReadAll', {
+        unreadCount: 0,
+      })
+      .catch(() => {});
   }
 
   async getUnreadCount(userId: string): Promise<number> {
@@ -104,5 +127,16 @@ export class NotificationsService {
       userId,
       isRead: false,
     });
+  }
+
+  private toClientNotification(notification: Notification): Record<string, unknown> {
+    const asAny = notification as any;
+    const plain =
+      typeof asAny.toObject === 'function' ? asAny.toObject() : asAny;
+    return {
+      ...plain,
+      id: plain?._id?.toString?.() ?? plain?.id?.toString?.() ?? '',
+      _id: plain?._id?.toString?.() ?? plain?.id?.toString?.() ?? '',
+    };
   }
 }

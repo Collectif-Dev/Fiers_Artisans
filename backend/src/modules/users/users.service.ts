@@ -207,6 +207,23 @@ export class UsersService {
       isAvailable: savedProfile.is_available,
       isSubscriptionActive: savedProfile.is_subscription_active,
     });
+    this.chatGateway
+      .emitUserSyncEvent(savedProfile.user_id, 'userProfileUpdated', {
+        role: 'ARTISAN',
+        updatedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
+    this.chatGateway
+      .emitGlobalSyncEvent('artisanProfileUpdated', {
+        artisanUserId: savedProfile.user_id,
+        artisanProfileId: savedProfile.id,
+        isAvailable: savedProfile.is_available,
+        categoryId: savedProfile.category_id,
+        subcategoryId: savedProfile.subcategory_id,
+        isSubscriptionActive: savedProfile.is_subscription_active,
+        updatedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
 
     return savedProfile;
   }
@@ -250,6 +267,12 @@ export class UsersService {
       city: saved.city,
       commune: saved.commune,
     });
+    this.chatGateway
+      .emitUserSyncEvent(saved.user_id, 'userProfileUpdated', {
+        role: 'CLIENT',
+        updatedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
     return saved;
   }
 
@@ -333,12 +356,26 @@ export class UsersService {
           }),
         );
       }
+      this.chatGateway
+        .emitUserSyncEvent(clientUserId, 'favoriteStatusUpdated', {
+          artisanUserId: artisanProfile.user_id,
+          isFavorite: true,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch(() => {});
       return { is_favorite: true };
     }
 
     if (existing) {
       await this.favoriteArtisanRepository.delete(existing.id);
     }
+    this.chatGateway
+      .emitUserSyncEvent(clientUserId, 'favoriteStatusUpdated', {
+        artisanUserId: artisanProfile.user_id,
+        isFavorite: false,
+        updatedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
     return { is_favorite: false };
   }
 

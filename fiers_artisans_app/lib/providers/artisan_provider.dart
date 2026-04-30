@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/artisan_model.dart';
 import '../data/models/review_model.dart';
 import '../data/models/portfolio_model.dart';
 import '../data/repositories/artisan_repository.dart';
 import '../services/push_notification_service.dart';
+import '../services/chat_realtime_service.dart';
 
 enum ReviewSubmitFailure { duplicate, network, backend, unknown }
 
@@ -58,6 +61,8 @@ final artisanDetailProvider =
 
 class ArtisanDetailNotifier extends StateNotifier<ArtisanDetailState> {
   final ArtisanRepository _repo = ArtisanRepository();
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
   ArtisanDetailNotifier() : super(const ArtisanDetailState()) {
     PushNotificationService().onReviewUpdate = () {
@@ -67,6 +72,13 @@ class ArtisanDetailNotifier extends StateNotifier<ArtisanDetailState> {
       }
       refreshReviewsAndSummary(artisanId);
     };
+    _realtimeSub = _realtime.domainEvents.listen(_onRealtimeEvent);
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> loadArtisan(String userId) async {
@@ -144,5 +156,29 @@ class ArtisanDetailNotifier extends StateNotifier<ArtisanDetailState> {
   }) async {
     await _repo.replyToReview(reviewId: reviewId, reply: reply);
     await refreshReviewsAndSummary(artisanId);
+  }
+
+  void _onRealtimeEvent(ChatRealtimeEvent event) {
+    final artisan = state.artisan;
+    if (artisan == null) return;
+
+    final payloadUserId =
+        event.payload['artisanUserId']?.toString() ??
+        event.payload['artisan_user_id']?.toString();
+    final isSameArtisan = payloadUserId != null && payloadUserId == artisan.userId;
+    if (!isSameArtisan) return;
+
+    if (event.event == 'artisanReviewsUpdated') {
+      refreshReviewsAndSummary(artisan.id);
+      return;
+    }
+    if (event.event == 'artisanPortfolioUpdated') {
+      _loadPortfolio(artisan.id);
+      return;
+    }
+    if (event.event == 'artisanProfileUpdated' ||
+        event.event == 'artisanSubscriptionUpdated') {
+      loadArtisan(artisan.userId);
+    }
   }
 }

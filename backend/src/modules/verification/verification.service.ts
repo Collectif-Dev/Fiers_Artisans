@@ -22,6 +22,7 @@ import { SubmitDocumentDto } from './dto/submit-document.dto';
 import { ReviewDocumentDto } from './dto/review-document.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AdminRealtimeService } from '../../common/realtime/admin-realtime.service';
+import { ChatGateway } from '../chat/chat.gateway';
 
 const IDENTITY_TYPES = [DocumentType.CNI, DocumentType.PASSPORT];
 const DIPLOMA_TYPES = [
@@ -41,6 +42,7 @@ export class VerificationService {
     private readonly userRepository: Repository<User>,
     private readonly notificationsService: NotificationsService,
     private readonly adminRealtimeService: AdminRealtimeService,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   /** Emits on new submissions and reviews — admin SSE subscribes to this. */
@@ -124,6 +126,14 @@ export class VerificationService {
         userId,
         documentType: dto.document_type,
       });
+      this.chatGateway
+        .emitUserSyncEvent(userId, 'verificationStatusUpdated', {
+          documentId: saved.id,
+          documentType: dto.document_type,
+          status: DocumentStatus.PENDING,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch(() => {});
       return this.docRepository.findOne({
         where: { id: saved.id },
         relations: ['pages'],
@@ -167,6 +177,14 @@ export class VerificationService {
       userId,
       documentType: dto.document_type,
     });
+    this.chatGateway
+      .emitUserSyncEvent(userId, 'verificationStatusUpdated', {
+        documentId: saved.id,
+        documentType: dto.document_type,
+        status: DocumentStatus.PENDING,
+        updatedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
 
     return this.docRepository.findOne({
       where: { id: saved.id },
@@ -374,6 +392,14 @@ export class VerificationService {
       status: dto.status,
       documentType: doc.document_type,
     });
+    this.chatGateway
+      .emitUserSyncEvent(doc.user_id, 'verificationStatusUpdated', {
+        documentId: doc.id,
+        documentType: doc.document_type,
+        status: dto.status,
+        updatedAt: new Date().toISOString(),
+      })
+      .catch(() => {});
 
     return saved;
   }

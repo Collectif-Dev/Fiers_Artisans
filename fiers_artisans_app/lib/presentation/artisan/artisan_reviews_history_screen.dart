@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import '../../data/models/artisan_model.dart';
 import '../../data/models/review_model.dart';
 import '../../data/repositories/artisan_repository.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/chat_realtime_service.dart';
 import '../common/rating_stars.dart';
 
 class ArtisanReviewsHistoryScreen extends ConsumerStatefulWidget {
@@ -21,6 +24,8 @@ class ArtisanReviewsHistoryScreen extends ConsumerStatefulWidget {
 class _ArtisanReviewsHistoryScreenState
     extends ConsumerState<ArtisanReviewsHistoryScreen> {
   final ArtisanRepository _repository = ArtisanRepository();
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
   bool _isLoading = true;
   String? _error;
@@ -32,6 +37,13 @@ class _ArtisanReviewsHistoryScreenState
   void initState() {
     super.initState();
     Future.microtask(_load);
+    _realtimeSub = _realtime.domainEvents.listen(_onRealtimeEvent);
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -342,6 +354,30 @@ class _ArtisanReviewsHistoryScreenState
     } finally {
       if (mounted) {
         setState(() => _replyingReviewId = null);
+      }
+    }
+  }
+
+  void _onRealtimeEvent(ChatRealtimeEvent event) {
+    final currentUserId = ref.read(authProvider).user?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    final artisanUserId = event.payload['artisanUserId']?.toString();
+    final isCurrentArtisan =
+        artisanUserId != null && artisanUserId == currentUserId;
+
+    if (event.event == 'artisanReviewsUpdated' && isCurrentArtisan) {
+      _load();
+      return;
+    }
+
+    if (event.event == 'notificationCreated') {
+      final notif = event.payload['notification'];
+      if (notif is Map<String, dynamic>) {
+        final type = notif['type']?.toString().toUpperCase();
+        if (type == 'REVIEW_CREATED' || type == 'REVIEW_UPDATED') {
+          _load();
+        }
       }
     }
   }

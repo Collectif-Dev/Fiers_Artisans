@@ -12,9 +12,11 @@ import {
 } from './schemas/portfolio-item.schema';
 import { ArtisanProfile } from '../users/entities/artisan-profile.entity';
 import { User } from '../users/entities/user.entity';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
+    ChatModule,
     MongooseModule.forFeature([
       { name: PortfolioItem.name, schema: PortfolioItemSchema },
     ]),

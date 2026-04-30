@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -7,20 +8,25 @@ import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../data/models/portfolio_model.dart';
 import '../../data/repositories/artisan_repository.dart';
+import '../../providers/auth_provider.dart';
+import '../../services/chat_realtime_service.dart';
 import '../common/empty_state.dart';
 import '../common/portfolio_item_card.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class PortfolioScreen extends StatefulWidget {
+class PortfolioScreen extends ConsumerStatefulWidget {
   const PortfolioScreen({super.key});
 
   @override
-  State<PortfolioScreen> createState() => _PortfolioScreenState();
+  ConsumerState<PortfolioScreen> createState() => _PortfolioScreenState();
 }
 
-class _PortfolioScreenState extends State<PortfolioScreen> {
+class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
   final ArtisanRepository _repo = ArtisanRepository();
   final ApiClient _api = ApiClient();
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
 
   List<PortfolioModel> _items = [];
   bool _loading = true;
@@ -30,6 +36,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   void initState() {
     super.initState();
     _loadPortfolio();
+    _realtimeSub = _realtime.domainEvents.listen(_onRealtimeEvent);
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPortfolio() async {
@@ -197,6 +210,18 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     }
   }
 
+  void _onRealtimeEvent(ChatRealtimeEvent event) {
+    final currentUserId = ref.read(authProvider).user?.id;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+
+    final artisanUserId = event.payload['artisanUserId']?.toString();
+    final isCurrentArtisan =
+        artisanUserId != null && artisanUserId == currentUserId;
+
+    if (event.event == 'artisanPortfolioUpdated' && isCurrentArtisan) {
+      _loadPortfolio();
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

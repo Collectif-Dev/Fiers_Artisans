@@ -23,12 +23,15 @@ class ChatRealtimeService {
       StreamController<Map<String, dynamic>>.broadcast();
   final _participantAvailabilityController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final _domainEventController =
+      StreamController<ChatRealtimeEvent>.broadcast();
 
   Stream<Map<String, dynamic>> get newMessages => _newMessageController.stream;
   Stream<Map<String, dynamic>> get messagesRead =>
       _messagesReadController.stream;
   Stream<Map<String, dynamic>> get participantAvailabilityUpdates =>
       _participantAvailabilityController.stream;
+  Stream<ChatRealtimeEvent> get domainEvents => _domainEventController.stream;
 
   bool get isConnected => _socket?.connected == true;
 
@@ -103,6 +106,18 @@ class ChatRealtimeService {
         _participantAvailabilityController.add(parsed);
       }
     });
+
+    _bindDomainEvent(socket, 'notificationCreated');
+    _bindDomainEvent(socket, 'notificationRead');
+    _bindDomainEvent(socket, 'notificationsReadAll');
+    _bindDomainEvent(socket, 'userProfileUpdated');
+    _bindDomainEvent(socket, 'favoriteStatusUpdated');
+    _bindDomainEvent(socket, 'artisanProfileUpdated');
+    _bindDomainEvent(socket, 'artisanReviewsUpdated');
+    _bindDomainEvent(socket, 'artisanPortfolioUpdated');
+    _bindDomainEvent(socket, 'subscriptionStatusUpdated');
+    _bindDomainEvent(socket, 'artisanSubscriptionUpdated');
+    _bindDomainEvent(socket, 'verificationStatusUpdated');
   }
 
   void joinConversation(String conversationId) {
@@ -130,4 +145,20 @@ class ChatRealtimeService {
     }
     return <String, dynamic>{};
   }
+
+  void _bindDomainEvent(io.Socket socket, String eventName) {
+    socket.on(eventName, (payload) {
+      final parsed = _toMap(payload);
+      _domainEventController.add(
+        ChatRealtimeEvent(event: eventName, payload: parsed),
+      );
+    });
+  }
+}
+
+class ChatRealtimeEvent {
+  final String event;
+  final Map<String, dynamic> payload;
+
+  const ChatRealtimeEvent({required this.event, required this.payload});
 }
