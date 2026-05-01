@@ -219,7 +219,7 @@ export default function PaymentManualPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap">
-        <Select value={status} onValueChange={setStatus}>
+        <Select value={status} onValueChange={(value) => setStatus(value || 'all')}>
           <SelectTrigger className="w-[220px]">
             <SelectValue />
           </SelectTrigger>
