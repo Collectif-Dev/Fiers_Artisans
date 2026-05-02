@@ -87,11 +87,11 @@ export class PaymentManualService implements OnModuleDestroy {
     );
     this.submitBurstLimit = Math.max(
       1,
-      Number(this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_LIMIT') || 5),
+      Number(this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_LIMIT') || 2),
     );
     this.submitBurstTtlSeconds = Math.max(
       30,
-      Number(this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS') || 300),
+      Number(this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS') || 60),
     );
     this.maxExpireBatchLoops = Math.max(
       1,
@@ -251,6 +251,10 @@ export class PaymentManualService implements OnModuleDestroy {
       );
     }
     await this.enforceProofSubmissionRateLimit(params.userId);
+
+    this.logger.log(
+      `[SUBMIT] Proof submission allowed for user=${params.userId} transactionId=${params.transactionId}`,
+    );
 
     const validation = await this.proofValidationService.validateImage(params.file);
     const imageHash = createHash('sha256').update(params.file.buffer).digest('hex');
@@ -826,9 +830,12 @@ export class PaymentManualService implements OnModuleDestroy {
         await redis.expire(dayKey, this.secondsUntilUtcDayEnd());
       }
       if (dayCount > this.dailyUploadLimit) {
+        this.logger.warn(
+          `[RATE-LIMIT] Daily upload limit reached for user=${userId} dayCount=${dayCount} dayLimit=${this.dailyUploadLimit}`,
+        );
         throw new BusinessException(
           'PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT',
-          'Limite quotidienne des envois de preuve atteinte.',
+          `Limite quotidienne de ${this.dailyUploadLimit} envois atteinte. Reessayez demain.`,
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
@@ -838,9 +845,13 @@ export class PaymentManualService implements OnModuleDestroy {
         await redis.expire(burstKey, this.submitBurstTtlSeconds);
       }
       if (burstCount > this.submitBurstLimit) {
+        const remainingTtl = await redis.ttl(burstKey);
+        this.logger.warn(
+          `[RATE-LIMIT] Burst limit reached for user=${userId} burstCount=${burstCount} burstLimit=${this.submitBurstLimit} remainingTtl=${remainingTtl}s`,
+        );
         throw new BusinessException(
           'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT',
-          'Trop de soumissions en peu de temps. Reessayez plus tard.',
+          `Trop de soumissions. Reessayez dans ${Math.ceil(remainingTtl / 60)} minute(s).`,
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }

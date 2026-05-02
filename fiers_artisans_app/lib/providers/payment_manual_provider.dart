@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/manual_payment_model.dart';
@@ -88,7 +89,14 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
       );
       _startPolling();
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      String errorMessage;
+      if (e is DioException && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
+      } else {
+        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
+      }
+      state = state.copyWith(isLoading: false, error: errorMessage);
     }
   }
 
@@ -106,7 +114,14 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
         _pollingTimer?.cancel();
       }
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      String errorMessage;
+      if (e is DioException && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
+      } else {
+        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
+      }
+      state = state.copyWith(isLoading: false, error: errorMessage);
     }
   }
 
@@ -175,7 +190,14 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
       await fetchStatus();
       _startPolling();
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      String errorMessage;
+      if (e is DioException && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
+      } else {
+        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
+      }
+      state = state.copyWith(isLoading: false, error: errorMessage);
     }
   }
 

@@ -18,6 +18,7 @@ abstract class PaymentManualRepositoryContract {
 class PaymentManualRepository implements PaymentManualRepositoryContract {
   final ApiClient _api = ApiClient();
 
+  @override
   Future<ManualPaymentModel> initiatePayment({required String provider}) async {
     final response = await _api.post(
       ApiEndpoints.manualPaymentInitiate,
@@ -26,11 +27,13 @@ class PaymentManualRepository implements PaymentManualRepositoryContract {
     return ManualPaymentModel.fromJson(response.data as Map<String, dynamic>);
   }
 
+  @override
   Future<ManualPaymentModel> fetchStatus({required String transactionId}) async {
     final response = await _api.get(ApiEndpoints.manualPaymentStatus(transactionId));
     return ManualPaymentModel.fromJson(response.data as Map<String, dynamic>);
   }
 
+  @override
   Future<void> submitProof({
     required String transactionId,
     required String filePath,

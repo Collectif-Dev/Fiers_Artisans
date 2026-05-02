@@ -116,7 +116,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: theme.dividerColor.withOpacity(0.35)),
+                            border: Border.all(
+                              color: theme.dividerColor.withValues(alpha: 0.35),
+                            ),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,7 +127,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                                 width: 42,
                                 height: 42,
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.08),
+                                  color: Colors.black.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: const Icon(Icons.bolt_outlined, color: Colors.black87),
@@ -152,9 +154,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.28),
+                            color: Colors.black.withValues(alpha: 0.28),
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppTheme.gold.withOpacity(0.35)),
+                            border: Border.all(
+                              color: AppTheme.gold.withValues(alpha: 0.35),
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

@@ -455,11 +455,38 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                 label: const Text('Envoyer la preuve'),
               ),
             ],
-            if (state.error != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                state.error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+            if (state.error != null && state.error!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        state.error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ],
