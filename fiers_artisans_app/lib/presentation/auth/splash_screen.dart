@@ -13,10 +13,10 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
-  static const Duration _minSplashVisible = Duration(milliseconds: 900);
+  static const Duration _minSplashVisible = Duration(milliseconds: 1800);
 
   late AnimationController _controller;
-  late Animation<double> _darkScaleAnimation;
+  late Animation<double> _fadeAnimation;
   late DateTime _splashStartedAt;
   bool _navigated = false;
 
@@ -26,14 +26,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _splashStartedAt = DateTime.now();
     _controller = AnimationController(
       vsync: this,
-      duration: _minSplashVisible,
+      duration: const Duration(milliseconds: 650),
     );
 
-    _darkScaleAnimation = Tween<double>(begin: 0.24, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeIn,
     );
 
     final authState = ref.read(authProvider);
@@ -50,7 +48,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void didChangeDependencies() {
     super.didChangeDependencies();
     precacheImage(
-      const AssetImage('assets/branding/splash_dark_layer_1.png'),
+      const AssetImage('assets/branding/logo_lockup_dark.png'),
+      context,
+    );
+    precacheImage(
+      const AssetImage('assets/branding/logo_lockup_light.png'),
       context,
     );
   }
@@ -101,32 +103,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     }
   }
 
-  Widget _buildDarkAnimatedLogo() {
-    return ScaleTransition(
-      scale: _darkScaleAnimation,
-      child: SizedBox(
-        width: 320,
-        height: 320,
-        child: Image.asset(
-          'assets/branding/splash_dark_layer_1.png',
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return Image.asset(
-              'assets/branding/logo_app_dark.png',
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) {
-                return Image.asset(
-                  'assets/branding/logo_app.png',
-                  fit: BoxFit.contain,
-                );
-              },
-            );
-          },
-        ),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _controller.dispose();
@@ -136,45 +112,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final lockupAsset = isDark
-        ? 'assets/branding/logo_lockup_dark.png'
-        : 'assets/branding/logo_lockup_light.png';
 
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark
-                ? [const Color(0xFF000000), const Color(0xFF000000)]
-                : [const Color(0xFFF7F7F9), const Color(0xFFFFFFFF)],
+      backgroundColor: isDark ? Colors.black : Colors.white,
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Center(
+          child: Image.asset(
+            isDark
+                ? 'assets/branding/logo_lockup_dark.png'
+                : 'assets/branding/logo_lockup_light.png',
+            width: MediaQuery.of(context).size.width * 0.72,
+            fit: BoxFit.contain,
           ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (isDark)
-              _buildDarkAnimatedLogo()
-            else
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Image.asset(
-                    lockupAsset,
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.asset(
-                        'assets/branding/logo_app.png',
-                        fit: BoxFit.contain,
-                      );
-                    },
-                  ),
-                ),
-              ),
-          ],
         ),
       ),
     );
