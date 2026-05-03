@@ -6,6 +6,7 @@ import {
   Query,
   Req,
   Res,
+  BadRequestException,
   ForbiddenException,
   UseGuards,
   UseInterceptors,
@@ -54,19 +55,26 @@ export class MediaController {
   private isPublicBucket(bucket: string): boolean {
     const portfolioBucket =
       this.configService.get<string>('minio.buckets.portfolio') || 'portfolio';
-    const mediaBucket =
-      this.configService.get<string>('minio.buckets.media') || 'media';
-    return bucket === portfolioBucket || bucket === mediaBucket;
+    const profilesBucket =
+      this.configService.get<string>('minio.buckets.profiles') || 'profiles';
+    return bucket === portfolioBucket || bucket === profilesBucket;
   }
 
-  @Post('upload')
-  @UseGuards(AuthGuard('jwt'), PhoneVerifiedGuard)
-  @UseInterceptors(FileInterceptor('file'))
-  async upload(
-    @CurrentUser('id') userId: string,
-    @UploadedFile() file: Express.Multer.File,
-    @Query('bucket') bucket: string,
-    @Req() req: Request,
+  private getBucket(
+    bucketKey: 'portfolio' | 'documents' | 'media' | 'profiles',
+  ): string {
+    return this.configService.get<string>(`minio.buckets.${bucketKey}`) || bucketKey;
+  }
+
+  private getAllowedUploadBuckets(): string[] {
+    return [this.getBucket('portfolio'), this.getBucket('documents')];
+  }
+
+  private async handleUpload(
+    userId: string,
+    bucket: string,
+    file: Express.Multer.File,
+    req: Request,
   ) {
     const media = await this.mediaService.upload(userId, bucket, file);
     const [url, thumbnailUrl] = await Promise.all([
@@ -96,6 +104,49 @@ export class MediaController {
       mimeType: media.mimeType,
       size: media.size,
     };
+  }
+
+  @Post('upload')
+  @UseGuards(AuthGuard('jwt'), PhoneVerifiedGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async upload(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('bucket') bucket: string,
+    @Req() req: Request,
+  ) {
+    const allowedBuckets = this.getAllowedUploadBuckets();
+    if (!bucket || !allowedBuckets.includes(bucket)) {
+      throw new BadRequestException(
+        `Bucket non autorise. Buckets autorises: ${allowedBuckets.join(', ')}`,
+      );
+    }
+
+    return this.handleUpload(userId, bucket, file, req);
+  }
+
+  @Post('upload/profile')
+  @UseGuards(AuthGuard('jwt'), PhoneVerifiedGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadProfile(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
+  ) {
+    const bucket = this.getBucket('profiles');
+    return this.handleUpload(userId, bucket, file, req);
+  }
+
+  @Post('upload/chat')
+  @UseGuards(AuthGuard('jwt'), PhoneVerifiedGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadChatAttachment(
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
+  ) {
+    const bucket = this.getBucket('media');
+    return this.handleUpload(userId, bucket, file, req);
   }
 
   @Get('file/:bucket/:objectKey')
@@ -129,7 +180,7 @@ export class MediaController {
     @Res() res: Response,
   ) {
     if (!this.isPublicBucket(bucket)) {
-      throw new ForbiddenException('Accès public non autorisé pour ce bucket.');
+      throw new ForbiddenException('AccĂ¨s public non autorisĂ© pour ce bucket.');
     }
 
     try {

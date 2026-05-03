@@ -33,7 +33,12 @@ Composants du monorepo:
 - PostgreSQL: users, profils, categories, verification, reviews, subscriptions, payments
 - MongoDB: chat, conversations, notifications (TTL), analytics (TTL), portfolio, metadonnees media
 - Redis: OTP (TTL), anti brute-force OTP/PIN, sessions, pub/sub temps reel
-- MinIO: documents KYC, fichiers media, images portfolio
+- MinIO:
+	- `portfolio` : images portfolio artisans (public)
+	- `profiles` : photos de profil utilisateurs (public)
+	- `media` : pieces jointes de chat, medias conversations (prive - JWT)
+	- `documents` : pieces d'identite, diplomes (prive - JWT + admin)
+	- `payment-proofs` : preuves de paiement manuel (prive - JWT + admin)
 
 Regle de coherence cross-bases:
 - toute reference PostgreSQL stockee en MongoDB doit etre validee cote backend avant insertion.
