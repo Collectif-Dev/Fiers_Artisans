@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -9,14 +11,16 @@ import 'config/app_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
+
+  await Future.wait([
+    dotenv.load(fileName: '.env'),
+    EasyLocalization.ensureInitialized(),
+  ]);
 
   if (kDebugMode) {
     debugPrint('[Config] API Base URL: ${AppConfig.apiBaseUrl}');
     debugPrint('[Config] WS Base URL: ${AppConfig.wsBaseUrl}');
   }
-
-  await EasyLocalization.ensureInitialized();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -24,11 +28,6 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
 
   runApp(
     EasyLocalization(
@@ -40,6 +39,13 @@ void main() async {
         child: FiersArtisansApp(),
       ),
     ),
+  );
+
+  unawaited(
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
   );
 }
 

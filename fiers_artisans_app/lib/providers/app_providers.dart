@@ -11,33 +11,54 @@ final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>((ref) {
 });
 
 class ThemeNotifier extends StateNotifier<ThemeMode> {
-  ThemeNotifier() : super(ThemeMode.dark) {
+  ThemeNotifier() : super(ThemeMode.system) {
     _loadTheme();
   }
 
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    final mode = prefs.getString(AppConstants.keyThemeMode) ?? 'dark';
-    state = mode == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final mode = prefs.getString(AppConstants.keyThemeMode) ?? 'system';
+    switch (mode) {
+      case 'dark':
+        state = ThemeMode.dark;
+      case 'light':
+        state = ThemeMode.light;
+      default:
+        state = ThemeMode.system;
+    }
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
+    final prefs = await SharedPreferences.getInstance();
+    final value = switch (mode) {
+      ThemeMode.dark => 'dark',
+      ThemeMode.light => 'light',
+      ThemeMode.system => 'system',
+    };
+    await prefs.setString(AppConstants.keyThemeMode, value);
   }
 
   Future<void> setDark() async {
-    state = ThemeMode.dark;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConstants.keyThemeMode, 'dark');
+    await setThemeMode(ThemeMode.dark);
   }
 
   Future<void> setLight() async {
-    state = ThemeMode.light;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConstants.keyThemeMode, 'light');
+    await setThemeMode(ThemeMode.light);
+  }
+
+  Future<void> setSystem() async {
+    await setThemeMode(ThemeMode.system);
   }
 
   Future<void> toggle() async {
-    if (state == ThemeMode.dark) {
-      await setLight();
-    } else {
-      await setDark();
+    switch (state) {
+      case ThemeMode.dark:
+        await setLight();
+      case ThemeMode.light:
+        await setSystem();
+      case ThemeMode.system:
+        await setDark();
     }
   }
 

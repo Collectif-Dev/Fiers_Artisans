@@ -82,4 +82,5 @@ flutter:
     - assets/translations/
     - assets/images/
     - assets/icons/
+    - assets/branding/
     - assets/animations/

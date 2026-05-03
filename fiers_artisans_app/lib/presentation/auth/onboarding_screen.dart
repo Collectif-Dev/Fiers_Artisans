@@ -46,7 +46,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeMode = ref.watch(themeProvider);
-    final isDark = themeMode == ThemeMode.dark;
 
     return Scaffold(
       body: SafeArea(
@@ -58,24 +57,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: Column(
                 children: [
                   // Theme toggle
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _ThemeOption(
-                        icon: Icons.dark_mode_rounded,
-                        label: 'theme.dark'.tr(),
-                        isSelected: isDark,
-                        onTap: () => ref.read(themeProvider.notifier).setDark(),
-                      ),
-                      const SizedBox(width: 12),
-                      _ThemeOption(
-                        icon: Icons.light_mode_rounded,
-                        label: 'theme.light'.tr(),
-                        isSelected: !isDark,
-                        onTap: () =>
-                            ref.read(themeProvider.notifier).setLight(),
-                      ),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _ThemeOption(
+                          icon: Icons.brightness_auto_rounded,
+                          label: 'theme.system'.tr(),
+                          isSelected: themeMode == ThemeMode.system,
+                          onTap: () =>
+                              ref.read(themeProvider.notifier).setSystem(),
+                        ),
+                        const SizedBox(width: 12),
+                        _ThemeOption(
+                          icon: Icons.dark_mode_rounded,
+                          label: 'theme.dark'.tr(),
+                          isSelected: themeMode == ThemeMode.dark,
+                          onTap: () =>
+                              ref.read(themeProvider.notifier).setDark(),
+                        ),
+                        const SizedBox(width: 12),
+                        _ThemeOption(
+                          icon: Icons.light_mode_rounded,
+                          label: 'theme.light'.tr(),
+                          isSelected: themeMode == ThemeMode.light,
+                          onTap: () =>
+                              ref.read(themeProvider.notifier).setLight(),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   // Language toggle

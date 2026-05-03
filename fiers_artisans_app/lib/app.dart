@@ -5,6 +5,7 @@ import 'config/theme.dart';
 import 'config/routes.dart';
 import 'providers/app_providers.dart';
 import 'providers/payment_manual_provider.dart';
+import 'services/app_icon_service.dart';
 
 class FiersArtisansApp extends ConsumerStatefulWidget {
   const FiersArtisansApp({super.key});
@@ -16,6 +17,24 @@ class FiersArtisansApp extends ConsumerStatefulWidget {
 class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
+  bool? _lastDarkIconValue;
+
+  void _syncHomeIconWithTheme(ThemeMode themeMode, BuildContext context) {
+    final systemBrightness = MediaQuery.platformBrightnessOf(context);
+    final isDark =
+        themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            systemBrightness == Brightness.dark);
+
+    if (_lastDarkIconValue == isDark) {
+      return;
+    }
+    _lastDarkIconValue = isDark;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AppIconService.syncForTheme(isDark: isDark);
+    });
+  }
 
   @override
   void initState() {
@@ -34,6 +53,7 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeProvider);
+    _syncHomeIconWithTheme(themeMode, context);
 
     return MaterialApp.router(
       scaffoldMessengerKey: _scaffoldMessengerKey,

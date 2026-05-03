@@ -4,6 +4,7 @@
     "tagline": "La confiance, c'est leur métier"
   },
   "theme": {
+    "system": "Système",
     "dark": "Sombre",
     "light": "Clair",
     "select": "Choisissez votre thème"

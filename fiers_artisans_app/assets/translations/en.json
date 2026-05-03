@@ -4,6 +4,7 @@
     "tagline": "Trust is their craft"
   },
   "theme": {
+    "system": "System",
     "dark": "Dark",
     "light": "Light",
     "select": "Choose your theme"

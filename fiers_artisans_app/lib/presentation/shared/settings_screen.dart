@@ -13,7 +13,16 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
-    final isDark = themeMode == ThemeMode.dark;
+    final themeIcon = switch (themeMode) {
+      ThemeMode.system => Icons.brightness_auto_rounded,
+      ThemeMode.dark => Icons.dark_mode_rounded,
+      ThemeMode.light => Icons.light_mode_rounded,
+    };
+    final themeSubtitle = switch (themeMode) {
+      ThemeMode.system => 'theme.system'.tr(),
+      ThemeMode.dark => 'theme.dark'.tr(),
+      ThemeMode.light => 'theme.light'.tr(),
+    };
 
     return Scaffold(
       appBar: AppBar(title: Text('settings.title'.tr())),
@@ -23,10 +32,10 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           // Theme
           _SettingsTile(
-            icon: isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+            icon: themeIcon,
             title: 'settings.theme'.tr(),
-            subtitle: isDark ? 'theme.dark'.tr() : 'theme.light'.tr(),
-            onTap: () => ref.read(themeProvider.notifier).toggle(),
+            subtitle: themeSubtitle,
+            onTap: () => _openThemeSelector(context, ref, themeMode),
           ),
 
           // Language
@@ -73,6 +82,59 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _openThemeSelector(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeMode selectedMode,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.brightness_auto_rounded),
+                title: Text('theme.system'.tr()),
+                trailing: selectedMode == ThemeMode.system
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () {
+                  ref.read(themeProvider.notifier).setSystem();
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.dark_mode_rounded),
+                title: Text('theme.dark'.tr()),
+                trailing: selectedMode == ThemeMode.dark
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () {
+                  ref.read(themeProvider.notifier).setDark();
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.light_mode_rounded),
+                title: Text('theme.light'.tr()),
+                trailing: selectedMode == ThemeMode.light
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () {
+                  ref.read(themeProvider.notifier).setLight();
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
