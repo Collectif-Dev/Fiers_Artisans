@@ -11,6 +11,7 @@ services:
       - "3000:3000"
     volumes:
       - ../backend/src:/app/src
+      - ../:/workspace
     environment:
       - NODE_ENV=development
       - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-localhost}
