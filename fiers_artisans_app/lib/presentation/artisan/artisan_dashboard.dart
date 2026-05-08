@@ -90,9 +90,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       if (mounted) {
         setState(() => _isAvailable = previous);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Synchronisation indisponible. Réessayez.'),
-          ),
+          SnackBar(content: Text('dashboard.artisan.sync_unavailable'.tr())),
         );
       }
     }
@@ -788,7 +786,8 @@ class _LoopingMarqueeState extends State<_LoopingMarquee>
       textScaler: textScaler,
       maxLines: 1,
     )..layout();
-    final marqueeHeight = lineHeightPainter.preferredLineHeight.ceilToDouble() + 2;
+    final marqueeHeight =
+        lineHeightPainter.preferredLineHeight.ceilToDouble() + 2;
 
     return LayoutBuilder(
       builder: (context, constraints) {

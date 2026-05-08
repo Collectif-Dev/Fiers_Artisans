@@ -96,7 +96,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ? conversation!.participantName
         : (widget.participantName?.trim().isNotEmpty ?? false)
         ? widget.participantName!.trim()
-        : 'Conversation';
+        : 'chat.conversation'.tr();
 
     final resolvedAvatar =
         (conversation?.participantAvatarUrl?.trim().isNotEmpty ?? false)
@@ -129,14 +129,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 const Icon(Icons.error_outline, size: 34),
                 const SizedBox(height: 12),
                 Text(
-                  'Conversation invalide. Veuillez ouvrir une conversation depuis la liste.',
+                  'chat.invalid_conversation'.tr(),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: () => context.go('/chat'),
-                  child: const Text('Retour aux conversations'),
+                  child: Text('chat.back_to_conversations'.tr()),
                 ),
               ],
             ),
@@ -162,14 +162,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 const Icon(Icons.lock_outline, size: 34),
                 const SizedBox(height: 12),
                 Text(
-                  'Session expiree. Veuillez vous reconnecter.',
+                  'chat.session_expired'.tr(),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: () => context.go('/login'),
-                  child: const Text('Se reconnecter'),
+                  child: Text('common.reconnect'.tr()),
                 ),
               ],
             ),
@@ -218,7 +218,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ],
                   ),
                   Text(
-                    hasKnownConversation ? 'Messagerie SMS' : 'Chargement…',
+                    hasKnownConversation
+                        ? 'chat.channel_sms'.tr()
+                        : 'common.loading'.tr(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.labelSmall,
@@ -238,7 +240,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 : messages.isEmpty
                 ? Center(
                     child: Text(
-                      chatState.errorMessage ?? 'Aucun message',
+                      chatState.errorMessage ?? 'chat.no_messages'.tr(),
                       style: theme.textTheme.bodySmall,
                     ),
                   )
@@ -355,11 +357,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     await _resolveCurrentUserIdIfNeeded();
     if ((_currentUserId ?? '').isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Session invalide. Veuillez vous reconnecter.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('error.unauthorized'.tr())));
       return;
     }
 

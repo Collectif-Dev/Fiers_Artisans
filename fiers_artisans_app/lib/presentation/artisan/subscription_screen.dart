@@ -25,15 +25,13 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   void _openManualPayment({required bool isSubscriptionActive}) {
     if (isSubscriptionActive) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Votre abonnement est deja actif. Aucun paiement n\'est requis pour le moment.'),
-        ),
+        SnackBar(content: Text('subscription.manual.already_active'.tr())),
       );
       return;
     }
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ManualPaymentPage()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ManualPaymentPage()));
   }
 
   @override
@@ -53,7 +51,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 48,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -130,19 +130,27 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                                   color: Colors.black.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Icon(Icons.bolt_outlined, color: Colors.black87),
+                                child: const Icon(
+                                  Icons.bolt_outlined,
+                                  color: Colors.black87,
+                                ),
                               ),
                               const SizedBox(width: 12),
-                              const Expanded(
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Wave (automatique)',
-                                      style: TextStyle(fontWeight: FontWeight.w700),
+                                      'subscription.manual.wave_automatic'.tr(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                     SizedBox(height: 4),
-                                    Text('Temporairement desactive'),
+                                    Text(
+                                      'subscription.manual.temporarily_disabled'
+                                          .tr(),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -165,11 +173,15 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.account_balance_wallet_outlined, color: AppTheme.gold),
+                                  Icon(
+                                    Icons.account_balance_wallet_outlined,
+                                    color: AppTheme.gold,
+                                  ),
                                   const SizedBox(width: 8),
-                                  const Expanded(
+                                  Expanded(
                                     child: Text(
-                                      'Mobile Money (paiement manuel)',
+                                      'subscription.manual.mobile_money_title'
+                                          .tr(),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: Colors.white,
@@ -180,13 +192,18 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Effectuez le virement vers le numero affiche, puis envoyez la preuve dans l\'application.',
-                                style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                                'subscription.manual.instructions'.tr(),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white70,
+                                ),
                               ),
                               if (isActive) ...[
                                 const SizedBox(height: 10),
                                 Text(
-                                  'Abonnement actif: $daysRemaining jour(s) restant(s).',
+                                  'subscription.manual.active_days_remaining'
+                                      .tr(
+                                        namedArgs: {'days': '$daysRemaining'},
+                                      ),
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: AppTheme.gold,
                                     fontWeight: FontWeight.w600,
@@ -195,12 +212,14 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                               ],
                               const SizedBox(height: 14),
                               AppButton(
-                                text: 'Commencer un paiement manuel',
+                                text: 'subscription.manual.start_payment'.tr(),
                                 icon: Icons.upload_file_outlined,
                                 isLoading: false,
                                 onPressed: isActive
                                     ? null
-                                    : () => _openManualPayment(isSubscriptionActive: isActive),
+                                    : () => _openManualPayment(
+                                        isSubscriptionActive: isActive,
+                                      ),
                               ),
                             ],
                           ),

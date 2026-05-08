@@ -470,7 +470,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
                 if (searchState.results.isNotEmpty)
                   Text(
-                    '  •  ${searchState.results.length} résultat(s)',
+                    '  •  ${'search.results'.tr(namedArgs: {'count': '${searchState.results.length}'})}',
                     style: theme.textTheme.bodySmall,
                   ),
               ],
@@ -482,14 +482,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               children: [
                 ChoiceChip(
                   selected: !_showMap,
-                  label: const Text('Liste'),
+                  label: Text('search.view_list'.tr()),
                   avatar: const Icon(Icons.view_agenda_rounded, size: 18),
                   onSelected: (_) => setState(() => _showMap = false),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
                   selected: _showMap,
-                  label: const Text('Carte'),
+                  label: Text('search.view_map'.tr()),
                   avatar: const Icon(Icons.map_outlined, size: 18),
                   onSelected: (_) => setState(() => _showMap = true),
                 ),
@@ -555,8 +555,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (_latitude == null || _longitude == null) {
       return EmptyState(
         icon: Icons.location_off_rounded,
-        title: 'Position indisponible',
-        subtitle: 'Activez la localisation pour utiliser la carte.',
+        title: 'search.position_unavailable'.tr(),
+        subtitle: 'search.enable_location_map'.tr(),
         actionLabel: 'common.retry'.tr(),
         onAction: _initLocation,
       );
@@ -565,8 +565,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (mapArtisans.isEmpty) {
       return EmptyState(
         icon: Icons.map_outlined,
-        title: 'Aucun artisan geolocalise',
-        subtitle: 'Essayez un rayon plus large ou modifiez vos filtres.',
+        title: 'search.none_geolocated'.tr(),
+        subtitle: 'search.adjust_filters'.tr(),
         actionLabel: 'common.retry'.tr(),
         onAction: _search,
       );

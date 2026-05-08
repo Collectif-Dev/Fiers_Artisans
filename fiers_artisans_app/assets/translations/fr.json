@@ -131,7 +131,13 @@
     "top_rated_desc": "Trier par note décroissante",
     "available_only": "Disponibles",
     "available_only_desc": "Afficher uniquement les artisans disponibles",
-    "apply_filters": "Appliquer"
+    "apply_filters": "Appliquer",
+    "view_list": "Liste",
+    "view_map": "Carte",
+    "position_unavailable": "Position indisponible",
+    "enable_location_map": "Activez la localisation pour utiliser la carte.",
+    "none_geolocated": "Aucun artisan geolocalise",
+    "adjust_filters": "Essayez un rayon plus large ou modifiez vos filtres."
   },
   "artisan": {
     "verified": "Vérifié",
@@ -162,7 +168,19 @@
       "upload_success": "Document soumis avec succès",
       "upload_error": "Échec de l'envoi du document",
       "submitting": "Envoi en cours…",
-      "submit_document": "Envoyer le dossier"
+      "submit_document": "Envoyer le dossier",
+      "file_complete": "Dossier complet - pret a envoyer",
+      "file_incomplete": "Dossier incomplet",
+      "cni_instruction": "Veuillez fournir le recto et le verso de votre CNI",
+      "cni_front": "Recto (face avant)",
+      "cni_back": "Verso (face arriere)",
+      "passport_instruction": "Veuillez fournir la page principale de votre passeport",
+      "diploma_instruction": "Ajoutez la page principale puis les pages additionnelles si necessaire",
+      "main_page": "Page principale",
+      "main_page_required": "Page principale (obligatoire)",
+      "additional_pages": "Pages additionnelles ({count}/{max})",
+      "page_number": "Page {number}",
+      "add_page": "Ajouter une page"
     }
   },
   "portfolio": {
@@ -175,6 +193,9 @@
     "empty": "Votre portfolio est vide. Ajoutez vos réalisations !",
     "images_required": "Ajoutez au moins une photo.",
     "add_error": "Erreur lors de l'ajout. Réessayez.",
+    "upload_images_error": "Impossible d'uploader une ou plusieurs images.",
+    "create_after_upload_error": "Images uploadees, mais creation de realisation echouee.",
+    "upload_or_save_error": "Echec lors de l'upload ou de l'enregistrement.",
     "delete_confirm_title": "Supprimer",
     "delete_confirm": "Supprimer cette réalisation de votre portfolio ?",
     "delete_error": "Erreur lors de la suppression."
@@ -189,7 +210,75 @@
     "renew": "Renouveler",
     "renew_available_in": "Renouvellement disponible dans {days} jour(s).",
     "error_open_wave": "Impossible d'ouvrir Wave. Vérifiez que l'application est installée.",
-    "error_payment": "Erreur lors de l'initiation du paiement."
+    "error_payment": "Erreur lors de l'initiation du paiement.",
+    "manual": {
+      "already_active": "Votre abonnement est deja actif. Aucun paiement n'est requis pour le moment.",
+      "wave_automatic": "Wave (automatique)",
+      "temporarily_disabled": "Temporairement desactive",
+      "mobile_money_title": "Mobile Money (paiement manuel)",
+      "instructions": "Effectuez le virement vers le numero affiche, puis envoyez la preuve dans l'application.",
+      "active_days_remaining": "Abonnement actif: {days} jour(s) restant(s).",
+      "start_payment": "Commencer un paiement manuel"
+    }
+  },
+  "manual_payment": {
+    "title": "Paiement manuel",
+    "guide_title": "Guide de paiement manuel",
+    "copy_success": "Numero copie.",
+    "provider_unavailable_moov": "Moov Money n'est pas encore disponible pour le paiement manuel.",
+    "request_pending": "Une demande est deja en cours. Veuillez finaliser ou attendre la validation.",
+    "new_transaction_not_allowed": "Vous ne pouvez pas initier une nouvelle transaction pour le moment.",
+    "recipient_number_label": "Numero destinataire: {number}",
+    "generate_first": "Generez d'abord une transaction.",
+    "proof_not_allowed": "La transaction ne permet pas une nouvelle preuve.",
+    "proof_already_pending": "Votre preuve est deja en attente de validation.",
+    "sender_invalid": "Numero expediteur invalide: +225 suivi de 10 chiffres (07, 05 ou 01).",
+    "proof_sent": "Preuve envoyee.",
+    "step1_title": "1. Choisissez un operateur",
+    "step1_body": "Selectionnez le canal Mobile Money et verifiez le numero destinataire.",
+    "step2_title": "2. Faites le virement",
+    "step2_body": "Effectuez le transfert depuis votre compte et conservez une capture claire.",
+    "step3_title": "3. Soumettez la preuve",
+    "step3_body": "Saisissez le numero de telephone utilise pour effectuer le depot, puis envoyez la capture d'ecran du paiement.",
+    "step4_title": "4. Attendez la validation",
+    "step4_body": "Le statut passe en attente admin puis valide/rejete selon controle.",
+    "refund_policy_title": "Politique de remboursement",
+    "refund_policy_line1": "- Si vous envoyez un montant inferieur a 5 000 FCFA (frais non inclus), la transaction est rejetee et un remboursement est du.",
+    "refund_policy_line2": "- Si vous envoyez un montant superieur a 5 000 FCFA et que le compte n'est pas active (rejet/expiration), vous etes rembourse des frais deduits par l'operateur.",
+    "refund_policy_line3": "- En cas de non-validation sous 72 heures, la demande expire et un remboursement est necessaire.",
+    "mobile_money_title": "Mobile Money (paiement manuel)",
+    "method": "Methode",
+    "recipient_unavailable": "Numero destinataire: Pas encore disponible pour cet operateur.",
+    "send_exact_amount": "Veuillez envoyer exactement 5 000 FCFA a ce numero :",
+    "copy": "Copier",
+    "server_confirmed_number": "Numero confirme par le serveur",
+    "moov_temporarily_unavailable": "Moov Money est temporairement indisponible. Choisissez Orange, MTN ou Wave manuel.",
+    "pending_admin_notice": "Votre demande de paiement est en attente de validation par nos equipes.",
+    "transaction_initiated_notice": "Transaction initiee - veuillez soumettre votre preuve.",
+    "generate_transaction": "Generer une transaction manuelle",
+    "amount_label": "Montant: {amount} FCFA",
+    "sender_number_label": "Numero qui a effectue le depot (ex: 07XXXXXXXX)",
+    "sender_number_hint": "07XXXXXXXX",
+    "proof_already_submitted": "Preuve deja soumise",
+    "select_proof": "Selectionner la preuve",
+    "submit_proof": "Envoyer la preuve",
+    "transaction_id": "Transaction: {id}",
+    "admin_expiration": "Expiration admin: {date}",
+    "rejection_reason_label": "Motif du rejet: {reason}",
+    "status_label": "Statut: {status}",
+    "provider": {
+      "orange": "Orange Money",
+      "mtn": "MTN MoMo",
+      "moov_unavailable": "Moov Money (indisponible)",
+      "wave_manual": "Wave (manuel)"
+    },
+    "status": {
+      "completed": "Complete",
+      "rejected": "Rejete",
+      "pending_admin": "En attente admin",
+      "expired": "Expire",
+      "pending": "En attente"
+    }
   },
   "review": {
     "title": "Avis",
@@ -212,6 +301,13 @@
   "chat": {
     "title": "Messages",
     "empty": "Aucune conversation",
+    "conversation": "Conversation",
+    "session_expired": "Session expiree. Veuillez vous reconnecter.",
+    "invalid_conversation": "Conversation invalide. Veuillez ouvrir une conversation depuis la liste.",
+    "back_to_conversations": "Retour aux conversations",
+    "channel_sms": "Messagerie SMS",
+    "no_messages": "Aucun message",
+    "start_error": "Impossible de demarrer la conversation.",
     "type_message": "Écrire un message...",
     "send": "Envoyer",
     "online": "En ligne",
@@ -231,6 +327,24 @@
     "logout_confirm": "Voulez-vous vraiment vous déconnecter ?",
     "version": "Version {version}"
   },
+  "nav": {
+    "home": "Accueil",
+    "messages": "Messages",
+    "notifications": "Notifs",
+    "settings": "Parametres",
+    "dashboard": "Dashboard"
+  },
+  "location": {
+    "prefill_in_progress": "Localisation en cours...",
+    "use_current_position": "Utiliser ma position",
+    "open_settings": "Reglages",
+    "enable_gps": "Activer GPS",
+    "error_services_disabled": "La geolocalisation est desactivee. Activez le GPS puis reessayez.",
+    "error_permission_required": "La permission de localisation est requise pour utiliser cette fonctionnalite.",
+    "error_permission_denied_forever": "La permission de localisation est refusee de facon permanente. Activez-la dans les reglages de l'application.",
+    "error_position_failed": "Impossible de recuperer votre position actuelle. Verifiez votre GPS puis reessayez.",
+    "error_reverse_geocoding_failed": "Position recuperee, mais impossible de determiner la ville/commune automatiquement."
+  },
   "error": {
     "generic": "Une erreur est survenue. Veuillez réessayer.",
     "no_internet": "Pas de connexion internet.",
@@ -247,6 +361,8 @@
     "edit": "Modifier",
     "loading": "Chargement...",
     "retry": "Réessayer",
+    "reconnect": "Se reconnecter",
+    "required": "Requis",
     "yes": "Oui",
     "no": "Non",
     "ok": "OK"

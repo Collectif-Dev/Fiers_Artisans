@@ -130,7 +130,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Impossible d\'uploader une ou plusieurs images.'),
+            content: Text('portfolio.upload_images_error'.tr()),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -140,9 +140,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Images uploadées, mais création de réalisation échouée.',
-            ),
+            content: Text('portfolio.create_after_upload_error'.tr()),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -153,7 +151,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Echec lors de l\'upload ou de l\'enregistrement.'),
+            content: Text('portfolio.upload_or_save_error'.tr()),
             backgroundColor: AppTheme.error,
           ),
         );
@@ -222,6 +220,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       _loadPortfolio();
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

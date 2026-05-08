@@ -42,14 +42,14 @@ class _ConversationsListScreenState
                 const Icon(Icons.lock_outline, size: 34),
                 const SizedBox(height: 12),
                 Text(
-                  'Session expiree. Veuillez vous reconnecter.',
+                  'chat.session_expired'.tr(),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: () => context.go('/login'),
-                  child: const Text('Se reconnecter'),
+                  child: Text('common.reconnect'.tr()),
                 ),
               ],
             ),

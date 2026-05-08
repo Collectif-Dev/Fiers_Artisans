@@ -131,7 +131,13 @@
     "top_rated_desc": "Sort by highest rating",
     "available_only": "Available now",
     "available_only_desc": "Show only available craftsmen",
-    "apply_filters": "Apply"
+    "apply_filters": "Apply",
+    "view_list": "List",
+    "view_map": "Map",
+    "position_unavailable": "Position unavailable",
+    "enable_location_map": "Enable location to use the map.",
+    "none_geolocated": "No geolocated craftsman",
+    "adjust_filters": "Try a wider radius or adjust your filters."
   },
   "artisan": {
     "verified": "Verified",
@@ -162,7 +168,19 @@
       "upload_success": "Document submitted successfully",
       "upload_error": "Failed to upload document",
       "submitting": "Submitting…",
-      "submit_document": "Submit document"
+      "submit_document": "Submit document",
+      "file_complete": "Complete file - ready to submit",
+      "file_incomplete": "Incomplete file",
+      "cni_instruction": "Please provide both front and back of your ID card",
+      "cni_front": "Front side",
+      "cni_back": "Back side",
+      "passport_instruction": "Please provide the main page of your passport",
+      "diploma_instruction": "Add the main page, then extra pages if needed",
+      "main_page": "Main page",
+      "main_page_required": "Main page (required)",
+      "additional_pages": "Additional pages ({count}/{max})",
+      "page_number": "Page {number}",
+      "add_page": "Add a page"
     }
   },
   "portfolio": {
@@ -175,6 +193,9 @@
     "empty": "Your portfolio is empty. Add your projects!",
     "images_required": "Add at least one photo.",
     "add_error": "Error adding item. Try again.",
+    "upload_images_error": "Unable to upload one or more images.",
+    "create_after_upload_error": "Images uploaded, but project creation failed.",
+    "upload_or_save_error": "Upload or save failed.",
     "delete_confirm_title": "Delete",
     "delete_confirm": "Delete this project from your portfolio?",
     "delete_error": "Error deleting item."
@@ -189,7 +210,75 @@
     "renew": "Renew",
     "renew_available_in": "Renewal available in {days} day(s).",
     "error_open_wave": "Unable to open Wave. Please check the app is installed.",
-    "error_payment": "Error initiating payment."
+    "error_payment": "Error initiating payment.",
+    "manual": {
+      "already_active": "Your subscription is already active. No payment is required right now.",
+      "wave_automatic": "Wave (automatic)",
+      "temporarily_disabled": "Temporarily disabled",
+      "mobile_money_title": "Mobile Money (manual payment)",
+      "instructions": "Send the transfer to the displayed number, then upload your proof inside the app.",
+      "active_days_remaining": "Active subscription: {days} day(s) remaining.",
+      "start_payment": "Start manual payment"
+    }
+  },
+  "manual_payment": {
+    "title": "Manual payment",
+    "guide_title": "Manual payment guide",
+    "copy_success": "Number copied.",
+    "provider_unavailable_moov": "Moov Money is not available yet for manual payment.",
+    "request_pending": "A request is already in progress. Please complete it or wait for validation.",
+    "new_transaction_not_allowed": "You cannot start a new transaction at the moment.",
+    "recipient_number_label": "Recipient number: {number}",
+    "generate_first": "Generate a transaction first.",
+    "proof_not_allowed": "This transaction does not allow a new proof upload.",
+    "proof_already_pending": "Your proof is already pending validation.",
+    "sender_invalid": "Invalid sender number: +225 followed by 10 digits (07, 05 or 01).",
+    "proof_sent": "Proof sent.",
+    "step1_title": "1. Choose an operator",
+    "step1_body": "Select the Mobile Money channel and check the recipient number.",
+    "step2_title": "2. Make the transfer",
+    "step2_body": "Send the payment from your account and keep a clear screenshot.",
+    "step3_title": "3. Submit proof",
+    "step3_body": "Enter the phone number used for the transfer, then upload the payment screenshot.",
+    "step4_title": "4. Wait for validation",
+    "step4_body": "Status moves to admin pending, then validated/rejected after review.",
+    "refund_policy_title": "Refund policy",
+    "refund_policy_line1": "- If you send less than 5,000 FCFA (fees excluded), the transaction is rejected and a refund is due.",
+    "refund_policy_line2": "- If you send more than 5,000 FCFA and the account is not activated (rejected/expired), you are refunded minus operator fees.",
+    "refund_policy_line3": "- If not validated within 72 hours, the request expires and a refund is required.",
+    "mobile_money_title": "Mobile Money (manual payment)",
+    "method": "Method",
+    "recipient_unavailable": "Recipient number: Not available yet for this operator.",
+    "send_exact_amount": "Please send exactly 5,000 FCFA to this number:",
+    "copy": "Copy",
+    "server_confirmed_number": "Number confirmed by server",
+    "moov_temporarily_unavailable": "Moov Money is temporarily unavailable. Choose Orange, MTN or manual Wave.",
+    "pending_admin_notice": "Your payment request is awaiting validation by our team.",
+    "transaction_initiated_notice": "Transaction initiated - please submit your proof.",
+    "generate_transaction": "Generate manual transaction",
+    "amount_label": "Amount: {amount} FCFA",
+    "sender_number_label": "Sender number used for transfer (ex: 07XXXXXXXX)",
+    "sender_number_hint": "07XXXXXXXX",
+    "proof_already_submitted": "Proof already submitted",
+    "select_proof": "Select proof",
+    "submit_proof": "Submit proof",
+    "transaction_id": "Transaction: {id}",
+    "admin_expiration": "Admin expiration: {date}",
+    "rejection_reason_label": "Rejection reason: {reason}",
+    "status_label": "Status: {status}",
+    "provider": {
+      "orange": "Orange Money",
+      "mtn": "MTN MoMo",
+      "moov_unavailable": "Moov Money (unavailable)",
+      "wave_manual": "Wave (manual)"
+    },
+    "status": {
+      "completed": "Completed",
+      "rejected": "Rejected",
+      "pending_admin": "Pending admin",
+      "expired": "Expired",
+      "pending": "Pending"
+    }
   },
   "review": {
     "title": "Reviews",
@@ -212,6 +301,13 @@
   "chat": {
     "title": "Messages",
     "empty": "No conversations",
+    "conversation": "Conversation",
+    "session_expired": "Session expired. Please log in again.",
+    "invalid_conversation": "Invalid conversation. Please open one from the list.",
+    "back_to_conversations": "Back to conversations",
+    "channel_sms": "SMS messaging",
+    "no_messages": "No messages",
+    "start_error": "Unable to start conversation.",
     "type_message": "Type a message...",
     "send": "Send",
     "online": "Online",
@@ -231,6 +327,24 @@
     "logout_confirm": "Are you sure you want to log out?",
     "version": "Version {version}"
   },
+  "nav": {
+    "home": "Home",
+    "messages": "Messages",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "dashboard": "Dashboard"
+  },
+  "location": {
+    "prefill_in_progress": "Fetching location...",
+    "use_current_position": "Use my position",
+    "open_settings": "Settings",
+    "enable_gps": "Enable GPS",
+    "error_services_disabled": "Location is disabled. Enable GPS then try again.",
+    "error_permission_required": "Location permission is required to use this feature.",
+    "error_permission_denied_forever": "Location permission is permanently denied. Enable it in app settings.",
+    "error_position_failed": "Unable to read your current position. Check GPS and try again.",
+    "error_reverse_geocoding_failed": "Position found, but city/district could not be resolved automatically."
+  },
   "error": {
     "generic": "An error occurred. Please try again.",
     "no_internet": "No internet connection.",
@@ -247,6 +361,8 @@
     "edit": "Edit",
     "loading": "Loading...",
     "retry": "Retry",
+    "reconnect": "Log in again",
+    "required": "Required",
     "yes": "Yes",
     "no": "No",
     "ok": "OK"

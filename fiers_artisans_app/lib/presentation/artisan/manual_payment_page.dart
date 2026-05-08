@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../config/theme.dart';
 import '../../providers/payment_manual_provider.dart';
@@ -66,9 +67,9 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
   Future<void> _copyRecipient(String number) async {
     await Clipboard.setData(ClipboardData(text: number));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Numero copie.')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('manual_payment.copy_success'.tr())));
   }
 
   Future<void> _initiate() async {
@@ -78,8 +79,8 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
     if (_recipientByProvider[_provider] == null) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Moov Money n\'est pas encore disponible pour le paiement manuel.'),
+        SnackBar(
+          content: Text('manual_payment.provider_unavailable_moov'.tr()),
         ),
       );
       return;
@@ -87,23 +88,23 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
     if (tx != null && (tx.isPending || tx.isPendingAdmin)) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Une demande est deja en cours. Veuillez finaliser ou attendre la validation.'),
-        ),
+        SnackBar(content: Text('manual_payment.request_pending'.tr())),
       );
       return;
     }
 
     if (tx != null && !tx.canInitiateNewTransaction) {
       messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Vous ne pouvez pas initier une nouvelle transaction pour le moment.'),
+        SnackBar(
+          content: Text('manual_payment.new_transaction_not_allowed'.tr()),
         ),
       );
       return;
     }
 
-    await ref.read(paymentManualProvider.notifier).initiatePayment(provider: _provider);
+    await ref
+        .read(paymentManualProvider.notifier)
+        .initiatePayment(provider: _provider);
 
     if (!mounted) return;
     final latest = ref.read(paymentManualProvider).currentTransaction;
@@ -112,7 +113,15 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
         latest.recipientNumber != null &&
         latest.recipientNumber!.isNotEmpty) {
       messenger.showSnackBar(
-        SnackBar(content: Text('Numero destinataire: ${_formatPhoneSpaced(latest.recipientNumber!)}')),
+        SnackBar(
+          content: Text(
+            'manual_payment.recipient_number_label'.tr(
+              namedArgs: {
+                'number': _formatPhoneSpaced(latest.recipientNumber!),
+              },
+            ),
+          ),
+        ),
       );
     }
   }
@@ -125,45 +134,42 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
     if (tx == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Generez d\'abord une transaction.')),
+        SnackBar(content: Text('manual_payment.generate_first'.tr())),
       );
       return;
     }
 
     if (!(tx.isPending || tx.isRejected)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('La transaction ne permet pas une nouvelle preuve.')),
+        SnackBar(content: Text('manual_payment.proof_not_allowed'.tr())),
       );
       return;
     }
 
     if (state.hasSubmittedProof && tx.isPendingAdmin) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Votre preuve est deja en attente de validation.')),
+        SnackBar(content: Text('manual_payment.proof_already_pending'.tr())),
       );
       return;
     }
 
     if (image == null || !_ivorianMobilePattern.hasMatch(sender)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Numero expediteur invalide: +225 suivi de 10 chiffres (07, 05 ou 01).'),
-        ),
+        SnackBar(content: Text('manual_payment.sender_invalid'.tr())),
       );
       return;
     }
 
-    await ref.read(paymentManualProvider.notifier).submitProof(
-          filePath: image.path,
-          senderNumber: sender,
-        );
+    await ref
+        .read(paymentManualProvider.notifier)
+        .submitProof(filePath: image.path, senderNumber: sender);
 
     if (!mounted) return;
     final error = ref.read(paymentManualProvider).error;
     if (error == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preuve envoyee.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('manual_payment.proof_sent'.tr())));
     }
   }
 
@@ -187,7 +193,10 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 2),
               Text(text, style: const TextStyle(color: Colors.white70)),
@@ -207,10 +216,12 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     final isPendingAdminLocked =
         tx != null && tx.isPendingAdmin && state.hasSubmittedProof;
 
-    final canInitiate = !state.isLoading &&
+    final canInitiate =
+        !state.isLoading &&
         !providerUnavailable &&
         (tx == null || tx.canInitiateNewTransaction);
-    final canSubmit = !state.isLoading &&
+    final canSubmit =
+        !state.isLoading &&
         tx != null &&
         (tx.isPending || tx.isRejected) &&
         !(state.hasSubmittedProof && tx.isPendingAdmin);
@@ -220,19 +231,20 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     final selectedRecipient = recipientFromBackend
         ? tx.recipientNumber
         : _recipientByProvider[_provider];
-    final formattedRecipient =
-        selectedRecipient == null ? null : _formatPhoneSpaced(selectedRecipient);
+    final formattedRecipient = selectedRecipient == null
+        ? null
+        : _formatPhoneSpaced(selectedRecipient);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Paiement manuel')),
+      appBar: AppBar(title: Text('manual_payment.title'.tr())),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Guide de paiement manuel',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            Text(
+              'manual_payment.guide_title'.tr(),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 10),
             Container(
@@ -241,32 +253,34 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.28),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.32)),
+                border: Border.all(
+                  color: AppTheme.gold.withValues(alpha: 0.32),
+                ),
               ),
               child: Column(
                 children: [
                   _stepItem(
                     Icons.looks_one_outlined,
-                    '1. Choisissez un operateur',
-                    'Selectionnez le canal Mobile Money et verifiez le numero destinataire.',
+                    'manual_payment.step1_title'.tr(),
+                    'manual_payment.step1_body'.tr(),
                   ),
                   const SizedBox(height: 10),
                   _stepItem(
                     Icons.looks_two_outlined,
-                    '2. Faites le virement',
-                    'Effectuez le transfert depuis votre compte et conservez une capture claire.',
+                    'manual_payment.step2_title'.tr(),
+                    'manual_payment.step2_body'.tr(),
                   ),
                   const SizedBox(height: 10),
                   _stepItem(
                     Icons.looks_3_outlined,
-                    '3. Soumettez la preuve',
-                    'Saisissez le numero de telephone que vous avez utilise pour effectuer le depot, puis envoyez la capture d\'ecran du paiement.',
+                    'manual_payment.step3_title'.tr(),
+                    'manual_payment.step3_body'.tr(),
                   ),
                   const SizedBox(height: 10),
                   _stepItem(
                     Icons.looks_4_outlined,
-                    '4. Attendez la validation',
-                    'Le statut passe en attente admin puis valide/rejete selon controle.',
+                    'manual_payment.step4_title'.tr(),
+                    'manual_payment.step4_body'.tr(),
                   ),
                 ],
               ),
@@ -280,44 +294,59 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFFFFD166)),
               ),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Politique de remboursement',
-                    style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black87),
+                    'manual_payment.refund_policy_title'.tr(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87,
+                    ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
-                    '- Si vous envoyez un montant inferieur a 5 000 FCFA (frais non inclus), la transaction est rejetee et un remboursement est du.',
-                    style: TextStyle(color: Colors.black87),
+                    'manual_payment.refund_policy_line1'.tr(),
+                    style: const TextStyle(color: Colors.black87),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Text(
-                    '- Si vous envoyez un montant superieur a 5 000 FCFA et que le compte n\'est pas active (rejet/expiration), vous etes rembourse des frais deduits par l\'operateur.',
-                    style: TextStyle(color: Colors.black87),
+                    'manual_payment.refund_policy_line2'.tr(),
+                    style: const TextStyle(color: Colors.black87),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Text(
-                    '- En cas de non-validation sous 72 heures, la demande expire et un remboursement est necessaire.',
-                    style: TextStyle(color: Colors.black87),
+                    'manual_payment.refund_policy_line3'.tr(),
+                    style: const TextStyle(color: Colors.black87),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Mobile Money (paiement manuel)',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            Text(
+              'manual_payment.mobile_money_title'.tr(),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               initialValue: _provider,
-              items: const [
-                DropdownMenuItem(value: 'ORANGE_MONEY', child: Text('Orange Money')),
-                DropdownMenuItem(value: 'MTN_MOMO', child: Text('MTN MoMo')),
-                DropdownMenuItem(value: 'MOOV_MONEY', child: Text('Moov Money (indisponible)')),
-                DropdownMenuItem(value: 'WAVE', child: Text('Wave (manuel)')),
+              items: [
+                DropdownMenuItem(
+                  value: 'ORANGE_MONEY',
+                  child: Text('manual_payment.provider.orange'.tr()),
+                ),
+                DropdownMenuItem(
+                  value: 'MTN_MOMO',
+                  child: Text('manual_payment.provider.mtn'.tr()),
+                ),
+                DropdownMenuItem(
+                  value: 'MOOV_MONEY',
+                  child: Text('manual_payment.provider.moov_unavailable'.tr()),
+                ),
+                DropdownMenuItem(
+                  value: 'WAVE',
+                  child: Text('manual_payment.provider.wave_manual'.tr()),
+                ),
               ],
               onChanged: isPendingAdminLocked
                   ? null
@@ -327,7 +356,9 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                         _provider = value;
                       });
                     },
-              decoration: const InputDecoration(labelText: 'Methode'),
+              decoration: InputDecoration(
+                labelText: 'manual_payment.method'.tr(),
+              ),
             ),
             const SizedBox(height: 10),
             Container(
@@ -336,19 +367,24 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.36),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.42)),
+                border: Border.all(
+                  color: AppTheme.gold.withValues(alpha: 0.42),
+                ),
               ),
               child: selectedRecipient == null
-                  ? const Text(
-                      'Numero destinataire: Pas encore disponible pour cet operateur.',
-                      style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w700),
+                  ? Text(
+                      'manual_payment.recipient_unavailable'.tr(),
+                      style: const TextStyle(
+                        color: Colors.orangeAccent,
+                        fontWeight: FontWeight.w700,
+                      ),
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Veuillez envoyer exactement 5 000 FCFA a ce numero :',
-                          style: TextStyle(color: Colors.white70),
+                        Text(
+                          'manual_payment.send_exact_amount'.tr(),
+                          style: const TextStyle(color: Colors.white70),
                         ),
                         const SizedBox(height: 6),
                         Row(
@@ -365,50 +401,61 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                               ),
                             ),
                             IconButton(
-                              tooltip: 'Copier',
-                              onPressed: () => _copyRecipient(selectedRecipient),
-                              icon: Icon(Icons.copy_rounded, color: AppTheme.gold),
+                              tooltip: 'manual_payment.copy'.tr(),
+                              onPressed: () =>
+                                  _copyRecipient(selectedRecipient),
+                              icon: Icon(
+                                Icons.copy_rounded,
+                                color: AppTheme.gold,
+                              ),
                             ),
                           ],
                         ),
                         if (recipientFromBackend)
-                          const Text(
-                            'Numero confirme par le serveur',
-                            style: TextStyle(color: Colors.white54, fontSize: 12),
+                          Text(
+                            'manual_payment.server_confirmed_number'.tr(),
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
                           ),
                       ],
                     ),
             ),
             if (providerUnavailable) ...[
               const SizedBox(height: 8),
-              const Text(
-                'Moov Money est temporairement indisponible. Choisissez Orange, MTN ou Wave manuel.',
-                style: TextStyle(color: Colors.orangeAccent),
+              Text(
+                'manual_payment.moov_temporarily_unavailable'.tr(),
+                style: const TextStyle(color: Colors.orangeAccent),
               ),
             ],
             if (tx != null && tx.isPendingAdmin) ...[
               const SizedBox(height: 8),
-              const Text(
-                'Votre demande de paiement est en attente de validation par nos equipes.',
-                style: TextStyle(color: Colors.orangeAccent),
+              Text(
+                'manual_payment.pending_admin_notice'.tr(),
+                style: const TextStyle(color: Colors.orangeAccent),
               ),
             ] else if (tx != null && tx.isPending) ...[
               const SizedBox(height: 8),
-              const Text(
-                'Transaction initiee - veuillez soumettre votre preuve.',
-                style: TextStyle(color: Colors.orangeAccent),
+              Text(
+                'manual_payment.transaction_initiated_notice'.tr(),
+                style: const TextStyle(color: Colors.orangeAccent),
               ),
             ],
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: canInitiate ? _initiate : null,
-              child: const Text('Generer une transaction manuelle'),
+              child: Text('manual_payment.generate_transaction'.tr()),
             ),
             const SizedBox(height: 16),
             PaymentStatusWidget(transaction: tx),
             const SizedBox(height: 12),
             if (tx != null) ...[
-              Text('Montant: ${tx.amountFcfa} FCFA'),
+              Text(
+                'manual_payment.amount_label'.tr(
+                  namedArgs: {'amount': '${tx.amountFcfa}'},
+                ),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _senderController,
@@ -418,10 +465,10 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(10),
                 ],
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   prefixText: '+225 ',
-                  labelText: 'Numero qui a effectue le depot (ex: 07XXXXXXXX)',
-                  hintText: '07XXXXXXXX',
+                  labelText: 'manual_payment.sender_number_label'.tr(),
+                  hintText: 'manual_payment.sender_number_hint'.tr(),
                   counterText: '',
                 ),
               ),
@@ -433,8 +480,8 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                 icon: const Icon(Icons.image_outlined),
                 label: Text(
                   isPendingAdminLocked
-                      ? 'Preuve deja soumise'
-                      : 'Selectionner la preuve',
+                      ? 'manual_payment.proof_already_submitted'.tr()
+                      : 'manual_payment.select_proof'.tr(),
                 ),
               ),
               const SizedBox(height: 8),
@@ -452,7 +499,7 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
               ElevatedButton.icon(
                 onPressed: canSubmit ? _submit : null,
                 icon: const Icon(Icons.upload_file),
-                label: const Text('Envoyer la preuve'),
+                label: Text('manual_payment.submit_proof'.tr()),
               ),
             ],
             if (state.error != null && state.error!.isNotEmpty) ...[
@@ -461,10 +508,14 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.3),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.error.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(

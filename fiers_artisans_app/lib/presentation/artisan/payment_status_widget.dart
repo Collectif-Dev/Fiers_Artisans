@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../data/models/manual_payment_model.dart';
 
@@ -29,7 +30,9 @@ class PaymentStatusWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Statut: $status',
+            'manual_payment.status_label'.tr(
+              namedArgs: {'status': _statusLabel(status).tr()},
+            ),
             style: TextStyle(fontWeight: FontWeight.w700, color: color),
           ),
           if (transaction!.isRejected &&
@@ -37,7 +40,9 @@ class PaymentStatusWidget extends StatelessWidget {
               transaction!.rejectionReason!.trim().isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Motif du rejet: ${transaction!.rejectionReason}',
+              'manual_payment.rejection_reason_label'.tr(
+                namedArgs: {'reason': transaction!.rejectionReason!},
+              ),
               style: TextStyle(
                 color: theme.colorScheme.error,
                 fontWeight: FontWeight.w600,
@@ -45,12 +50,30 @@ class PaymentStatusWidget extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 4),
-          Text('Transaction: ${transaction!.transactionId}'),
+          Text(
+            'manual_payment.transaction_id'.tr(
+              namedArgs: {'id': transaction!.transactionId},
+            ),
+          ),
           if (transaction!.expiresAtAdmin != null)
-            Text('Expiration admin: ${transaction!.expiresAtAdmin}'),
+            Text(
+              'manual_payment.admin_expiration'.tr(
+                namedArgs: {'date': '${transaction!.expiresAtAdmin}'},
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  String _statusLabel(String status) {
+    return switch (status) {
+      'COMPLETED' => 'manual_payment.status.completed',
+      'REJECTED' => 'manual_payment.status.rejected',
+      'PENDING_ADMIN' => 'manual_payment.status.pending_admin',
+      'EXPIRED' => 'manual_payment.status.expired',
+      _ => 'manual_payment.status.pending',
+    };
   }
 
   Color _colorForStatus(String status, ThemeData theme) {

@@ -42,12 +42,9 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsTile(
             icon: Icons.language_rounded,
             title: 'settings.language'.tr(),
-            subtitle: context.locale.languageCode == 'fr'
-                ? 'Français'
-                : 'English',
-            onTap: () => ref
-                .read(localeProvider.notifier)
-                .toggleLocale(context),
+            subtitle: 'language.${context.locale.languageCode}'.tr(),
+            onTap: () =>
+                ref.read(localeProvider.notifier).toggleLocale(context),
           ),
 
           const Divider(height: 32),
@@ -65,8 +62,9 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsTile(
             icon: Icons.info_outline_rounded,
             title: 'settings.about'.tr(),
-            subtitle: 'settings.version'
-                .tr(namedArgs: {'version': AppConfig.appVersion}),
+            subtitle: 'settings.version'.tr(
+              namedArgs: {'version': AppConfig.appVersion},
+            ),
             onTap: () {},
           ),
 
@@ -188,13 +186,17 @@ class _SettingsTile extends StatelessWidget {
     final theme = Theme.of(context);
     return ListTile(
       leading: Icon(icon, color: iconColor ?? theme.colorScheme.primary),
-      title: Text(title,
-          style: theme.textTheme.titleMedium?.copyWith(color: titleColor)),
+      title: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(color: titleColor),
+      ),
       subtitle: subtitle != null
           ? Text(subtitle!, style: theme.textTheme.bodySmall)
           : null,
-      trailing: Icon(Icons.chevron_right_rounded,
-          color: theme.textTheme.bodySmall?.color),
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        color: theme.textTheme.bodySmall?.color,
+      ),
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );

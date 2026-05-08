@@ -76,25 +76,25 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
 
       if (result.issueType == LocationIssueType.reverseGeocodingFailed &&
           result.message != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(result.message!)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('location.error_reverse_geocoding_failed'.tr()),
+          ),
+        );
       }
     } else {
-      final message =
-          result.message ??
-          'Impossible de recuperer votre position. Verifiez vos permissions et reessayez.';
+      final message = _locationIssueMessage(result.issueType);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
           action: result.issueType == LocationIssueType.permissionDeniedForever
               ? SnackBarAction(
-                  label: 'Reglages',
+                  label: 'location.open_settings'.tr(),
                   onPressed: Geolocator.openAppSettings,
                 )
               : result.issueType == LocationIssueType.servicesDisabled
               ? SnackBarAction(
-                  label: 'Activer GPS',
+                  label: 'location.enable_gps'.tr(),
                   onPressed: Geolocator.openLocationSettings,
                 )
               : null,
@@ -207,7 +207,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         label: 'auth.first_name'.tr(),
                         prefixIcon: Icons.person_outline,
                         textInputAction: TextInputAction.next,
-                        validator: (v) => v!.isEmpty ? 'Requis' : null,
+                        validator: (v) =>
+                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -216,7 +217,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         controller: _lastNameCtrl,
                         label: 'auth.last_name'.tr(),
                         textInputAction: TextInputAction.next,
-                        validator: (v) => v!.isEmpty ? 'Requis' : null,
+                        validator: (v) =>
+                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                   ],
@@ -230,7 +232,7 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                   prefixIcon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
-                  validator: (v) => v!.isEmpty ? 'Requis' : null,
+                  validator: (v) => v!.isEmpty ? 'common.required'.tr() : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -350,8 +352,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         : const Icon(Icons.my_location_rounded),
                     label: Text(
                       _isPrefillingLocation
-                          ? 'Localisation en cours...'
-                          : 'Utiliser ma position',
+                          ? 'location.prefill_in_progress'.tr()
+                          : 'location.use_current_position'.tr(),
                     ),
                   ),
                 ),
@@ -365,7 +367,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         hint: 'Abidjan',
                         prefixIcon: Icons.location_city_outlined,
                         textInputAction: TextInputAction.next,
-                        validator: (v) => v!.isEmpty ? 'Requis' : null,
+                        validator: (v) =>
+                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -375,7 +378,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         label: 'auth.commune'.tr(),
                         hint: 'Cocody',
                         textInputAction: TextInputAction.next,
-                        validator: (v) => v!.isEmpty ? 'Requis' : null,
+                        validator: (v) =>
+                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                   ],
@@ -499,6 +503,22 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
         );
       },
     );
+  }
+
+  String _locationIssueMessage(LocationIssueType? issueType) {
+    return switch (issueType) {
+      LocationIssueType.servicesDisabled =>
+        'location.error_services_disabled'.tr(),
+      LocationIssueType.permissionDenied =>
+        'location.error_permission_required'.tr(),
+      LocationIssueType.permissionDeniedForever =>
+        'location.error_permission_denied_forever'.tr(),
+      LocationIssueType.positionReadFailed =>
+        'location.error_position_failed'.tr(),
+      LocationIssueType.reverseGeocodingFailed =>
+        'location.error_reverse_geocoding_failed'.tr(),
+      _ => 'location.error_position_failed'.tr(),
+    };
   }
 }
 

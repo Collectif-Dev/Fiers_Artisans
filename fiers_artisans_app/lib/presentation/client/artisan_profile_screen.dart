@@ -611,11 +611,9 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
       context.push('/chat/${convo.id}?$query');
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Impossible de demarrer la conversation.'),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('chat.start_error'.tr())));
     } finally {
       if (mounted) {
         setState(() => _isOpeningChat = false);

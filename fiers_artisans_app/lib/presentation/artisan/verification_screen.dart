@@ -14,8 +14,7 @@ class VerificationScreen extends ConsumerStatefulWidget {
   const VerificationScreen({super.key});
 
   @override
-  ConsumerState<VerificationScreen> createState() =>
-      _VerificationScreenState();
+  ConsumerState<VerificationScreen> createState() => _VerificationScreenState();
 }
 
 class _VerificationScreenState extends ConsumerState<VerificationScreen>
@@ -89,24 +88,24 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen>
   }) {
     Navigator.of(context)
         .push(
-      MaterialPageRoute(
-        builder: (_) => _DocumentBuilderScreen(
-          documentType: documentType,
-          repo: _repo,
-          onSubmitted: () {
-            // Optimistic local update then refresh from backend
-            ref
-                .read(verificationProvider.notifier)
-                .markFamilyPending(isIdentity: isIdentity);
-            ref.read(verificationProvider.notifier).refresh();
-          },
-        ),
-      ),
-    )
+          MaterialPageRoute(
+            builder: (_) => _DocumentBuilderScreen(
+              documentType: documentType,
+              repo: _repo,
+              onSubmitted: () {
+                // Optimistic local update then refresh from backend
+                ref
+                    .read(verificationProvider.notifier)
+                    .markFamilyPending(isIdentity: isIdentity);
+                ref.read(verificationProvider.notifier).refresh();
+              },
+            ),
+          ),
+        )
         .then((_) {
-      // Refresh when returning from builder screen
-      ref.read(verificationProvider.notifier).refresh();
-    });
+          // Refresh when returning from builder screen
+          ref.read(verificationProvider.notifier).refresh();
+        });
   }
 
   @override
@@ -118,50 +117,48 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen>
       body: vState.isLoading && vState.documents.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : vState.error != null && vState.documents.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('error.generic'.tr()),
-                      const SizedBox(height: 12),
-                      OutlinedButton(
-                        onPressed: () =>
-                            ref.read(verificationProvider.notifier).refresh(),
-                        child: Text('common.retry'.tr()),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('error.generic'.tr()),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () =>
+                        ref.read(verificationProvider.notifier).refresh(),
+                    child: Text('common.retry'.tr()),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () =>
-                      ref.read(verificationProvider.notifier).refresh(),
-                  child: ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      _VerificationStep(
-                        icon: Icons.badge_outlined,
-                        title: 'artisan.verification.upload_id'.tr(),
-                        familyStatus: vState.identityStatus,
-                        rejectionReason: vState.identityRejectionReason,
-                        onAction: _canSubmit(vState.identityStatus)
-                            ? () =>
-                                _showDocumentTypePicker(isIdentity: true)
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      _VerificationStep(
-                        icon: Icons.school_outlined,
-                        title: 'artisan.verification.upload_diploma'.tr(),
-                        familyStatus: vState.diplomaStatus,
-                        rejectionReason: vState.diplomaRejectionReason,
-                        onAction: _canSubmit(vState.diplomaStatus)
-                            ? () =>
-                                _showDocumentTypePicker(isIdentity: false)
-                            : null,
-                      ),
-                    ],
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: () =>
+                  ref.read(verificationProvider.notifier).refresh(),
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  _VerificationStep(
+                    icon: Icons.badge_outlined,
+                    title: 'artisan.verification.upload_id'.tr(),
+                    familyStatus: vState.identityStatus,
+                    rejectionReason: vState.identityRejectionReason,
+                    onAction: _canSubmit(vState.identityStatus)
+                        ? () => _showDocumentTypePicker(isIdentity: true)
+                        : null,
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  _VerificationStep(
+                    icon: Icons.school_outlined,
+                    title: 'artisan.verification.upload_diploma'.tr(),
+                    familyStatus: vState.diplomaStatus,
+                    rejectionReason: vState.diplomaRejectionReason,
+                    onAction: _canSubmit(vState.diplomaStatus)
+                        ? () => _showDocumentTypePicker(isIdentity: false)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -403,11 +400,11 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
 
     if (_isComplete) {
       color = AppTheme.success;
-      text = 'Dossier complet — prêt à envoyer';
+      text = 'artisan.verification.file_complete'.tr();
       icon = Icons.check_circle_outline;
     } else {
       color = AppTheme.warning;
-      text = 'Dossier incomplet';
+      text = 'artisan.verification.file_incomplete'.tr();
       icon = Icons.info_outline;
     }
 
@@ -438,12 +435,12 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
   List<Widget> _buildCNISlots(ThemeData theme) {
     return [
       Text(
-        'Veuillez fournir le recto et le verso de votre CNI',
+        'artisan.verification.cni_instruction'.tr(),
         style: theme.textTheme.bodyMedium,
       ),
       const SizedBox(height: 16),
       _ImageSlot(
-        label: 'Recto (face avant)',
+        label: 'artisan.verification.cni_front'.tr(),
         file: _frontFile,
         required: true,
         onPick: () async {
@@ -454,7 +451,7 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
       ),
       const SizedBox(height: 12),
       _ImageSlot(
-        label: 'Verso (face arrière)',
+        label: 'artisan.verification.cni_back'.tr(),
         file: _backFile,
         required: true,
         onPick: () async {
@@ -471,12 +468,12 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
   List<Widget> _buildPassportSlot(ThemeData theme) {
     return [
       Text(
-        'Veuillez fournir la page principale de votre passeport',
+        'artisan.verification.passport_instruction'.tr(),
         style: theme.textTheme.bodyMedium,
       ),
       const SizedBox(height: 16),
       _ImageSlot(
-        label: 'Page principale',
+        label: 'artisan.verification.main_page'.tr(),
         file: _mainFile,
         required: true,
         onPick: () async {
@@ -493,12 +490,12 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
   List<Widget> _buildDiplomaSlots(ThemeData theme) {
     return [
       Text(
-        'Ajoutez la page principale puis les pages additionnelles si nécessaire',
+        'artisan.verification.diploma_instruction'.tr(),
         style: theme.textTheme.bodyMedium,
       ),
       const SizedBox(height: 16),
       _ImageSlot(
-        label: 'Page principale (obligatoire)',
+        label: 'artisan.verification.main_page_required'.tr(),
         file: _mainFile,
         required: true,
         onPick: () async {
@@ -509,7 +506,12 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
       ),
       const SizedBox(height: 16),
       Text(
-        'Pages additionnelles (${_extraFiles.length}/$kMaxExtraPages)',
+        'artisan.verification.additional_pages'.tr(
+          namedArgs: {
+            'count': '${_extraFiles.length}',
+            'max': '$kMaxExtraPages',
+          },
+        ),
         style: theme.textTheme.titleSmall,
       ),
       const SizedBox(height: 8),
@@ -517,7 +519,9 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: _ImageSlot(
-            label: 'Page ${i + 2}',
+            label: 'artisan.verification.page_number'.tr(
+              namedArgs: {'number': '${i + 2}'},
+            ),
             file: _extraFiles[i],
             required: false,
             onPick: () async {
@@ -539,12 +543,10 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
               if (f != null) setState(() => _extraFiles.add(f));
             },
             icon: const Icon(Icons.add_photo_alternate_outlined),
-            label: const Text('Ajouter une page'),
+            label: Text('artisan.verification.add_page'.tr()),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppTheme.gold,
-              side: BorderSide(
-                color: AppTheme.gold.withValues(alpha: 0.5),
-              ),
+              side: BorderSide(color: AppTheme.gold.withValues(alpha: 0.5)),
             ),
           ),
         ),
@@ -620,8 +622,11 @@ class _ImageSlot extends StatelessWidget {
                     visualDensity: VisualDensity.compact,
                   ),
                   IconButton(
-                    icon: Icon(Icons.delete_outline,
-                        size: 20, color: AppTheme.error),
+                    icon: Icon(
+                      Icons.delete_outline,
+                      size: 20,
+                      color: AppTheme.error,
+                    ),
                     tooltip: 'Supprimer',
                     onPressed: onRemove,
                     visualDensity: VisualDensity.compact,
@@ -657,8 +662,9 @@ class _ImageSlot extends StatelessWidget {
                 height: 120,
                 margin: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.3),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: theme.dividerColor,
@@ -692,10 +698,7 @@ class _PickedImage {
   final Uint8List bytes;
   final String filename;
 
-  const _PickedImage({
-    required this.bytes,
-    required this.filename,
-  });
+  const _PickedImage({required this.bytes, required this.filename});
 }
 
 // ─── Verification Step Widget (unchanged) ─────────────────────────────────────
@@ -776,8 +779,9 @@ class _VerificationStep extends StatelessWidget {
                         Flexible(
                           child: Text(
                             statusText,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: statusColor),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: statusColor,
+                            ),
                           ),
                         ),
                       ],
@@ -799,8 +803,9 @@ class _VerificationStep extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppTheme.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
-                border:
-                    Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppTheme.error.withValues(alpha: 0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

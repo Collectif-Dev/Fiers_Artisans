@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../presentation/auth/splash_screen.dart';
 import '../presentation/auth/onboarding_screen.dart';
 import '../presentation/auth/login_screen.dart';
@@ -245,22 +246,22 @@ class _ClientShell extends StatelessWidget {
           NavigationDestination(
             icon: const Icon(Icons.home_outlined),
             selectedIcon: const Icon(Icons.home_rounded),
-            label: 'Accueil',
+            label: 'nav.home'.tr(),
           ),
           NavigationDestination(
             icon: const Icon(Icons.chat_bubble_outline),
             selectedIcon: const Icon(Icons.chat_bubble),
-            label: 'Messages',
+            label: 'nav.messages'.tr(),
           ),
           NavigationDestination(
             icon: const Icon(Icons.notifications_none_rounded),
             selectedIcon: const Icon(Icons.notifications_rounded),
-            label: 'Notifs',
+            label: 'nav.notifications'.tr(),
           ),
           NavigationDestination(
             icon: const Icon(Icons.settings_outlined),
             selectedIcon: const Icon(Icons.settings_rounded),
-            label: 'Paramètres',
+            label: 'nav.settings'.tr(),
           ),
         ],
       ),
@@ -302,22 +303,22 @@ class _ArtisanShell extends StatelessWidget {
           NavigationDestination(
             icon: const Icon(Icons.dashboard_outlined),
             selectedIcon: const Icon(Icons.dashboard_rounded),
-            label: 'Dashboard',
+            label: 'nav.dashboard'.tr(),
           ),
           NavigationDestination(
             icon: const Icon(Icons.chat_bubble_outline),
             selectedIcon: const Icon(Icons.chat_bubble),
-            label: 'Messages',
+            label: 'nav.messages'.tr(),
           ),
           NavigationDestination(
             icon: const Icon(Icons.notifications_none_rounded),
             selectedIcon: const Icon(Icons.notifications_rounded),
-            label: 'Notifs',
+            label: 'nav.notifications'.tr(),
           ),
           NavigationDestination(
             icon: const Icon(Icons.settings_outlined),
             selectedIcon: const Icon(Icons.settings_rounded),
-            label: 'Paramètres',
+            label: 'nav.settings'.tr(),
           ),
         ],
       ),
