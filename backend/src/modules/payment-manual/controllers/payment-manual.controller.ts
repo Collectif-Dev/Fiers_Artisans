@@ -32,8 +32,12 @@ export class PaymentManualController {
     @CurrentUser('id') userId: string,
     @Body() dto: CreatePaymentManualDto,
   ) {
-    const payment = await this.paymentManualService.initiatePayment(userId, dto.provider);
-    const recipientNumber = this.paymentManualService.getRecipientNumberForProvider(payment.provider);
+    const payment = await this.paymentManualService.initiatePayment(
+      userId,
+      dto.provider,
+    );
+    const recipientNumber =
+      this.paymentManualService.getRecipientNumberForProvider(payment.provider);
     return {
       transaction_id: payment.transaction_id,
       provider: payment.provider,
@@ -41,7 +45,28 @@ export class PaymentManualController {
       status: payment.status,
       expires_at_admin: payment.expires_at_admin,
       recipient_number: recipientNumber,
-      provider_available: this.paymentManualService.isProviderAvailable(payment.provider),
+      provider_available: this.paymentManualService.isProviderAvailable(
+        payment.provider,
+      ),
+    };
+  }
+
+  @Get('current')
+  async getCurrent(@CurrentUser('id') userId: string) {
+    const payment =
+      await this.paymentManualService.getCurrentTransaction(userId);
+    if (!payment) {
+      return null;
+    }
+
+    return {
+      ...payment,
+      recipient_number: this.paymentManualService.getRecipientNumberForProvider(
+        payment.provider,
+      ),
+      provider_available: this.paymentManualService.isProviderAvailable(
+        payment.provider,
+      ),
     };
   }
 
@@ -50,11 +75,18 @@ export class PaymentManualController {
     @Param('transactionId') transactionId: string,
     @CurrentUser('id') userId: string,
   ) {
-    const payment = await this.paymentManualService.getStatus(transactionId, userId);
+    const payment = await this.paymentManualService.getStatus(
+      transactionId,
+      userId,
+    );
     return {
       ...payment,
-      recipient_number: this.paymentManualService.getRecipientNumberForProvider(payment.provider),
-      provider_available: this.paymentManualService.isProviderAvailable(payment.provider),
+      recipient_number: this.paymentManualService.getRecipientNumberForProvider(
+        payment.provider,
+      ),
+      provider_available: this.paymentManualService.isProviderAvailable(
+        payment.provider,
+      ),
     };
   }
 
@@ -67,9 +99,7 @@ export class PaymentManualController {
     @Body() dto: SubmitProofDto,
     @UploadedFile(
       new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-        ],
+        validators: [new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 })],
       }),
     )
     file: Express.Multer.File,
@@ -79,7 +109,9 @@ export class PaymentManualController {
       userId,
       file,
       senderNumber: dto.sender_number,
-      declaredTime: dto.declared_payment_time ? new Date(dto.declared_payment_time) : undefined,
+      declaredTime: dto.declared_payment_time
+        ? new Date(dto.declared_payment_time)
+        : undefined,
     });
 
     return proof;
@@ -91,6 +123,10 @@ export class PaymentManualController {
     @Param('proofId', ParseUUIDPipe) proofId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.paymentManualService.getProofSignedUrl(transactionId, proofId, userId);
+    return this.paymentManualService.getProofSignedUrl(
+      transactionId,
+      proofId,
+      userId,
+    );
   }
 }

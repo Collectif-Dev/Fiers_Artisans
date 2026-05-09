@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../config/theme.dart';
+import '../../providers/payment_manual_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
@@ -18,9 +19,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(subscriptionProvider.notifier).loadStatus(),
-    );
+    Future.microtask(() async {
+      await ref.read(subscriptionProvider.notifier).loadStatus();
+      await ref
+          .read(paymentManualProvider.notifier)
+          .loadCurrentTransaction(refresh: true);
+    });
   }
 
   void _openManualPayment({required bool isSubscriptionActive}) {
@@ -40,9 +44,36 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final subState = ref.watch(subscriptionProvider);
+    final manualState = ref.watch(paymentManualProvider);
     final subscription = subState.subscription;
+    final manualTx = manualState.currentTransaction;
+
     final isActive = subscription?.isActive == true;
     final daysRemaining = subscription?.daysRemaining ?? 0;
+
+    final manualInProgress =
+        manualTx != null && (manualTx.isPending || manualTx.isPendingAdmin);
+    final manualRejected = manualTx?.isRejected == true;
+
+    final statusText = isActive
+        ? 'subscription.active'.tr()
+        : subscription == null
+        ? 'subscription.none'.tr()
+        : 'subscription.expired'.tr();
+
+    final manualStatusText = manualInProgress
+        ? (manualTx.isPendingAdmin
+              ? 'subscription.manual.pending_admin'.tr()
+              : 'subscription.manual.pending'.tr())
+        : manualRejected
+        ? 'subscription.manual.rejected'.tr()
+        : null;
+
+    final manualActionText = manualInProgress
+        ? 'subscription.manual.view_pending'.tr()
+        : manualRejected
+        ? 'subscription.manual.retry_payment'.tr()
+        : 'subscription.manual.start_payment'.tr();
 
     return Scaffold(
       appBar: AppBar(title: Text('subscription.title'.tr())),
@@ -83,9 +114,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                isActive
-                                    ? 'subscription.active'.tr()
-                                    : 'subscription.expired'.tr(),
+                                statusText,
                                 style: const TextStyle(
                                   color: Colors.black87,
                                   fontSize: 16,
@@ -110,6 +139,40 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                             child: Text(
                               subState.error!,
                               style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                          ),
+                        if (manualStatusText != null)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.gold.withValues(alpha: 0.35),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  manualInProgress
+                                      ? Icons.hourglass_top_outlined
+                                      : Icons.warning_amber_rounded,
+                                  color: manualInProgress
+                                      ? AppTheme.warning
+                                      : AppTheme.error,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    manualStatusText,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         Container(
@@ -214,7 +277,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                               ],
                               const SizedBox(height: 14),
                               AppButton(
-                                text: 'subscription.manual.start_payment'.tr(),
+                                text: manualActionText,
                                 icon: Icons.upload_file_outlined,
                                 isLoading: false,
                                 onPressed: isActive

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -75,6 +76,15 @@ export class PaymentManualAdminController {
     @CurrentUser('id') adminId: string,
   ) {
     await this.paymentManualService.markRefundDone(id, adminId);
+    return { success: true };
+  }
+
+  @Delete('payment-proofs/:id')
+  async softDelete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') adminId: string,
+  ) {
+    await this.paymentManualService.softDeletePayment(id, adminId);
     return { success: true };
   }
 

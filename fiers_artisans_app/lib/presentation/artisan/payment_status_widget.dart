@@ -57,7 +57,7 @@ class PaymentStatusWidget extends StatelessWidget {
           ),
           if (transaction!.expiresAtAdmin != null)
             Text(
-              'manual_payment.admin_expiration'.tr(
+              'manual_payment.expiration'.tr(
                 namedArgs: {'date': '${transaction!.expiresAtAdmin}'},
               ),
             ),

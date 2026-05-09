@@ -12,9 +12,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { randomBytes, createHash, randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
-import { PaymentManual, PaymentManualStatus, PaymentProviderManual } from '../entities/payment-manual.entity';
+import {
+  PaymentManual,
+  PaymentManualStatus,
+  PaymentProviderManual,
+} from '../entities/payment-manual.entity';
 import { PaymentProof } from '../entities/payment-proof.entity';
-import { Subscription, SubscriptionStatus } from '../../subscription/entities/subscription.entity';
+import {
+  Subscription,
+  SubscriptionStatus,
+} from '../../subscription/entities/subscription.entity';
 import { ArtisanProfile } from '../../users/entities/artisan-profile.entity';
 import { User, UserRole } from '../../users/entities/user.entity';
 import { MediaService } from '../../media/media.service';
@@ -34,7 +41,10 @@ interface AdminListFilters {
   sort?: 'asc' | 'desc' | string;
 }
 
-const MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER: Record<PaymentProviderManual, string | null> = {
+const MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER: Record<
+  PaymentProviderManual,
+  string | null
+> = {
   [PaymentProviderManual.ORANGE_MONEY]: '0703063570',
   [PaymentProviderManual.MTN_MOMO]: '0503265984',
   [PaymentProviderManual.WAVE]: '0703063570',
@@ -75,15 +85,21 @@ export class PaymentManualService implements OnModuleDestroy {
     private readonly paymentRealtimeService: PaymentRealtimeService,
     private readonly configService: ConfigService,
   ) {
-    this.amountFcfa = Number(this.configService.get('PAYMENT_MANUAL_AMOUNT_FCFA') || 5000);
-    this.expiryHours = Number(this.configService.get('PAYMENT_MANUAL_EXPIRY_HOURS') || 72);
+    this.amountFcfa = Number(
+      this.configService.get('PAYMENT_MANUAL_AMOUNT_FCFA') || 5000,
+    );
+    this.expiryHours = Number(
+      this.configService.get('PAYMENT_MANUAL_EXPIRY_HOURS') || 72,
+    );
     this.bucket =
       this.configService.get<string>('minio.buckets.paymentProofs') ||
       this.configService.get<string>('MINIO_PAYMENT_PROOF_BUCKET') ||
       'payment-proofs';
     this.dailyUploadLimit = Math.max(
       1,
-      Number(this.configService.get('PAYMENT_MANUAL_UPLOADS_PER_DAY_LIMIT') || 12),
+      Number(
+        this.configService.get('PAYMENT_MANUAL_UPLOADS_PER_DAY_LIMIT') || 12,
+      ),
     );
     this.submitBurstLimit = Math.max(
       1,
@@ -91,14 +107,19 @@ export class PaymentManualService implements OnModuleDestroy {
     );
     this.submitBurstTtlSeconds = Math.max(
       30,
-      Number(this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS') || 60),
+      Number(
+        this.configService.get('PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS') || 60,
+      ),
     );
     this.maxExpireBatchLoops = Math.max(
       1,
       Number(this.configService.get('PAYMENT_MANUAL_EXPIRE_BATCH_LOOPS') || 30),
     );
     this.disableRedisRateLimit =
-      String(this.configService.get('PAYMENT_MANUAL_DISABLE_REDIS_RATE_LIMIT') || 'false') === 'true';
+      String(
+        this.configService.get('PAYMENT_MANUAL_DISABLE_REDIS_RATE_LIMIT') ||
+          'false',
+      ) === 'true';
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -108,11 +129,14 @@ export class PaymentManualService implements OnModuleDestroy {
     }
   }
 
-  async initiatePayment(userId: string, provider: PaymentProviderManual): Promise<PaymentManual> {
+  async initiatePayment(
+    userId: string,
+    provider: PaymentProviderManual,
+  ): Promise<PaymentManual> {
     if (!this.isProviderAvailable(provider)) {
       throw new BusinessException(
         'PAYMENT_MANUAL_PROVIDER_UNAVAILABLE',
-        'Le paiement manuel via Moov Money n\'est pas encore disponible.',
+        "Le paiement manuel via Moov Money n'est pas encore disponible.",
       );
     }
 
@@ -186,11 +210,15 @@ export class PaymentManualService implements OnModuleDestroy {
         return openPayment;
       }
 
-      throw new ConflictException('Aucune tentative supplementaire autorisee pour ce paiement.');
+      throw new ConflictException(
+        'Aucune tentative supplementaire autorisee pour ce paiement.',
+      );
     }
 
     const now = new Date();
-    const expiresAtAdmin = new Date(now.getTime() + this.expiryHours * 60 * 60 * 1000);
+    const expiresAtAdmin = new Date(
+      now.getTime() + this.expiryHours * 60 * 60 * 1000,
+    );
 
     const payment = await this.paymentManualRepository.save(
       this.paymentManualRepository.create({
@@ -210,15 +238,17 @@ export class PaymentManualService implements OnModuleDestroy {
       }),
     );
 
-    this.analyticsService.logActivity({
-      actorId: userId,
-      action: 'PAYMENT_MANUAL_INITIATED',
-      targetId: payment.id,
-      metadata: {
-        transactionId: payment.transaction_id,
-        provider,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: userId,
+        action: 'PAYMENT_MANUAL_INITIATED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+          provider,
+        },
+      })
+      .catch(() => {});
 
     return payment;
   }
@@ -230,9 +260,16 @@ export class PaymentManualService implements OnModuleDestroy {
     senderNumber: string;
     declaredTime?: Date;
   }): Promise<PaymentProof> {
-    const payment = await this.findOwnedPaymentByTransactionId(params.userId, params.transactionId);
+    const payment = await this.findOwnedPaymentByTransactionId(
+      params.userId,
+      params.transactionId,
+    );
 
-    if (![PaymentManualStatus.PENDING, PaymentManualStatus.REJECTED].includes(payment.status)) {
+    if (
+      ![PaymentManualStatus.PENDING, PaymentManualStatus.REJECTED].includes(
+        payment.status,
+      )
+    ) {
       throw new BusinessException(
         'PAYMENT_MANUAL_INVALID_STATUS',
         'La transaction ne peut pas recevoir de nouvelle preuve.',
@@ -256,8 +293,12 @@ export class PaymentManualService implements OnModuleDestroy {
       `[SUBMIT] Proof submission allowed for user=${params.userId} transactionId=${params.transactionId}`,
     );
 
-    const validation = await this.proofValidationService.validateImage(params.file);
-    const imageHash = createHash('sha256').update(params.file.buffer).digest('hex');
+    const validation = await this.proofValidationService.validateImage(
+      params.file,
+    );
+    const imageHash = createHash('sha256')
+      .update(params.file.buffer)
+      .digest('hex');
 
     const existingHash = await this.paymentProofRepository.findOne({
       where: { image_hash_sha256: imageHash },
@@ -268,7 +309,8 @@ export class PaymentManualService implements OnModuleDestroy {
     }
 
     const exif = await this.exifExtractorService.extract(params.file.buffer);
-    const suspiciousSoftware = this.exifExtractorService.detectSuspiciousSoftware(exif);
+    const suspiciousSoftware =
+      this.exifExtractorService.detectSuspiciousSoftware(exif);
     const aiScore = this.fraudDetectionService.scoreImage(imageHash, exif, {
       width: validation.width,
       height: validation.height,
@@ -298,7 +340,10 @@ export class PaymentManualService implements OnModuleDestroy {
       exif_device: exif.device,
       exif_software: exif.software,
       ai_suspicion_score: aiScore,
-      is_suspected_fraud: suspiciousSoftware || validation.suspiciousCompression || aiScore >= 0.7,
+      is_suspected_fraud:
+        suspiciousSoftware ||
+        validation.suspiciousCompression ||
+        aiScore >= 0.7,
     });
 
     let savedProof: PaymentProof;
@@ -330,21 +375,24 @@ export class PaymentManualService implements OnModuleDestroy {
     ];
     await this.paymentManualRepository.save(payment);
 
-    this.analyticsService.logActivity({
-      actorId: params.userId,
-      action: 'PROOF_SUBMITTED',
-      targetId: payment.id,
-      metadata: {
-        transactionId: payment.transaction_id,
-        proofId: savedProof.id,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: params.userId,
+        action: 'PROOF_SUBMITTED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+          proofId: savedProof.id,
+        },
+      })
+      .catch(() => {});
 
     await this.paymentRealtimeService.emitNewProof({
       paymentId: payment.id,
       transactionId: payment.transaction_id,
       status: payment.status,
-      submittedAt: savedProof.submitted_at?.toISOString?.() || new Date().toISOString(),
+      submittedAt:
+        savedProof.submitted_at?.toISOString?.() || new Date().toISOString(),
       provider: payment.provider,
       amountFcfa: payment.amount_fcfa,
       suspectedFraud: savedProof.is_suspected_fraud,
@@ -361,7 +409,11 @@ export class PaymentManualService implements OnModuleDestroy {
     return savedProof;
   }
 
-  async validateProof(paymentId: string, adminId: string, notes?: string): Promise<void> {
+  async validateProof(
+    paymentId: string,
+    adminId: string,
+    notes?: string,
+  ): Promise<void> {
     const payment = await this.paymentManualRepository.findOne({
       where: { id: paymentId, deleted_at: IsNull() },
       relations: ['subscription', 'subscription.artisan_profile'],
@@ -408,15 +460,17 @@ export class PaymentManualService implements OnModuleDestroy {
       });
     }
 
-    this.analyticsService.logActivity({
-      actorId: adminId,
-      action: 'PROOF_VALIDATED',
-      targetId: payment.id,
-      metadata: {
-        transactionId: payment.transaction_id,
-        notes: notes || null,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: adminId,
+        action: 'PROOF_VALIDATED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+          notes: notes || null,
+        },
+      })
+      .catch(() => {});
 
     await this.paymentRealtimeService.emitPaymentUpdated({
       userId: artisanUserId,
@@ -427,7 +481,11 @@ export class PaymentManualService implements OnModuleDestroy {
     });
   }
 
-  async rejectProof(paymentId: string, adminId: string, reason: string): Promise<void> {
+  async rejectProof(
+    paymentId: string,
+    adminId: string,
+    reason: string,
+  ): Promise<void> {
     const payment = await this.paymentManualRepository.findOne({
       where: { id: paymentId, deleted_at: IsNull() },
       relations: ['subscription', 'subscription.artisan_profile'],
@@ -468,14 +526,16 @@ export class PaymentManualService implements OnModuleDestroy {
       });
     }
 
-    this.analyticsService.logActivity({
-      actorId: adminId,
-      action: 'PAYMENT_MANUAL_REJECTED',
-      targetId: payment.id,
-      metadata: {
-        transactionId: payment.transaction_id,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: adminId,
+        action: 'PAYMENT_MANUAL_REJECTED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+        },
+      })
+      .catch(() => {});
 
     await this.paymentRealtimeService.emitPaymentUpdated({
       userId: artisanUserId,
@@ -487,7 +547,11 @@ export class PaymentManualService implements OnModuleDestroy {
     });
   }
 
-  async reopenProof(paymentId: string, adminId: string, reason?: string): Promise<void> {
+  async reopenProof(
+    paymentId: string,
+    adminId: string,
+    reason?: string,
+  ): Promise<void> {
     const payment = await this.paymentManualRepository.findOne({
       where: { id: paymentId, deleted_at: IsNull() },
       relations: ['subscription', 'subscription.artisan_profile'],
@@ -497,8 +561,16 @@ export class PaymentManualService implements OnModuleDestroy {
       throw new NotFoundException('Paiement manuel introuvable.');
     }
 
-    if (![PaymentManualStatus.REJECTED, PaymentManualStatus.EXPIRED].includes(payment.status)) {
-      throw new BadRequestException('Seuls les paiements rejetes ou expires peuvent etre rouverts.');
+    const canReopenByStatus = [
+      PaymentManualStatus.REJECTED,
+      PaymentManualStatus.EXPIRED,
+      PaymentManualStatus.COMPLETED,
+    ].includes(payment.status);
+
+    if (!canReopenByStatus && !payment.refund_done_at) {
+      throw new BadRequestException(
+        'Seuls les paiements rejetes, expires, valides ou rembourses peuvent etre rouverts.',
+      );
     }
 
     const activeProofs = await this.paymentProofRepository.find({
@@ -508,27 +580,25 @@ export class PaymentManualService implements OnModuleDestroy {
       },
     });
     const now = new Date();
-    const expiresAtAdmin = new Date(now.getTime() + this.expiryHours * 60 * 60 * 1000);
+    const expiresAtAdmin = new Date(
+      now.getTime() + this.expiryHours * 60 * 60 * 1000,
+    );
 
-    if (activeProofs.length > 0) {
-      for (const proof of activeProofs) {
-        proof.deleted_at = now;
-        proof.deletion_requested = true;
-      }
-      await this.paymentProofRepository.save(activeProofs);
-    }
-
-    payment.status = PaymentManualStatus.PENDING;
+    payment.status =
+      activeProofs.length > 0
+        ? PaymentManualStatus.PENDING_ADMIN
+        : PaymentManualStatus.PENDING;
     payment.rejected_at = null;
     payment.rejection_reason = null;
     payment.refund_required = false;
+    payment.refund_done_at = null;
     payment.expires_at_admin = expiresAtAdmin;
     payment.timeline = [
       ...(payment.timeline || []),
       this.timelineEvent('PAYMENT_MANUAL_REOPENED', {
         byAdminId: adminId,
         reason: reason || null,
-        resetAttemptsFrom: activeProofs.length,
+        keptProofsCount: activeProofs.length,
       }),
     ];
     await this.paymentManualRepository.save(payment);
@@ -547,15 +617,17 @@ export class PaymentManualService implements OnModuleDestroy {
       });
     }
 
-    this.analyticsService.logActivity({
-      actorId: adminId,
-      action: 'PAYMENT_MANUAL_REOPENED',
-      targetId: payment.id,
-      metadata: {
-        transactionId: payment.transaction_id,
-        resetAttemptsFrom: activeProofs.length,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: adminId,
+        action: 'PAYMENT_MANUAL_REOPENED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+          keptProofsCount: activeProofs.length,
+        },
+      })
+      .catch(() => {});
 
     await this.paymentRealtimeService.emitPaymentUpdated({
       userId: artisanUserId,
@@ -565,6 +637,58 @@ export class PaymentManualService implements OnModuleDestroy {
       rejectionReason: null,
       refundRequired: false,
       updatedAt: new Date().toISOString(),
+    });
+  }
+
+  async softDeletePayment(paymentId: string, adminId: string): Promise<void> {
+    const payment = await this.paymentManualRepository.findOne({
+      where: { id: paymentId, deleted_at: IsNull() },
+      relations: ['subscription', 'subscription.artisan_profile'],
+    });
+
+    if (!payment) {
+      throw new NotFoundException('Paiement manuel introuvable.');
+    }
+
+    const isFinalStatus = [
+      PaymentManualStatus.COMPLETED,
+      PaymentManualStatus.REJECTED,
+      PaymentManualStatus.EXPIRED,
+    ].includes(payment.status);
+
+    if (!isFinalStatus && !payment.refund_done_at) {
+      throw new BadRequestException(
+        'Seuls les paiements finalises (valide, rejete, expire ou rembourse) peuvent etre supprimes.',
+      );
+    }
+
+    const now = new Date();
+    payment.deleted_at = now;
+    payment.timeline = [
+      ...(payment.timeline || []),
+      this.timelineEvent('PAYMENT_MANUAL_SOFT_DELETED', {
+        byAdminId: adminId,
+      }),
+    ];
+    await this.paymentManualRepository.save(payment);
+
+    this.analyticsService
+      .logActivity({
+        actorId: adminId,
+        action: 'PAYMENT_MANUAL_SOFT_DELETED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+        },
+      })
+      .catch(() => {});
+
+    await this.paymentRealtimeService.emitPaymentUpdated({
+      userId: payment.subscription?.artisan_profile?.user_id,
+      paymentId: payment.id,
+      transactionId: payment.transaction_id,
+      status: payment.status,
+      updatedAt: now.toISOString(),
     });
   }
 
@@ -590,7 +714,8 @@ export class PaymentManualService implements OnModuleDestroy {
       for (const payment of stale) {
         payment.status = PaymentManualStatus.EXPIRED;
         payment.refund_required = true;
-        payment.attempted_refund_count = (payment.attempted_refund_count || 0) + 1;
+        payment.attempted_refund_count =
+          (payment.attempted_refund_count || 0) + 1;
         payment.timeline = [
           ...(payment.timeline || []),
           this.timelineEvent('PAYMENT_MANUAL_EXPIRED', {
@@ -605,7 +730,7 @@ export class PaymentManualService implements OnModuleDestroy {
             userId: artisanUserId,
             type: 'PAYMENT_MANUAL_EXPIRED',
             title: 'Paiement expire',
-            body: 'Votre preuve n\'a pas ete traitee a temps. Un remboursement est requis.',
+            body: "Votre preuve n'a pas ete traitee a temps. Un remboursement est requis.",
             data: {
               paymentId: payment.id,
               transactionId: payment.transaction_id,
@@ -623,12 +748,14 @@ export class PaymentManualService implements OnModuleDestroy {
           updatedAt: new Date().toISOString(),
         });
 
-        this.analyticsService.logActivity({
-          actorId: 'system',
-          action: 'PAYMENT_MANUAL_EXPIRED',
-          targetId: payment.id,
-          metadata: { transactionId: payment.transaction_id },
-        }).catch(() => {});
+        this.analyticsService
+          .logActivity({
+            actorId: 'system',
+            action: 'PAYMENT_MANUAL_EXPIRED',
+            targetId: payment.id,
+            metadata: { transactionId: payment.transaction_id },
+          })
+          .catch(() => {});
       }
 
       totalExpired += stale.length;
@@ -676,14 +803,16 @@ export class PaymentManualService implements OnModuleDestroy {
       });
     }
 
-    this.analyticsService.logActivity({
-      actorId: adminId,
-      action: 'REFUND_PROCESSED',
-      targetId: payment.id,
-      metadata: {
-        transactionId: payment.transaction_id,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: adminId,
+        action: 'REFUND_PROCESSED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+        },
+      })
+      .catch(() => {});
 
     await this.paymentRealtimeService.emitPaymentUpdated({
       userId: artisanUserId,
@@ -699,7 +828,8 @@ export class PaymentManualService implements OnModuleDestroy {
   async getAdminList(filters: AdminListFilters) {
     const page = Math.max(1, Number(filters.page || 1));
     const limit = Math.min(100, Math.max(1, Number(filters.limit || 20)));
-    const sortDirection = (filters.sort || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const sortDirection =
+      (filters.sort || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
     const qb = this.paymentManualRepository
       .createQueryBuilder('pm')
@@ -733,7 +863,12 @@ export class PaymentManualService implements OnModuleDestroy {
   async getDetailed(paymentId: string): Promise<PaymentManual> {
     const payment = await this.paymentManualRepository.findOne({
       where: { id: paymentId, deleted_at: IsNull() },
-      relations: ['proofs', 'subscription', 'subscription.artisan_profile', 'subscription.artisan_profile.user'],
+      relations: [
+        'proofs',
+        'subscription',
+        'subscription.artisan_profile',
+        'subscription.artisan_profile.user',
+      ],
       order: { proofs: { submitted_at: 'DESC' } },
     });
 
@@ -744,7 +879,32 @@ export class PaymentManualService implements OnModuleDestroy {
     return payment;
   }
 
-  async getStatus(transactionId: string, userId: string): Promise<PaymentManual> {
+  async getCurrentTransaction(userId: string): Promise<PaymentManual | null> {
+    const activeStatuses = [
+      PaymentManualStatus.PENDING,
+      PaymentManualStatus.PENDING_ADMIN,
+      PaymentManualStatus.REJECTED,
+    ];
+
+    const payment = await this.paymentManualRepository
+      .createQueryBuilder('pm')
+      .leftJoinAndSelect('pm.proofs', 'proof', 'proof.deleted_at IS NULL')
+      .leftJoinAndSelect('pm.subscription', 'subscription')
+      .leftJoinAndSelect('subscription.artisan_profile', 'artisan')
+      .where('artisan.user_id = :userId', { userId })
+      .andWhere('pm.deleted_at IS NULL')
+      .andWhere('pm.status IN (:...statuses)', { statuses: activeStatuses })
+      .orderBy('pm.created_at', 'DESC')
+      .addOrderBy('proof.submitted_at', 'DESC')
+      .getOne();
+
+    return payment ?? null;
+  }
+
+  async getStatus(
+    transactionId: string,
+    userId: string,
+  ): Promise<PaymentManual> {
     return this.findOwnedPaymentByTransactionId(userId, transactionId, true);
   }
 
@@ -753,7 +913,10 @@ export class PaymentManualService implements OnModuleDestroy {
     proofId: string,
     userId: string,
   ): Promise<{ url: string; expiresInSeconds: number }> {
-    const payment = await this.findOwnedPaymentByTransactionId(userId, transactionId);
+    const payment = await this.findOwnedPaymentByTransactionId(
+      userId,
+      transactionId,
+    );
 
     const proof = await this.paymentProofRepository.findOne({
       where: {
@@ -769,12 +932,18 @@ export class PaymentManualService implements OnModuleDestroy {
     }
 
     const parsed = this.parseImageRef(proof.image_url);
-    const url = await this.mediaService.getSignedUrl(parsed.bucket, parsed.objectKey);
+    const url = await this.mediaService.getSignedUrl(
+      parsed.bucket,
+      parsed.objectKey,
+    );
 
     return { url, expiresInSeconds: 3600 };
   }
 
-  async verifyProofHashesIntegrity(): Promise<{ checked: number; mismatches: number }> {
+  async verifyProofHashesIntegrity(): Promise<{
+    checked: number;
+    mismatches: number;
+  }> {
     const proofs = await this.paymentProofRepository.find({
       where: { deleted_at: IsNull() },
       select: ['id', 'image_url', 'image_hash_sha256'],
@@ -787,7 +956,10 @@ export class PaymentManualService implements OnModuleDestroy {
     for (const proof of proofs) {
       try {
         const parsed = this.parseImageRef(proof.image_url);
-        const { stream } = await this.mediaService.streamFile(parsed.bucket, parsed.objectKey);
+        const { stream } = await this.mediaService.streamFile(
+          parsed.bucket,
+          parsed.objectKey,
+        );
         const buffer = await this.streamToBuffer(stream);
         const currentHash = createHash('sha256').update(buffer).digest('hex');
 
@@ -801,12 +973,18 @@ export class PaymentManualService implements OnModuleDestroy {
       } catch (error) {
         mismatches += 1;
         incidentProofIds.push(proof.id);
-        this.logger.error(`Hash verification failed for proof ${proof.id}: ${error}`);
+        this.logger.error(
+          `Hash verification failed for proof ${proof.id}: ${error}`,
+        );
       }
     }
 
     if (mismatches > 0) {
-      await this.notifyIntegrityAlert(proofs.length, mismatches, incidentProofIds);
+      await this.notifyIntegrityAlert(
+        proofs.length,
+        mismatches,
+        incidentProofIds,
+      );
     }
 
     return {
@@ -920,22 +1098,26 @@ export class PaymentManualService implements OnModuleDestroy {
     const sample = proofIds.slice(0, 10);
     await Promise.all(
       admins.map((admin) =>
-        this.notificationsService.create({
-          userId: admin.id,
-          type: 'PAYMENT_MANUAL_INTEGRITY_ALERT',
-          title: 'Alerte integrite paiement manuel',
-          body: `${mismatches} preuve(s) presentent une incoherence de hash sur ${checked} verifiees.`,
-          data: {
-            checked,
-            mismatches,
-            sampleProofIds: sample,
-          },
-        }).catch(() => null),
+        this.notificationsService
+          .create({
+            userId: admin.id,
+            type: 'PAYMENT_MANUAL_INTEGRITY_ALERT',
+            title: 'Alerte integrite paiement manuel',
+            body: `${mismatches} preuve(s) presentent une incoherence de hash sur ${checked} verifiees.`,
+            data: {
+              checked,
+              mismatches,
+              sampleProofIds: sample,
+            },
+          })
+          .catch(() => null),
       ),
     );
   }
 
-  getRecipientNumberForProvider(provider: PaymentProviderManual): string | null {
+  getRecipientNumberForProvider(
+    provider: PaymentProviderManual,
+  ): string | null {
     return MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER[provider] ?? null;
   }
 
@@ -967,7 +1149,7 @@ export class PaymentManualService implements OnModuleDestroy {
     if (!ownerUserId || ownerUserId !== userId) {
       throw new BusinessException(
         'PAYMENT_MANUAL_FORBIDDEN',
-        'Vous n\'etes pas autorise a acceder a cette transaction.',
+        "Vous n'etes pas autorise a acceder a cette transaction.",
       );
     }
 
@@ -992,7 +1174,10 @@ export class PaymentManualService implements OnModuleDestroy {
     };
   }
 
-  private parseImageRef(imageUrl: string): { bucket: string; objectKey: string } {
+  private parseImageRef(imageUrl: string): {
+    bucket: string;
+    objectKey: string;
+  } {
     const normalized = (imageUrl || '').trim().replace(/^\/+/, '');
     const [bucket, ...rest] = normalized.split('/');
 

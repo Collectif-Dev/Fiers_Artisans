@@ -9,8 +9,10 @@ import '../../config/theme.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/utils/formatters.dart';
+import '../../data/models/manual_payment_model.dart';
 import '../../data/repositories/artisan_repository.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/payment_manual_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../providers/chat_provider.dart';
@@ -60,6 +62,9 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     _loadAvailability();
     Future.microtask(() {
       ref.read(subscriptionProvider.notifier).loadStatus();
+      ref
+          .read(paymentManualProvider.notifier)
+          .loadCurrentTransaction(refresh: true);
       ref.read(chatProvider.notifier).loadConversations();
       ref.read(verificationProvider.notifier).refresh();
       _syncAvailabilityFromBackend();
@@ -118,6 +123,9 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
   Future<void> _onRefresh() async {
     await Future.wait([
       ref.read(subscriptionProvider.notifier).loadStatus(),
+      ref
+          .read(paymentManualProvider.notifier)
+          .loadCurrentTransaction(refresh: true),
       ref.read(chatProvider.notifier).loadConversations(),
       ref.read(verificationProvider.notifier).refresh(),
       _loadArtisanStats(),
@@ -191,6 +199,9 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.read(verificationProvider.notifier).refresh();
+      ref
+          .read(paymentManualProvider.notifier)
+          .loadCurrentTransaction(refresh: true);
       _syncLocationToBackend();
       _loadArtisanStats();
       _loadReviewMetrics();
@@ -254,15 +265,23 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     final theme = Theme.of(context);
     final user = ref.watch(authProvider).user;
     final subState = ref.watch(subscriptionProvider);
+    final manualPaymentState = ref.watch(paymentManualProvider);
     final chatState = ref.watch(chatProvider);
     final vState = ref.watch(verificationProvider);
     final isDark = theme.brightness == Brightness.dark;
     final isSubActive = subState.subscription?.isActive == true;
     final subDaysRemaining = subState.subscription?.daysRemaining ?? 0;
+    final manualTx = manualPaymentState.currentTransaction;
+    final hasManualInProgress =
+        manualTx != null && (manualTx.isPending || manualTx.isPendingAdmin);
+    final hasManualRejected = manualTx?.isRejected == true;
+
     final showSubscriptionAlert =
-        subState.hasLoaded &&
-        subState.error == null &&
-        (!isSubActive || subDaysRemaining <= 4);
+        hasManualInProgress ||
+        hasManualRejected ||
+        (subState.hasLoaded &&
+            subState.error == null &&
+            (!isSubActive || subDaysRemaining <= 4));
 
     final unreadMessages = chatState.conversations.fold<int>(
       0,
@@ -350,6 +369,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
                       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                       child: _SubscriptionCard(
                         subState: subState,
+                        manualTransaction: manualTx,
                         onTap: () => context.push('/artisan/subscription'),
                       ),
                     ),
@@ -910,15 +930,44 @@ class _LoopingMarqueeState extends State<_LoopingMarquee>
 
 class _SubscriptionCard extends StatelessWidget {
   final SubscriptionState subState;
+  final ManualPaymentModel? manualTransaction;
   final VoidCallback onTap;
 
-  const _SubscriptionCard({required this.subState, required this.onTap});
+  const _SubscriptionCard({
+    required this.subState,
+    required this.manualTransaction,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final sub = subState.subscription;
     final isActive = sub?.isActive == true;
+    final hasSubscriptionRecord = sub != null;
+    final manual = manualTransaction;
+
+    final bool isManualPending =
+        manual != null && (manual.isPending || manual.isPendingAdmin);
+    final bool isManualRejected = manual?.isRejected == true;
+
+    final String statusText = isActive
+        ? 'subscription.expires_in'.tr(
+            namedArgs: {'days': '${sub!.daysRemaining}'},
+          )
+        : isManualPending
+        ? (manual.isPendingAdmin
+              ? 'subscription.manual.pending_admin'.tr()
+              : 'subscription.manual.pending'.tr())
+        : isManualRejected
+        ? 'subscription.manual.rejected'.tr()
+        : hasSubscriptionRecord
+        ? 'subscription.expired'.tr()
+        : 'subscription.none'.tr();
+
+    final String actionText = isManualPending
+        ? 'subscription.manual.view_pending'.tr()
+        : 'subscription.pay'.tr();
 
     return GestureDetector(
       onTap: onTap,
@@ -930,7 +979,11 @@ class _SubscriptionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: isActive
               ? null
-              : Border.all(color: AppTheme.error.withValues(alpha: 0.5)),
+              : Border.all(
+                  color: isManualPending
+                      ? AppTheme.warning.withValues(alpha: 0.55)
+                      : AppTheme.error.withValues(alpha: 0.5),
+                ),
         ),
         child: Row(
           children: [
@@ -940,14 +993,20 @@ class _SubscriptionCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isActive
                     ? Colors.black.withValues(alpha: 0.15)
-                    : AppTheme.error.withValues(alpha: 0.1),
+                    : (isManualPending
+                          ? AppTheme.warning.withValues(alpha: 0.15)
+                          : AppTheme.error.withValues(alpha: 0.1)),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 isActive
                     ? Icons.workspace_premium_rounded
-                    : Icons.warning_amber_rounded,
-                color: isActive ? Colors.black : AppTheme.error,
+                    : (isManualPending
+                          ? Icons.hourglass_top_rounded
+                          : Icons.warning_amber_rounded),
+                color: isActive
+                    ? Colors.black
+                    : (isManualPending ? AppTheme.warning : AppTheme.error),
               ),
             ),
             const SizedBox(width: 12),
@@ -964,14 +1023,14 @@ class _SubscriptionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    isActive
-                        ? 'subscription.expires_in'.tr(
-                            namedArgs: {'days': '${sub!.daysRemaining}'},
-                          )
-                        : 'subscription.expired'.tr(),
+                    statusText,
                     style: TextStyle(
                       fontSize: 13,
-                      color: isActive ? Colors.black87 : AppTheme.error,
+                      color: isActive
+                          ? Colors.black87
+                          : (isManualPending
+                                ? AppTheme.warning
+                                : AppTheme.error),
                     ),
                   ),
                 ],
@@ -988,7 +1047,7 @@ class _SubscriptionCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'subscription.pay'.tr(),
+                  actionText,
                   style: const TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.w600,

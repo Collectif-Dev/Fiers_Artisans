@@ -66,6 +66,7 @@
     "validate": "Valider",
     "reject": "Rejeter",
     "reopen": "Rouvrir",
+    "delete": "Supprimer",
     "mark_refunded": "Marquer remboursé",
     "reason": "Motif",
     "status_all": "Tous",

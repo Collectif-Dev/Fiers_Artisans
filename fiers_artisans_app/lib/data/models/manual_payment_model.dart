@@ -8,6 +8,7 @@ class ManualPaymentModel {
   final bool refundRequired;
   final bool providerAvailable;
   final DateTime? expiresAtAdmin;
+  final int submittedProofCount;
 
   const ManualPaymentModel({
     required this.transactionId,
@@ -19,6 +20,7 @@ class ManualPaymentModel {
     this.refundRequired = false,
     this.providerAvailable = true,
     this.expiresAtAdmin,
+    this.submittedProofCount = 0,
   });
 
   bool get isRejected => status == 'REJECTED';
@@ -28,10 +30,21 @@ class ManualPaymentModel {
   bool get canInitiateNewTransaction => isRejected || status == 'EXPIRED';
 
   factory ManualPaymentModel.fromJson(Map<String, dynamic> json) {
+    final proofs = json['proofs'];
+    final proofCountFromPayload = int.tryParse(
+      (json['proof_count'] ?? json['proofCount'] ?? '').toString(),
+    );
+    final derivedProofCount = proofs is List ? proofs.length : 0;
+
     return ManualPaymentModel(
-      transactionId: (json['transaction_id'] ?? json['transactionId'] ?? '').toString(),
+      transactionId: (json['transaction_id'] ?? json['transactionId'] ?? '')
+          .toString(),
       provider: (json['provider'] ?? '').toString(),
-      amountFcfa: int.tryParse((json['amount_fcfa'] ?? json['amountFcfa'] ?? 0).toString()) ?? 0,
+      amountFcfa:
+          int.tryParse(
+            (json['amount_fcfa'] ?? json['amountFcfa'] ?? 0).toString(),
+          ) ??
+          0,
       status: (json['status'] ?? 'PENDING').toString(),
       recipientNumber: json['recipient_number']?.toString(),
       rejectionReason: json['rejection_reason']?.toString(),
@@ -42,6 +55,7 @@ class ManualPaymentModel {
       expiresAtAdmin: json['expires_at_admin'] != null
           ? DateTime.tryParse(json['expires_at_admin'].toString())
           : null,
+      submittedProofCount: proofCountFromPayload ?? derivedProofCount,
     );
   }
 }

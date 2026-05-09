@@ -24,6 +24,7 @@ class PaymentManualState {
 
   PaymentManualState copyWith({
     ManualPaymentModel? currentTransaction,
+    bool clearCurrentTransaction = false,
     bool? isLoading,
     String? error,
     bool clearError = false,
@@ -32,7 +33,9 @@ class PaymentManualState {
     bool clearTransientMessage = false,
   }) {
     return PaymentManualState(
-      currentTransaction: currentTransaction ?? this.currentTransaction,
+      currentTransaction: clearCurrentTransaction
+          ? null
+          : (currentTransaction ?? this.currentTransaction),
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       hasSubmittedProof: hasSubmittedProof ?? this.hasSubmittedProof,
@@ -45,8 +48,8 @@ class PaymentManualState {
 
 final paymentManualProvider =
     StateNotifierProvider<PaymentManualNotifier, PaymentManualState>((ref) {
-  return PaymentManualNotifier();
-});
+      return PaymentManualNotifier();
+    });
 
 class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
   final PaymentManualRepositoryContract _repository;
@@ -61,9 +64,10 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     ChatRealtimeService? realtime,
     Stream<ChatRealtimeEvent>? domainEvents,
     this.pollingInterval = const Duration(seconds: 30),
-  })  : _repository = repository ?? PaymentManualRepository(),
-        _domainEvents = domainEvents ?? (realtime ?? ChatRealtimeService()).domainEvents,
-        super(const PaymentManualState()) {
+  }) : _repository = repository ?? PaymentManualRepository(),
+       _domainEvents =
+           domainEvents ?? (realtime ?? ChatRealtimeService()).domainEvents,
+       super(const PaymentManualState()) {
     _realtimeSub = _domainEvents.listen((event) {
       if (event.event == 'manualPaymentUpdated') {
         unawaited(_handleManualPaymentUpdated(event.payload));
@@ -76,6 +80,38 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     _pollingTimer?.cancel();
     _realtimeSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> loadCurrentTransaction({bool refresh = false}) async {
+    if (!refresh && state.currentTransaction != null) {
+      return;
+    }
+
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final tx = await _repository.fetchCurrentTransaction();
+      state = state.copyWith(
+        currentTransaction: tx,
+        clearCurrentTransaction: tx == null,
+        isLoading: false,
+        hasSubmittedProof: tx?.isPendingAdmin == true,
+      );
+
+      if (tx != null && (tx.isPending || tx.isPendingAdmin)) {
+        _startPolling();
+      } else {
+        _pollingTimer?.cancel();
+      }
+    } catch (e) {
+      String errorMessage;
+      if (e is DioException && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
+      } else {
+        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
+      }
+      state = state.copyWith(isLoading: false, error: errorMessage);
+    }
   }
 
   Future<void> initiatePayment({required String provider}) async {
@@ -108,7 +144,9 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
       final tx = await _repository.fetchStatus(transactionId: txId);
       state = state.copyWith(
         currentTransaction: tx,
-        hasSubmittedProof: tx.status == 'REJECTED' ? false : state.hasSubmittedProof,
+        hasSubmittedProof: tx.status == 'REJECTED'
+            ? false
+            : state.hasSubmittedProof,
       );
       if (tx.isCompleted) {
         _pollingTimer?.cancel();
@@ -136,10 +174,13 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     if (txId != null && txId.isNotEmpty) {
       try {
         final latest = await _repository.fetchStatus(transactionId: txId);
-        final statusChanged = previousStatus == null || previousStatus != latest.status;
+        final statusChanged =
+            previousStatus == null || previousStatus != latest.status;
         state = state.copyWith(
           currentTransaction: latest,
-          hasSubmittedProof: latest.status == 'REJECTED' ? false : state.hasSubmittedProof,
+          hasSubmittedProof: latest.status == 'REJECTED'
+              ? false
+              : state.hasSubmittedProof,
           transientMessage: statusChanged
               ? _statusMessage(
                   latest.status,
@@ -172,10 +213,14 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     required String senderNumber,
     DateTime? declaredPaymentTime,
   }) async {
-    final txId = state.currentTransaction?.transactionId;
+    var txId = state.currentTransaction?.transactionId;
     if (txId == null || txId.isEmpty) {
-      state = state.copyWith(error: 'Transaction introuvable.');
-      return;
+      await loadCurrentTransaction(refresh: true);
+      txId = state.currentTransaction?.transactionId;
+      if (txId == null || txId.isEmpty) {
+        state = state.copyWith(error: 'Transaction introuvable.');
+        return;
+      }
     }
 
     state = state.copyWith(isLoading: true, clearError: true);

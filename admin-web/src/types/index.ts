@@ -170,7 +170,9 @@ export interface ActivityLog {
     | 'PROOF_SUBMITTED'
     | 'PROOF_VALIDATED'
     | 'PAYMENT_MANUAL_REJECTED'
+    | 'PAYMENT_MANUAL_REOPENED'
     | 'PAYMENT_MANUAL_EXPIRED'
+    | 'PAYMENT_MANUAL_SOFT_DELETED'
     | 'REFUND_PROCESSED';
   targetId?: string;
   metadata?: Record<string, unknown>;

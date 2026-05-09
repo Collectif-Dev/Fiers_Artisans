@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'dart:async';
 import 'config/theme.dart';
 import 'config/routes.dart';
 import 'providers/app_providers.dart';
 import 'providers/payment_manual_provider.dart';
 import 'services/app_icon_service.dart';
+import 'services/chat_realtime_service.dart';
 import 'presentation/common/app_snackbar.dart';
 
 class FiersArtisansApp extends ConsumerStatefulWidget {
@@ -18,6 +20,8 @@ class FiersArtisansApp extends ConsumerStatefulWidget {
 class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
+  final ChatRealtimeService _realtime = ChatRealtimeService();
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
   bool? _lastDarkIconValue;
 
   void _syncHomeIconWithTheme(ThemeMode themeMode, BuildContext context) {
@@ -50,6 +54,54 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
       AppSnackBar.show(context, message: message);
       ref.read(paymentManualProvider.notifier).clearTransientMessage();
     });
+
+    _realtimeSub = _realtime.domainEvents.listen(_handleRealtimeEvent);
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleRealtimeEvent(ChatRealtimeEvent event) {
+    if (!mounted || event.event != 'notificationCreated') {
+      return;
+    }
+
+    final notif = event.payload['notification'];
+    if (notif is! Map<String, dynamic>) {
+      return;
+    }
+
+    final type = (notif['type'] ?? '').toString().toUpperCase();
+    const paymentSnackTypes = {
+      'PAYMENT_MANUAL_VALIDATED',
+      'PAYMENT_MANUAL_REJECTED',
+      'PAYMENT_MANUAL_REOPENED',
+      'PAYMENT_MANUAL_EXPIRED',
+      'REFUND_PROCESSED',
+    };
+    if (!paymentSnackTypes.contains(type)) {
+      return;
+    }
+
+    final title = (notif['title'] ?? '').toString().trim();
+    final body = (notif['body'] ?? '').toString().trim();
+    final message = body.isNotEmpty ? body : title;
+
+    if (message.isEmpty) {
+      return;
+    }
+
+    AppSnackBar.show(
+      context,
+      message: message,
+      actionLabel: 'notifications.open'.tr(),
+      onAction: () {
+        appRouter.push('/notifications');
+      },
+    );
   }
 
   @override

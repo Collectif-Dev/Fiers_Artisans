@@ -66,6 +66,7 @@
     "validate": "Validate",
     "reject": "Reject",
     "reopen": "Reopen",
+    "delete": "Delete",
     "mark_refunded": "Mark refunded",
     "reason": "Reason",
     "status_all": "All",

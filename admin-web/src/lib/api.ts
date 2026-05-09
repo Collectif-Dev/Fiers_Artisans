@@ -1,4 +1,4 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type {
   AuthResponse,
   DashboardStats,
@@ -11,24 +11,27 @@ import type {
   ActivityLog,
   PaginatedResult,
   PaymentManualRecord,
-} from '@/types';
-import { forceLogout, getUser, saveAuth } from '@/lib/auth';
+} from "@/types";
+import { forceLogout, getUser, saveAuth } from "@/lib/auth";
 
 const API_URL = resolveApiUrl();
 
 function resolveApiUrl(): string {
   const explicitUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (explicitUrl) {
-    return explicitUrl.replace(/\/+$/, '');
+    return explicitUrl.replace(/\/+$/, "");
   }
 
-  const apiPort = process.env.NEXT_PUBLIC_API_PORT?.trim() || '3000';
-  const rawBasePath = process.env.NEXT_PUBLIC_API_BASE_PATH?.trim() || '/api/v1';
-  const basePath = rawBasePath.startsWith('/') ? rawBasePath : `/${rawBasePath}`;
+  const apiPort = process.env.NEXT_PUBLIC_API_PORT?.trim() || "3000";
+  const rawBasePath =
+    process.env.NEXT_PUBLIC_API_BASE_PATH?.trim() || "/api/v1";
+  const basePath = rawBasePath.startsWith("/")
+    ? rawBasePath
+    : `/${rawBasePath}`;
 
-  if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-    const host = window.location.hostname || 'localhost';
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "https" : "http";
+    const host = window.location.hostname || "localhost";
     return `${protocol}://${host}:${apiPort}${basePath}`;
   }
 
@@ -37,7 +40,7 @@ function resolveApiUrl(): string {
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { "Content-Type": "application/json" },
 });
 
 export async function refreshAdminSession(
@@ -51,9 +54,10 @@ export async function refreshAdminSession(
     },
   );
 
-  const payload = data && typeof data === 'object' && 'data' in data
-    ? (data as { data: AuthResponse }).data
-    : data;
+  const payload =
+    data && typeof data === "object" && "data" in data
+      ? (data as { data: AuthResponse }).data
+      : data;
 
   return payload;
 }
@@ -65,8 +69,8 @@ function toPaginatedResult<T>(
 ): PaginatedResult<T> {
   if (
     payload &&
-    typeof payload === 'object' &&
-    'data' in payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
     Array.isArray((payload as { data: unknown }).data)
   ) {
     const typed = payload as {
@@ -77,9 +81,9 @@ function toPaginatedResult<T>(
     };
     return {
       data: typed.data,
-      total: typeof typed.total === 'number' ? typed.total : typed.data.length,
-      page: typeof typed.page === 'number' ? typed.page : fallbackPage,
-      limit: typeof typed.limit === 'number' ? typed.limit : fallbackLimit,
+      total: typeof typed.total === "number" ? typed.total : typed.data.length,
+      page: typeof typed.page === "number" ? typed.page : fallbackPage,
+      limit: typeof typed.limit === "number" ? typed.limit : fallbackLimit,
     };
   }
 
@@ -105,10 +109,10 @@ api.interceptors.response.use((response) => {
   const body = response.data;
   if (
     body &&
-    typeof body === 'object' &&
-    'data' in body &&
-    'statusCode' in body &&
-    'timestamp' in body
+    typeof body === "object" &&
+    "data" in body &&
+    "statusCode" in body &&
+    "timestamp" in body
   ) {
     response.data = body.data;
   }
@@ -117,8 +121,8 @@ api.interceptors.response.use((response) => {
 
 // Inject JWT
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('admin_token');
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("admin_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -136,13 +140,22 @@ function onRefreshed(token: string) {
 }
 
 api.interceptors.response.use(undefined, async (error: AxiosError) => {
-  const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-  if (!originalRequest || error.response?.status !== 401 || originalRequest._retry) {
+  const originalRequest = error.config as InternalAxiosRequestConfig & {
+    _retry?: boolean;
+  };
+  if (
+    !originalRequest ||
+    error.response?.status !== 401 ||
+    originalRequest._retry
+  ) {
     return Promise.reject(error);
   }
 
   // Don't refresh on login or refresh endpoint itself
-  if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
+  if (
+    originalRequest.url?.includes("/auth/login") ||
+    originalRequest.url?.includes("/auth/refresh")
+  ) {
     return Promise.reject(error);
   }
 
@@ -159,8 +172,8 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
   isRefreshing = true;
 
   try {
-    const refreshToken = localStorage.getItem('admin_refresh_token');
-    if (!refreshToken) throw new Error('No refresh token');
+    const refreshToken = localStorage.getItem("admin_refresh_token");
+    if (!refreshToken) throw new Error("No refresh token");
 
     const refreshed = await refreshAdminSession(refreshToken);
     const newToken = refreshed?.access_token;
@@ -168,7 +181,7 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
     const user = refreshed?.user || getUser();
 
     if (!newToken || !newRefreshToken || !user) {
-      throw new Error('Invalid refresh response');
+      throw new Error("Invalid refresh response");
     }
 
     saveAuth(newToken, newRefreshToken, user);
@@ -185,8 +198,11 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
 });
 
 // Auth
-export async function loginAdmin(phone: string, pinCode: string): Promise<AuthResponse> {
-  const { data } = await api.post<AuthResponse>('/auth/login', {
+export async function loginAdmin(
+  phone: string,
+  pinCode: string,
+): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>("/auth/login", {
     phone_number: phone,
     pin_code: pinCode,
   });
@@ -195,7 +211,7 @@ export async function loginAdmin(phone: string, pinCode: string): Promise<AuthRe
 
 // Dashboard
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const { data } = await api.get<DashboardStats>('/admin/dashboard');
+  const { data } = await api.get<DashboardStats>("/admin/dashboard");
   return data;
 }
 
@@ -204,7 +220,7 @@ export async function getPendingVerifications(
   page = 1,
   limit = 20,
 ): Promise<PaginatedResult<VerificationDocument>> {
-  const { data } = await api.get('/admin/verifications/pending', {
+  const { data } = await api.get("/admin/verifications/pending", {
     params: { page, limit },
   });
   return toPaginatedResult<VerificationDocument>(data, page, limit);
@@ -212,8 +228,8 @@ export async function getPendingVerifications(
 
 export async function reviewDocument(
   id: string,
-  status: 'APPROVED' | 'REJECTED',
-  rejectionReason?: string
+  status: "APPROVED" | "REJECTED",
+  rejectionReason?: string,
 ): Promise<void> {
   await api.put(`/admin/verifications/${id}`, {
     status,
@@ -226,7 +242,7 @@ export async function getArtisans(
   page = 1,
   limit = 50,
 ): Promise<PaginatedResult<ArtisanProfile>> {
-  const { data } = await api.get('/admin/artisans', {
+  const { data } = await api.get("/admin/artisans", {
     params: { page, limit },
   });
   return toPaginatedResult<ArtisanProfile>(data, page, limit);
@@ -234,7 +250,7 @@ export async function getArtisans(
 
 // Analytics
 export async function getAnalytics(): Promise<AnalyticsData> {
-  const { data } = await api.get<AnalyticsData>('/admin/analytics');
+  const { data } = await api.get<AnalyticsData>("/admin/analytics");
   return data;
 }
 
@@ -243,7 +259,7 @@ export async function getClients(
   page = 1,
   limit = 50,
 ): Promise<PaginatedResult<ClientProfile>> {
-  const { data } = await api.get('/admin/clients', {
+  const { data } = await api.get("/admin/clients", {
     params: { page, limit },
   });
   return toPaginatedResult<ClientProfile>(data, page, limit);
@@ -254,7 +270,7 @@ export async function getSubscriptions(
   page = 1,
   limit = 50,
 ): Promise<PaginatedResult<SubscriptionRecord>> {
-  const { data } = await api.get('/admin/subscriptions', {
+  const { data } = await api.get("/admin/subscriptions", {
     params: { page, limit },
   });
   return toPaginatedResult<SubscriptionRecord>(data, page, limit);
@@ -265,7 +281,7 @@ export async function getReviews(
   page = 1,
   limit = 50,
 ): Promise<PaginatedResult<ReviewRecord>> {
-  const { data } = await api.get('/admin/reviews', {
+  const { data } = await api.get("/admin/reviews", {
     params: { page, limit },
   });
   return toPaginatedResult<ReviewRecord>(data, page, limit);
@@ -279,20 +295,33 @@ export async function deleteReview(id: string): Promise<void> {
 export async function getLogs(
   page?: number,
   limit?: number,
-  action?: string
-): Promise<{ data: ActivityLog[]; total: number; page: number; limit: number }> {
+  action?: string,
+): Promise<{
+  data: ActivityLog[];
+  total: number;
+  page: number;
+  limit: number;
+}> {
   const params: Record<string, string | number> = {};
   if (page) params.page = page;
   if (limit) params.limit = limit;
   if (action) params.action = action;
-  const { data } = await api.get<{ data: ActivityLog[]; total: number; page: number; limit: number }>('/admin/logs', { params });
+  const { data } = await api.get<{
+    data: ActivityLog[];
+    total: number;
+    page: number;
+    limit: number;
+  }>("/admin/logs", { params });
   return data;
 }
 
 // Media — authenticated blob fetch for admin preview/download
-export async function fetchFileBlob(bucket: string, objectKey: string): Promise<Blob> {
+export async function fetchFileBlob(
+  bucket: string,
+  objectKey: string,
+): Promise<Blob> {
   const response = await api.get(`/media/file/${bucket}/${objectKey}`, {
-    responseType: 'blob',
+    responseType: "blob",
   });
   return response.data as Blob;
 }
@@ -304,32 +333,49 @@ export async function getManualPayments(
   status?: string,
 ): Promise<PaginatedResult<PaymentManualRecord>> {
   const params: Record<string, string | number> = { page, limit };
-  if (status && status !== 'all') {
+  if (status && status !== "all") {
     params.status = status;
   }
-  const { data } = await api.get('/admin/payment-proofs', { params });
+  const { data } = await api.get("/admin/payment-proofs", { params });
   return toPaginatedResult<PaymentManualRecord>(data, page, limit);
 }
 
-export async function getManualPaymentDetails(id: string): Promise<PaymentManualRecord> {
-  const { data } = await api.get<PaymentManualRecord>(`/admin/payment-proofs/${id}/details`);
+export async function getManualPaymentDetails(
+  id: string,
+): Promise<PaymentManualRecord> {
+  const { data } = await api.get<PaymentManualRecord>(
+    `/admin/payment-proofs/${id}/details`,
+  );
   return data;
 }
 
-export async function validateManualPayment(id: string, notes?: string): Promise<void> {
+export async function validateManualPayment(
+  id: string,
+  notes?: string,
+): Promise<void> {
   await api.patch(`/admin/payment-proofs/${id}/validate`, { notes });
 }
 
-export async function rejectManualPayment(id: string, reason: string): Promise<void> {
+export async function rejectManualPayment(
+  id: string,
+  reason: string,
+): Promise<void> {
   await api.patch(`/admin/payment-proofs/${id}/reject`, { reason });
 }
 
-export async function reopenManualPayment(id: string, reason?: string): Promise<void> {
+export async function reopenManualPayment(
+  id: string,
+  reason?: string,
+): Promise<void> {
   await api.patch(`/admin/payment-proofs/${id}/reopen`, { reason });
 }
 
 export async function markManualPaymentRefunded(id: string): Promise<void> {
   await api.patch(`/admin/payment-proofs/${id}/mark-refunded`);
+}
+
+export async function deleteManualPayment(id: string): Promise<void> {
+  await api.delete(`/admin/payment-proofs/${id}`);
 }
 
 export { resolveApiUrl };

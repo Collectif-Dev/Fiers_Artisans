@@ -10,12 +10,19 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
   FakePaymentManualRepository({
     required this.initiateResult,
     required this.statusResult,
+    this.currentResult,
   });
 
   final ManualPaymentModel initiateResult;
   ManualPaymentModel statusResult;
+  ManualPaymentModel? currentResult;
   int fetchStatusCalls = 0;
   int submitProofCalls = 0;
+
+  @override
+  Future<ManualPaymentModel?> fetchCurrentTransaction() async {
+    return currentResult;
+  }
 
   @override
   Future<ManualPaymentModel> initiatePayment({required String provider}) async {
@@ -23,7 +30,9 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
   }
 
   @override
-  Future<ManualPaymentModel> fetchStatus({required String transactionId}) async {
+  Future<ManualPaymentModel> fetchStatus({
+    required String transactionId,
+  }) async {
     fetchStatusCalls += 1;
     return statusResult;
   }
@@ -71,46 +80,52 @@ void main() {
     await events.close();
   });
 
-  test('updates status when receiving manualPaymentUpdated realtime event', () async {
-    final repo = FakePaymentManualRepository(
-      initiateResult: const ManualPaymentModel(
-        transactionId: 'TX-REAL-1',
-        provider: 'MTN_MOMO',
-        amountFcfa: 5000,
-        status: 'PENDING',
-      ),
-      statusResult: const ManualPaymentModel(
-        transactionId: 'TX-REAL-1',
-        provider: 'MTN_MOMO',
-        amountFcfa: 5000,
-        status: 'COMPLETED',
-      ),
-    );
-    final events = StreamController<ChatRealtimeEvent>.broadcast();
-    final notifier = PaymentManualNotifier(
-      repository: repo,
-      domainEvents: events.stream,
-    );
+  test(
+    'updates status when receiving manualPaymentUpdated realtime event',
+    () async {
+      final repo = FakePaymentManualRepository(
+        initiateResult: const ManualPaymentModel(
+          transactionId: 'TX-REAL-1',
+          provider: 'MTN_MOMO',
+          amountFcfa: 5000,
+          status: 'PENDING',
+        ),
+        statusResult: const ManualPaymentModel(
+          transactionId: 'TX-REAL-1',
+          provider: 'MTN_MOMO',
+          amountFcfa: 5000,
+          status: 'COMPLETED',
+        ),
+      );
+      final events = StreamController<ChatRealtimeEvent>.broadcast();
+      final notifier = PaymentManualNotifier(
+        repository: repo,
+        domainEvents: events.stream,
+      );
 
-    await notifier.initiatePayment(provider: 'MTN_MOMO');
-    events.add(
-      const ChatRealtimeEvent(
-        event: 'manualPaymentUpdated',
-        payload: {'transactionId': 'TX-REAL-1'},
-      ),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+      await notifier.initiatePayment(provider: 'MTN_MOMO');
+      events.add(
+        const ChatRealtimeEvent(
+          event: 'manualPaymentUpdated',
+          payload: {'transactionId': 'TX-REAL-1'},
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
-    expect(repo.fetchStatusCalls, greaterThanOrEqualTo(1));
-    expect(notifier.state.currentTransaction?.status, 'COMPLETED');
-    expect(notifier.state.transientMessage, 'Votre paiement a ete valide. Abonnement actif.');
+      expect(repo.fetchStatusCalls, greaterThanOrEqualTo(1));
+      expect(notifier.state.currentTransaction?.status, 'COMPLETED');
+      expect(
+        notifier.state.transientMessage,
+        'Votre paiement a ete valide. Abonnement actif.',
+      );
 
-    notifier.clearTransientMessage();
-    expect(notifier.state.transientMessage, isNull);
+      notifier.clearTransientMessage();
+      expect(notifier.state.transientMessage, isNull);
 
-    notifier.dispose();
-    await events.close();
-  });
+      notifier.dispose();
+      await events.close();
+    },
+  );
 
   test('includes rejection reason in realtime transient message', () async {
     final repo = FakePaymentManualRepository(
@@ -154,36 +169,39 @@ void main() {
     await events.close();
   });
 
-  test('sets an explicit error when submitting proof without transaction', () async {
-    final repo = FakePaymentManualRepository(
-      initiateResult: const ManualPaymentModel(
-        transactionId: 'TX-X',
-        provider: 'WAVE',
-        amountFcfa: 5000,
-        status: 'PENDING',
-      ),
-      statusResult: const ManualPaymentModel(
-        transactionId: 'TX-X',
-        provider: 'WAVE',
-        amountFcfa: 5000,
-        status: 'PENDING',
-      ),
-    );
-    final events = StreamController<ChatRealtimeEvent>.broadcast();
-    final notifier = PaymentManualNotifier(
-      repository: repo,
-      domainEvents: events.stream,
-    );
+  test(
+    'sets an explicit error when submitting proof without transaction',
+    () async {
+      final repo = FakePaymentManualRepository(
+        initiateResult: const ManualPaymentModel(
+          transactionId: 'TX-X',
+          provider: 'WAVE',
+          amountFcfa: 5000,
+          status: 'PENDING',
+        ),
+        statusResult: const ManualPaymentModel(
+          transactionId: 'TX-X',
+          provider: 'WAVE',
+          amountFcfa: 5000,
+          status: 'PENDING',
+        ),
+      );
+      final events = StreamController<ChatRealtimeEvent>.broadcast();
+      final notifier = PaymentManualNotifier(
+        repository: repo,
+        domainEvents: events.stream,
+      );
 
-    await notifier.submitProof(
-      filePath: '/tmp/proof.png',
-      senderNumber: '0700000000',
-    );
+      await notifier.submitProof(
+        filePath: '/tmp/proof.png',
+        senderNumber: '0700000000',
+      );
 
-    expect(notifier.state.error, 'Transaction introuvable.');
-    expect(repo.submitProofCalls, 0);
+      expect(notifier.state.error, 'Transaction introuvable.');
+      expect(repo.submitProofCalls, 0);
 
-    notifier.dispose();
-    await events.close();
-  });
+      notifier.dispose();
+      await events.close();
+    },
+  );
 }

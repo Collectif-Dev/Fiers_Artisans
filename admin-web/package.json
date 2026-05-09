@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack -H 0.0.0.0 -p 3002",
-    "build": "next build",
+    "build": "NODE_ENV=production next build",
     "start": "next start -H 0.0.0.0 -p 3002",
     "lint": "eslint"
   },

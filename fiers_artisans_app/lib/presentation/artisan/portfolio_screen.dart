@@ -326,6 +326,8 @@ class _AddPortfolioSheet extends StatefulWidget {
 }
 
 class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
+  static const int _maxImagesPerProject = 5;
+
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
@@ -342,11 +344,26 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
   }
 
   Future<void> _pickImages() async {
+    if (_images.length >= _maxImagesPerProject) {
+      AppSnackBar.show(
+        context,
+        message: 'portfolio.max_images_reached'.tr(
+          namedArgs: {'count': '$_maxImagesPerProject'},
+        ),
+      );
+      return;
+    }
+
     final picked = await _picker.pickMultiImage(imageQuality: 80);
     if (picked.isNotEmpty) {
       final converted = <_PickedPortfolioImage>[];
+      final remainingSlots = _maxImagesPerProject - _images.length;
+      final pickedWithinLimit = picked.take(remainingSlots).toList();
       for (var i = 0; i < picked.length; i++) {
-        final file = picked[i];
+        if (i >= pickedWithinLimit.length) {
+          break;
+        }
+        final file = pickedWithinLimit[i];
         final bytes = await file.readAsBytes();
         final fallbackName =
             'portfolio_${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
@@ -360,6 +377,15 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
       setState(() {
         _images.addAll(converted);
       });
+
+      if (picked.length > pickedWithinLimit.length && mounted) {
+        AppSnackBar.show(
+          context,
+          message: 'portfolio.max_images_reached'.tr(
+            namedArgs: {'count': '$_maxImagesPerProject'},
+          ),
+        );
+      }
     }
   }
 
@@ -367,6 +393,16 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
     if (!_formKey.currentState!.validate()) return;
     if (_images.isEmpty) {
       AppSnackBar.show(context, message: 'portfolio.images_required'.tr());
+      return;
+    }
+
+    if (_images.length > _maxImagesPerProject) {
+      AppSnackBar.show(
+        context,
+        message: 'portfolio.max_images_reached'.tr(
+          namedArgs: {'count': '$_maxImagesPerProject'},
+        ),
+      );
       return;
     }
 
@@ -391,6 +427,7 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final imageLimitReached = _images.length >= _maxImagesPerProject;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -446,7 +483,9 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
 
               // Image picker
               Text(
-                'portfolio.item_images'.tr(),
+                'portfolio.item_images_with_limit'.tr(
+                  namedArgs: {'count': '$_maxImagesPerProject'},
+                ),
                 style: theme.textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -495,17 +534,22 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
                     );
                   }),
                   GestureDetector(
-                    onTap: _pickImages,
+                    onTap: imageLimitReached ? null : _pickImages,
                     child: Container(
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
                         border: Border.all(color: theme.dividerColor),
                         borderRadius: BorderRadius.circular(8),
+                        color: imageLimitReached
+                            ? theme.colorScheme.surfaceContainerHighest
+                            : null,
                       ),
                       child: Icon(
                         Icons.add_photo_alternate_outlined,
-                        color: theme.colorScheme.primary,
+                        color: imageLimitReached
+                            ? theme.disabledColor
+                            : theme.colorScheme.primary,
                       ),
                     ),
                   ),

@@ -6,6 +6,7 @@ import '../models/manual_payment_model.dart';
 
 abstract class PaymentManualRepositoryContract {
   Future<ManualPaymentModel> initiatePayment({required String provider});
+  Future<ManualPaymentModel?> fetchCurrentTransaction();
   Future<ManualPaymentModel> fetchStatus({required String transactionId});
   Future<void> submitProof({
     required String transactionId,
@@ -28,8 +29,28 @@ class PaymentManualRepository implements PaymentManualRepositoryContract {
   }
 
   @override
-  Future<ManualPaymentModel> fetchStatus({required String transactionId}) async {
-    final response = await _api.get(ApiEndpoints.manualPaymentStatus(transactionId));
+  Future<ManualPaymentModel?> fetchCurrentTransaction() async {
+    final response = await _api.get(ApiEndpoints.manualPaymentCurrent);
+    final payload = response.data;
+    if (payload == null) {
+      return null;
+    }
+    if (payload is! Map<String, dynamic>) {
+      return null;
+    }
+    if (payload.isEmpty) {
+      return null;
+    }
+    return ManualPaymentModel.fromJson(payload);
+  }
+
+  @override
+  Future<ManualPaymentModel> fetchStatus({
+    required String transactionId,
+  }) async {
+    final response = await _api.get(
+      ApiEndpoints.manualPaymentStatus(transactionId),
+    );
     return ManualPaymentModel.fromJson(response.data as Map<String, dynamic>);
   }
 

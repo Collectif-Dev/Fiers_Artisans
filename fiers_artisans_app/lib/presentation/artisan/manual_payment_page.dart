@@ -31,6 +31,31 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
   String _provider = 'ORANGE_MONEY';
 
   @override
+  void initState() {
+    super.initState();
+    ref.listenManual<PaymentManualState>(paymentManualProvider, (
+      previous,
+      next,
+    ) {
+      final tx = next.currentTransaction;
+      if (tx == null) {
+        return;
+      }
+      if (tx.provider != _provider && mounted) {
+        setState(() {
+          _provider = tx.provider;
+        });
+      }
+    });
+
+    Future.microtask(
+      () => ref
+          .read(paymentManualProvider.notifier)
+          .loadCurrentTransaction(refresh: true),
+    );
+  }
+
+  @override
   void dispose() {
     _senderController.dispose();
     super.dispose();
@@ -142,7 +167,12 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       return;
     }
 
-    if (image == null || !_ivorianMobilePattern.hasMatch(sender)) {
+    if (image == null) {
+      AppSnackBar.show(context, message: 'manual_payment.proof_required'.tr());
+      return;
+    }
+
+    if (!_ivorianMobilePattern.hasMatch(sender)) {
       AppSnackBar.show(context, message: 'manual_payment.sender_invalid'.tr());
       return;
     }
