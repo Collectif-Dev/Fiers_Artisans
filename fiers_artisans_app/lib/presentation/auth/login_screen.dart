@@ -7,6 +7,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../config/theme.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../providers/auth_provider.dart';
+import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 import '../common/pin_code_field.dart';
 import '../common/app_text_field.dart';
@@ -22,6 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   final _pinController = TextEditingController();
+  final _pinFocusNode = FocusNode();
   bool _isLoading = false;
   Timer? _autoLoginDebounce;
   String _lastAutoAttemptSignature = '';
@@ -39,6 +41,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _autoLoginDebounce?.cancel();
     _phoneController.dispose();
     _pinController.dispose();
+    _pinFocusNode.dispose();
     super.dispose();
   }
 
@@ -148,12 +151,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         return;
       }
       final error = authState.error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error ?? 'error.generic'.tr()),
-          backgroundColor: AppTheme.error,
-        ),
+      AppSnackBar.show(
+        context,
+        message: error ?? 'error.generic'.tr(),
+        backgroundColor: AppTheme.error,
       );
+
+      // Reset PIN bubbles instantly after any login failure so retry is frictionless.
+      _pinController.clear();
+      _lastAutoAttemptSignature = '';
+      _autoLoginDebounce?.cancel();
+      _pinFocusNode.requestFocus();
     }
   }
 
@@ -236,6 +244,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // PIN
                 PinCodeField(
                   controller: _pinController,
+                  focusNode: _pinFocusNode,
                   label: 'auth.pin'.tr(),
                   hint: '•••••',
                   textInputAction: TextInputAction.done,

@@ -14,6 +14,7 @@ import '../../providers/favorites_provider.dart';
 import '../../core/utils/formatters.dart';
 import '../../data/models/artisan_model.dart';
 import '../../data/repositories/analytics_repository.dart';
+import '../common/app_snackbar.dart';
 import '../common/rating_stars.dart';
 import '../common/badge_verified.dart';
 import '../common/skeleton_loader.dart';
@@ -611,9 +612,7 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
       context.push('/chat/${convo.id}?$query');
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('chat.start_error'.tr())));
+      AppSnackBar.show(context, message: 'chat.start_error'.tr());
     } finally {
       if (mounted) {
         setState(() => _isOpeningChat = false);
@@ -627,14 +626,11 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
         .toggleFavorite(artisan);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          updated
-              ? 'dashboard.client.favorite_added'.tr()
-              : 'dashboard.client.favorite_removed'.tr(),
-        ),
-      ),
+    AppSnackBar.show(
+      context,
+      message: updated
+          ? 'dashboard.client.favorite_added'.tr()
+          : 'dashboard.client.favorite_removed'.tr(),
     );
   }
 }

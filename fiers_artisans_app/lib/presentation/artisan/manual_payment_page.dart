@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 
 import '../../config/theme.dart';
 import '../../providers/payment_manual_provider.dart';
+import '../common/app_snackbar.dart';
 import 'payment_status_widget.dart';
 
 class ManualPaymentPage extends ConsumerStatefulWidget {
@@ -67,37 +68,30 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
   Future<void> _copyRecipient(String number) async {
     await Clipboard.setData(ClipboardData(text: number));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('manual_payment.copy_success'.tr())));
+    AppSnackBar.show(context, message: 'manual_payment.copy_success'.tr());
   }
 
   Future<void> _initiate() async {
-    final messenger = ScaffoldMessenger.of(context);
     final state = ref.read(paymentManualProvider);
     final tx = state.currentTransaction;
 
     if (_recipientByProvider[_provider] == null) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('manual_payment.provider_unavailable_moov'.tr()),
-        ),
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.provider_unavailable_moov'.tr(),
       );
       return;
     }
 
     if (tx != null && (tx.isPending || tx.isPendingAdmin)) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('manual_payment.request_pending'.tr())),
-      );
+      AppSnackBar.show(context, message: 'manual_payment.request_pending'.tr());
       return;
     }
 
     if (tx != null && !tx.canInitiateNewTransaction) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('manual_payment.new_transaction_not_allowed'.tr()),
-        ),
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.new_transaction_not_allowed'.tr(),
       );
       return;
     }
@@ -112,15 +106,10 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
         latest.provider == _provider &&
         latest.recipientNumber != null &&
         latest.recipientNumber!.isNotEmpty) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'manual_payment.recipient_number_label'.tr(
-              namedArgs: {
-                'number': _formatPhoneSpaced(latest.recipientNumber!),
-              },
-            ),
-          ),
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.recipient_number_label'.tr(
+          namedArgs: {'number': _formatPhoneSpaced(latest.recipientNumber!)},
         ),
       );
     }
@@ -133,30 +122,28 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     final sender = _senderController.text.trim();
 
     if (tx == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('manual_payment.generate_first'.tr())),
-      );
+      AppSnackBar.show(context, message: 'manual_payment.generate_first'.tr());
       return;
     }
 
     if (!(tx.isPending || tx.isRejected)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('manual_payment.proof_not_allowed'.tr())),
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.proof_not_allowed'.tr(),
       );
       return;
     }
 
     if (state.hasSubmittedProof && tx.isPendingAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('manual_payment.proof_already_pending'.tr())),
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.proof_already_pending'.tr(),
       );
       return;
     }
 
     if (image == null || !_ivorianMobilePattern.hasMatch(sender)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('manual_payment.sender_invalid'.tr())),
-      );
+      AppSnackBar.show(context, message: 'manual_payment.sender_invalid'.tr());
       return;
     }
 
@@ -167,9 +154,7 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     if (!mounted) return;
     final error = ref.read(paymentManualProvider).error;
     if (error == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('manual_payment.proof_sent'.tr())));
+      AppSnackBar.show(context, message: 'manual_payment.proof_sent'.tr());
     }
   }
 

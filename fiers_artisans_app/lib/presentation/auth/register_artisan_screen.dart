@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/categories_provider.dart';
 import '../../data/models/category_model.dart';
 import '../../services/location_service.dart';
+import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 import '../common/pin_code_field.dart';
 import '../common/app_text_field.dart';
@@ -76,29 +77,31 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
 
       if (result.issueType == LocationIssueType.reverseGeocodingFailed &&
           result.message != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('location.error_reverse_geocoding_failed'.tr()),
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'location.error_reverse_geocoding_failed'.tr(),
         );
       }
     } else {
       final message = _locationIssueMessage(result.issueType);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          action: result.issueType == LocationIssueType.permissionDeniedForever
-              ? SnackBarAction(
-                  label: 'location.open_settings'.tr(),
-                  onPressed: Geolocator.openAppSettings,
-                )
-              : result.issueType == LocationIssueType.servicesDisabled
-              ? SnackBarAction(
-                  label: 'location.enable_gps'.tr(),
-                  onPressed: Geolocator.openLocationSettings,
-                )
-              : null,
-        ),
+      final actionLabel =
+          result.issueType == LocationIssueType.permissionDeniedForever
+          ? 'location.open_settings'.tr()
+          : result.issueType == LocationIssueType.servicesDisabled
+          ? 'location.enable_gps'.tr()
+          : null;
+      final actionCallback =
+          result.issueType == LocationIssueType.permissionDeniedForever
+          ? Geolocator.openAppSettings
+          : result.issueType == LocationIssueType.servicesDisabled
+          ? Geolocator.openLocationSettings
+          : null;
+
+      AppSnackBar.show(
+        context,
+        message: message,
+        actionLabel: actionLabel,
+        onAction: actionCallback,
       );
     }
 
@@ -162,11 +165,10 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
       final phone = _phoneCtrl.text.trim();
       context.push('/otp', extra: phone);
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ref.read(authProvider).error ?? 'error.generic'.tr()),
-          backgroundColor: AppTheme.error,
-        ),
+      AppSnackBar.show(
+        context,
+        message: ref.read(authProvider).error ?? 'error.generic'.tr(),
+        backgroundColor: AppTheme.error,
       );
     }
   }

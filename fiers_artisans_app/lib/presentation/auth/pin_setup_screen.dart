@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_config.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 import '../common/app_text_field.dart';
 
@@ -72,16 +73,16 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
       await ref.read(authProvider.notifier).sendOtp(widget.phone);
       _startResendTimer();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('auth.otp.sent'.tr(namedArgs: {'phone': widget.phone}))),
+      AppSnackBar.show(
+        context,
+        message: 'auth.otp.sent'.tr(namedArgs: {'phone': widget.phone}),
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('auth.otp.unavailable'.tr()),
-          backgroundColor: AppTheme.warning,
-        ),
+      AppSnackBar.show(
+        context,
+        message: 'auth.otp.unavailable'.tr(),
+        backgroundColor: AppTheme.warning,
       );
     }
   }
@@ -91,7 +92,9 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).setupPin(
+    final success = await ref
+        .read(authProvider.notifier)
+        .setupPin(
           phone: widget.phone,
           code: _otpCtrl.text.trim(),
           pinCode: _pinCtrl.text,
@@ -111,11 +114,10 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
     }
 
     final error = ref.read(authProvider).error;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(error ?? 'error.generic'.tr()),
-        backgroundColor: AppTheme.error,
-      ),
+    AppSnackBar.show(
+      context,
+      message: error ?? 'error.generic'.tr(),
+      backgroundColor: AppTheme.error,
     );
   }
 
@@ -135,7 +137,9 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
               children: [
                 const SizedBox(height: 12),
                 Text(
-                  'auth.pin_setup.subtitle'.tr(namedArgs: {'phone': widget.phone}),
+                  'auth.pin_setup.subtitle'.tr(
+                    namedArgs: {'phone': widget.phone},
+                  ),
                   style: theme.textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 24),
@@ -150,7 +154,9 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
                   textInputAction: TextInputAction.next,
                   validator: (v) {
                     final value = (v ?? '').trim();
-                    if (value.length != 6) return 'auth.pin_setup.otp_6_digits'.tr();
+                    if (value.length != 6) {
+                      return 'auth.pin_setup.otp_6_digits'.tr();
+                    }
                     return null;
                   },
                 ),
@@ -166,7 +172,9 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
                   maxLength: 5,
                   textInputAction: TextInputAction.next,
                   validator: (v) {
-                    if ((v ?? '').length != 5) return 'auth.pin_5_digits'.tr();
+                    if ((v ?? '').length != 5) {
+                      return 'auth.pin_5_digits'.tr();
+                    }
                     return null;
                   },
                 ),
@@ -183,7 +191,9 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => _submit(),
                   validator: (v) {
-                    if (v != _pinCtrl.text) return 'auth.pin_mismatch'.tr();
+                    if (v != _pinCtrl.text) {
+                      return 'auth.pin_mismatch'.tr();
+                    }
                     return null;
                   },
                 ),
@@ -199,7 +209,9 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
                     onTap: _resendTimer == 0 ? _resend : null,
                     child: Text(
                       _resendTimer > 0
-                          ? 'auth.otp.resend_in'.tr(namedArgs: {'seconds': '$_resendTimer'})
+                          ? 'auth.otp.resend_in'.tr(
+                              namedArgs: {'seconds': '$_resendTimer'},
+                            )
                           : 'auth.otp.resend'.tr(),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: _resendTimer == 0

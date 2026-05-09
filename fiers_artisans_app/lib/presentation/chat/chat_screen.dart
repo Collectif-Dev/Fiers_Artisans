@@ -8,6 +8,7 @@ import '../../providers/chat_provider.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/utils/formatters.dart';
 import '../common/availability_badge.dart';
+import '../common/app_snackbar.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
@@ -357,9 +358,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     await _resolveCurrentUserIdIfNeeded();
     if ((_currentUserId ?? '').isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('error.unauthorized'.tr())));
+      AppSnackBar.show(context, message: 'error.unauthorized'.tr());
       return;
     }
 

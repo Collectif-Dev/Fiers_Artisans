@@ -17,6 +17,7 @@ import '../../providers/chat_provider.dart';
 import '../../services/chat_realtime_service.dart';
 import '../../services/location_service.dart';
 import '../common/recent_conversation_tile.dart';
+import '../common/app_snackbar.dart';
 
 class ArtisanDashboard extends ConsumerStatefulWidget {
   const ArtisanDashboard({super.key});
@@ -89,8 +90,9 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       await prefs.setBool('artisan_available', previous);
       if (mounted) {
         setState(() => _isAvailable = previous);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('dashboard.artisan.sync_unavailable'.tr())),
+        AppSnackBar.show(
+          context,
+          message: 'dashboard.artisan.sync_unavailable'.tr(),
         );
       }
     }

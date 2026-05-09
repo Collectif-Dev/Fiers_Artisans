@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../config/theme.dart';
 import '../../providers/artisan_provider.dart';
 import '../../providers/favorites_provider.dart';
+import '../common/app_snackbar.dart';
 import '../common/rating_stars.dart';
 import '../common/app_button.dart';
 import '../common/app_text_field.dart';
@@ -53,11 +54,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
               .patchFavoriteFromArtisan(refreshedArtisan);
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('review.submitted_success'.tr()),
-            backgroundColor: AppTheme.success,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'review.submitted_success'.tr(),
+          backgroundColor: AppTheme.success,
         );
         context.pop();
       } else {
@@ -67,11 +67,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
           ReviewSubmitFailure.backend => 'error.server'.tr(),
           _ => 'error.generic'.tr(),
         };
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppTheme.error,
-          ),
+        AppSnackBar.show(
+          context,
+          message: errorMessage,
+          backgroundColor: AppTheme.error,
         );
       }
     }

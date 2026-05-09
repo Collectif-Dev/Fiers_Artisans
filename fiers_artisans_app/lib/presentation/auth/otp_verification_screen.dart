@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import '../../config/theme.dart';
 import '../../config/app_config.dart';
 import '../../providers/auth_provider.dart';
+import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
@@ -17,10 +18,11 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
       _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState
-    extends ConsumerState<OtpVerificationScreen> {
-  final List<TextEditingController> _controllers =
-      List.generate(6, (_) => TextEditingController());
+class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
   int _resendTimer = AppConfig.otpResendDelay;
@@ -67,10 +69,9 @@ class _OtpVerificationScreenState
     if (code.length != 6) return;
 
     setState(() => _isLoading = true);
-    final success = await ref.read(authProvider.notifier).verifyOtp(
-          phone: widget.phone,
-          code: code,
-        );
+    final success = await ref
+        .read(authProvider.notifier)
+        .verifyOtp(phone: widget.phone, code: code);
     setState(() => _isLoading = false);
 
     if (success && mounted) {
@@ -86,11 +87,10 @@ class _OtpVerificationScreenState
       } else {
         // Flux login 403: pas de tokens, l'utilisateur doit se reconnecter
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('auth.otp.verified_login'.tr()),
-              backgroundColor: Colors.green,
-            ),
+          AppSnackBar.show(
+            context,
+            message: 'auth.otp.verified_login'.tr(),
+            backgroundColor: Colors.green,
           );
           context.go('/login');
         }
@@ -101,11 +101,10 @@ class _OtpVerificationScreenState
         c.clear();
       }
       _focusNodes[0].requestFocus();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('auth.otp.invalid'.tr()),
-          backgroundColor: AppTheme.error,
-        ),
+      AppSnackBar.show(
+        context,
+        message: 'auth.otp.invalid'.tr(),
+        backgroundColor: AppTheme.error,
       );
     }
   }
@@ -116,17 +115,17 @@ class _OtpVerificationScreenState
       await ref.read(authProvider.notifier).sendOtp(widget.phone);
       _startResendTimer();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('auth.otp.sent'.tr(namedArgs: {'phone': widget.phone}))),
+        AppSnackBar.show(
+          context,
+          message: 'auth.otp.sent'.tr(namedArgs: {'phone': widget.phone}),
         );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('auth.otp.unavailable'.tr()),
-            backgroundColor: AppTheme.warning,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'auth.otp.unavailable'.tr(),
+          backgroundColor: AppTheme.warning,
         );
       }
     }
@@ -144,8 +143,11 @@ class _OtpVerificationScreenState
           child: Column(
             children: [
               const SizedBox(height: 24),
-              Icon(Icons.verified_user_outlined,
-                  size: 64, color: theme.colorScheme.primary),
+              Icon(
+                Icons.verified_user_outlined,
+                size: 64,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(height: 24),
               Text(
                 'auth.otp.title'.tr(),
@@ -208,15 +210,15 @@ class _OtpVerificationScreenState
                 onTap: _resendTimer == 0 ? _resend : null,
                 child: Text(
                   _resendTimer > 0
-                      ? 'auth.otp.resend_in'
-                          .tr(namedArgs: {'seconds': '$_resendTimer'})
+                      ? 'auth.otp.resend_in'.tr(
+                          namedArgs: {'seconds': '$_resendTimer'},
+                        )
                       : 'auth.otp.resend'.tr(),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: _resendTimer == 0
                         ? theme.colorScheme.primary
                         : theme.textTheme.bodySmall?.color,
-                    fontWeight:
-                        _resendTimer == 0 ? FontWeight.w600 : null,
+                    fontWeight: _resendTimer == 0 ? FontWeight.w600 : null,
                   ),
                 ),
               ),

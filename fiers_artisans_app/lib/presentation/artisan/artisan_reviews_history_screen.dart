@@ -11,6 +11,7 @@ import '../../data/models/review_model.dart';
 import '../../data/repositories/artisan_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/chat_realtime_service.dart';
+import '../common/app_snackbar.dart';
 import '../common/rating_stars.dart';
 
 class ArtisanReviewsHistoryScreen extends ConsumerStatefulWidget {
@@ -333,9 +334,7 @@ class _ArtisanReviewsHistoryScreenState
     try {
       await _repository.replyToReview(reviewId: review.id, reply: reply);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('review.reply_success'.tr())));
+      AppSnackBar.show(context, message: 'review.reply_success'.tr());
       await _load();
     } on DioException catch (e) {
       if (!mounted) return;
@@ -343,14 +342,10 @@ class _ArtisanReviewsHistoryScreenState
       final message = status == 409
           ? 'review.reply_already_exists'.tr()
           : 'error.generic'.tr();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      AppSnackBar.show(context, message: message);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('error.generic'.tr())));
+      AppSnackBar.show(context, message: 'error.generic'.tr());
     } finally {
       if (mounted) {
         setState(() => _replyingReviewId = null);

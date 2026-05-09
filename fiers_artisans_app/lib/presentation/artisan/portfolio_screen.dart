@@ -10,6 +10,7 @@ import '../../data/models/portfolio_model.dart';
 import '../../data/repositories/artisan_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/chat_realtime_service.dart';
+import '../common/app_snackbar.dart';
 import '../common/empty_state.dart';
 import '../common/portfolio_item_card.dart';
 import 'package:dio/dio.dart';
@@ -128,43 +129,39 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     } on _PortfolioUploadException {
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('portfolio.upload_images_error'.tr()),
-            backgroundColor: AppTheme.error,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'portfolio.upload_images_error'.tr(),
+          backgroundColor: AppTheme.error,
         );
       }
     } on _PortfolioCreateException {
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('portfolio.create_after_upload_error'.tr()),
-            backgroundColor: AppTheme.error,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'portfolio.create_after_upload_error'.tr(),
+          backgroundColor: AppTheme.error,
         );
       }
     } on DioException catch (e) {
       debugPrint('[Portfolio] Network error: ${e.message}');
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('portfolio.upload_or_save_error'.tr()),
-            backgroundColor: AppTheme.error,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'portfolio.upload_or_save_error'.tr(),
+          backgroundColor: AppTheme.error,
         );
       }
     } catch (e) {
       debugPrint('[Portfolio] Unexpected error: $e');
       setState(() => _loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('portfolio.add_error'.tr()),
-            backgroundColor: AppTheme.error,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'portfolio.add_error'.tr(),
+          backgroundColor: AppTheme.error,
         );
       }
     }
@@ -198,11 +195,10 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
       await _loadPortfolio();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('portfolio.delete_error'.tr()),
-            backgroundColor: AppTheme.error,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'portfolio.delete_error'.tr(),
+          backgroundColor: AppTheme.error,
         );
       }
     }
@@ -370,9 +366,7 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     if (_images.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('portfolio.images_required'.tr())));
+      AppSnackBar.show(context, message: 'portfolio.images_required'.tr());
       return;
     }
 

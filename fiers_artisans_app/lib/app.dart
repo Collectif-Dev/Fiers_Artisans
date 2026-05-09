@@ -6,6 +6,7 @@ import 'config/routes.dart';
 import 'providers/app_providers.dart';
 import 'providers/payment_manual_provider.dart';
 import 'services/app_icon_service.dart';
+import 'presentation/common/app_snackbar.dart';
 
 class FiersArtisansApp extends ConsumerStatefulWidget {
   const FiersArtisansApp({super.key});
@@ -23,8 +24,7 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
     final systemBrightness = MediaQuery.platformBrightnessOf(context);
     final isDark =
         themeMode == ThemeMode.dark ||
-        (themeMode == ThemeMode.system &&
-            systemBrightness == Brightness.dark);
+        (themeMode == ThemeMode.system && systemBrightness == Brightness.dark);
 
     if (_lastDarkIconValue == isDark) {
       return;
@@ -39,13 +39,15 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
   @override
   void initState() {
     super.initState();
-    ref.listenManual<PaymentManualState>(paymentManualProvider, (previous, next) {
+    ref.listenManual<PaymentManualState>(paymentManualProvider, (
+      previous,
+      next,
+    ) {
       final message = next.transientMessage;
       if (message == null || message.trim().isEmpty) {
         return;
       }
-      final messenger = _scaffoldMessengerKey.currentState;
-      messenger?.showSnackBar(SnackBar(content: Text(message)));
+      AppSnackBar.show(context, message: message);
       ref.read(paymentManualProvider.notifier).clearTransientMessage();
     });
   }

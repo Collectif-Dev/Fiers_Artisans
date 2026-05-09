@@ -22,6 +22,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
+      target: production
     container_name: fiers-api
     restart: unless-stopped
     depends_on:

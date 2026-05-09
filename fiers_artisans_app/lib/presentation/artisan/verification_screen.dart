@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../config/theme.dart';
 import '../../data/repositories/verification_repository.dart';
 import '../../providers/verification_provider.dart';
+import '../common/app_snackbar.dart';
 
 /// Max extra pages allowed for DIPLOME/CERTIFICAT/ATTESTATION
 const int kMaxExtraPages = 5;
@@ -315,11 +316,10 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('artisan.verification.upload_success'.tr()),
-            backgroundColor: AppTheme.success,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'artisan.verification.upload_success'.tr(),
+          backgroundColor: AppTheme.success,
         );
         widget.onSubmitted();
         Navigator.of(context).pop();
@@ -327,11 +327,10 @@ class _DocumentBuilderScreenState extends State<_DocumentBuilderScreen> {
     } catch (e) {
       debugPrint('Verification submit error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('artisan.verification.upload_error'.tr()),
-            backgroundColor: AppTheme.error,
-          ),
+        AppSnackBar.show(
+          context,
+          message: 'artisan.verification.upload_error'.tr(),
+          backgroundColor: AppTheme.error,
         );
       }
     } finally {

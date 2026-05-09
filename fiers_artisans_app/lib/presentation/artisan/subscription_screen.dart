@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../config/theme.dart';
 import '../../providers/subscription_provider.dart';
+import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 import 'manual_payment_page.dart';
 
@@ -24,8 +25,9 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
 
   void _openManualPayment({required bool isSubscriptionActive}) {
     if (isSubscriptionActive) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('subscription.manual.already_active'.tr())),
+      AppSnackBar.show(
+        context,
+        message: 'subscription.manual.already_active'.tr(),
       );
       return;
     }
