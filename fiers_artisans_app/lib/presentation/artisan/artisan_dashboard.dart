@@ -944,7 +944,7 @@ class _SubscriptionCard extends StatelessWidget {
     final theme = Theme.of(context);
     final sub = subState.subscription;
     final isActive = sub?.isActive == true;
-    final hasSubscriptionRecord = sub != null;
+    final hasSubscriptionRecord = sub != null && !sub.isPending;
     final manual = manualTransaction;
 
     final bool isManualPending =

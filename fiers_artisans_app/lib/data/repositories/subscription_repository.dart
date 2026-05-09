@@ -11,11 +11,18 @@ class SubscriptionRepository {
       final data = response.data;
       // Backend returns { subscription: {...}, is_active: bool }
       if (data is Map<String, dynamic> && data.containsKey('subscription')) {
-        final sub = data['subscription'] as Map<String, dynamic>? ?? {};
+        final rawSub = data['subscription'];
+        if (rawSub == null || rawSub is! Map<String, dynamic> || rawSub.isEmpty) {
+          return null;
+        }
+        final sub = Map<String, dynamic>.from(rawSub);
         sub['is_active'] = data['is_active'];
         return SubscriptionModel.fromJson(sub);
       }
-      return SubscriptionModel.fromJson(data);
+      if (data is Map<String, dynamic>) {
+        return SubscriptionModel.fromJson(data);
+      }
+      return null;
     } catch (_) {
       return null;
     }

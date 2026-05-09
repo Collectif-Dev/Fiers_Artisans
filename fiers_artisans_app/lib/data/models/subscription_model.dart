@@ -21,7 +21,8 @@ class SubscriptionModel {
     return SubscriptionModel(
       id: json['id']?.toString() ?? '',
       artisanId: json['artisan_profile_id']?.toString() ?? json['artisanId']?.toString() ?? '',
-      status: (json['status'] ?? 'EXPIRED').toString().toLowerCase(),
+      // New artisans can legitimately have no subscription yet.
+      status: (json['status'] ?? 'PENDING').toString().toLowerCase(),
       startDate: json['starts_at'] != null
           ? DateTime.tryParse(json['starts_at'])
           : json['startDate'] != null
@@ -39,8 +40,11 @@ class SubscriptionModel {
 
   bool get isActive => status == 'active' && !isExpired;
 
+  bool get isPending => status == 'pending';
+
   bool get isExpired {
-    if (endDate == null) return true;
+    if (status == 'expired') return true;
+    if (endDate == null) return false;
     return DateTime.now().isAfter(endDate!);
   }
 

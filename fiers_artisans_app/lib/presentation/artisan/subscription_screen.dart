@@ -54,10 +54,11 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final manualInProgress =
         manualTx != null && (manualTx.isPending || manualTx.isPendingAdmin);
     final manualRejected = manualTx?.isRejected == true;
+    final hasExpiredSubscription = subscription != null && !subscription.isPending;
 
     final statusText = isActive
         ? 'subscription.active'.tr()
-        : subscription == null
+      : !hasExpiredSubscription
         ? 'subscription.none'.tr()
         : 'subscription.expired'.tr();
 

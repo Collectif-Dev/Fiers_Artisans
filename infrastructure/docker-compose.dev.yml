@@ -32,7 +32,7 @@ services:
       minio:
         condition: service_started
 
-  # Admin Web en mode developpement avec hot reload
+  # Admin Web en mode developpement (mode stable par defaut)
   admin-web:
     build:
       target: development
@@ -44,12 +44,21 @@ services:
       - /app/.next
     environment:
       - NODE_ENV=development
+      - ADMIN_WEB_STABLE_MODE=${ADMIN_WEB_STABLE_MODE:-true}
       # Vide en dev pour conserver la resolution automatique selon l'hote courant.
       - NEXT_PUBLIC_API_URL=
       - NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT:-3000}
       - NEXT_PUBLIC_API_BASE_PATH=${NEXT_PUBLIC_API_BASE_PATH:-/api/v1}
       - NEXT_PUBLIC_DEFAULT_LOCALE=${NEXT_PUBLIC_DEFAULT_LOCALE:-fr}
-    command: npm run dev
+    command:
+      - sh
+      - -lc
+      - |
+        if [ "$${ADMIN_WEB_STABLE_MODE}" = "true" ]; then
+          npm run build && npm run start
+        else
+          npm run dev
+        fi
     depends_on:
       api:
         condition: service_healthy
