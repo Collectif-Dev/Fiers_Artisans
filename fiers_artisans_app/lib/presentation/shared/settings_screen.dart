@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../config/theme.dart';
 import '../../config/app_config.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/push_notification_service.dart';
+import '../common/app_snackbar.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -47,6 +51,13 @@ class SettingsScreen extends ConsumerWidget {
                 ref.read(localeProvider.notifier).toggleLocale(context),
           ),
 
+          _SettingsTile(
+            icon: Icons.notifications_active_outlined,
+            title: 'settings.notifications_system'.tr(),
+            subtitle: 'settings.notifications_hint'.tr(),
+            onTap: () => _openNotificationsSystemSettings(context),
+          ),
+
           const Divider(height: 32),
 
           // Profile
@@ -81,6 +92,33 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _openNotificationsSystemSettings(BuildContext context) async {
+    final messaging = FirebaseMessaging.instance;
+    final current = await messaging.getNotificationSettings();
+
+    if (current.authorizationStatus == AuthorizationStatus.notDetermined) {
+      await PushNotificationService().initialize();
+      final refreshed = await messaging.getNotificationSettings();
+      if (refreshed.authorizationStatus == AuthorizationStatus.authorized ||
+          refreshed.authorizationStatus == AuthorizationStatus.provisional) {
+        if (!context.mounted) return;
+        AppSnackBar.show(
+          context,
+          message: 'settings.notifications_enabled'.tr(),
+        );
+        return;
+      }
+    }
+
+    final opened = await openAppSettings();
+    if (!opened && context.mounted) {
+      AppSnackBar.show(
+        context,
+        message: 'settings.notifications_open_settings_fail'.tr(),
+      );
+    }
   }
 
   Future<void> _openThemeSelector(

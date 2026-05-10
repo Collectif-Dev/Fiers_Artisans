@@ -11,6 +11,7 @@ export class Notification extends Document {
     enum: [
       'NEW_MESSAGE',
       'SUBSCRIPTION_EXPIRY',
+      'SUBSCRIPTION_UPDATED',
       'NEARBY_SEARCH',
       'REVIEW_RECEIVED',
       'DOCUMENT_APPROVED',

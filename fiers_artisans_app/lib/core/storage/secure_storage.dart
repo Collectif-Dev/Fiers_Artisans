@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../config/constants.dart';
@@ -6,11 +8,11 @@ import 'web_local_storage_stub.dart'
     as web_storage;
 
 class SecureStorage {
-    static bool _looksLikePhone(String? value) {
-      final normalized = value?.trim() ?? '';
-      if (normalized.isEmpty) return false;
-      return RegExp(r'^\+?[0-9]{6,20}$').hasMatch(normalized);
-    }
+  static bool _looksLikePhone(String? value) {
+    final normalized = value?.trim() ?? '';
+    if (normalized.isEmpty) return false;
+    return RegExp(r'^\+?[0-9]{6,20}$').hasMatch(normalized);
+  }
 
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -88,6 +90,44 @@ class SecureStorage {
     return web_storage.readWebLocalStorage(AppConstants.keyUserRole);
   }
 
+  static Future<void> saveUserProfileCache(
+    Map<String, dynamic> userJson,
+  ) async {
+    final encoded = jsonEncode(userJson);
+    try {
+      await _storage.write(
+        key: AppConstants.keyUserProfileCache,
+        value: encoded,
+      );
+    } catch (_) {}
+
+    await web_storage.writeWebLocalStorage(
+      AppConstants.keyUserProfileCache,
+      encoded,
+    );
+  }
+
+  static Future<Map<String, dynamic>?> getUserProfileCache() async {
+    String? raw;
+    try {
+      raw = await _storage.read(key: AppConstants.keyUserProfileCache);
+    } catch (_) {}
+
+    raw ??= web_storage.readWebLocalStorage(AppConstants.keyUserProfileCache);
+    if ((raw ?? '').isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(raw!);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // Login identifier (phone only, no password)
   static Future<void> saveLastLoginPhone(String phone) async {
     final normalized = phone.replaceAll(' ', '').trim();
@@ -116,8 +156,9 @@ class SecureStorage {
 
   static Future<String?> getLastLoginPhone() async {
     if (kIsWeb) {
-      final webValue =
-          web_storage.readWebLocalStorage(AppConstants.keyLastLoginPhone);
+      final webValue = web_storage.readWebLocalStorage(
+        AppConstants.keyLastLoginPhone,
+      );
       if (_looksLikePhone(webValue)) {
         return webValue!.trim();
       }
@@ -133,8 +174,9 @@ class SecureStorage {
       return secureValue!.trim();
     }
 
-    final webValue =
-        web_storage.readWebLocalStorage(AppConstants.keyLastLoginPhone);
+    final webValue = web_storage.readWebLocalStorage(
+      AppConstants.keyLastLoginPhone,
+    );
     if (_looksLikePhone(webValue)) {
       return webValue!.trim();
     }
@@ -148,6 +190,7 @@ class SecureStorage {
       AppConstants.keyRefreshToken,
       AppConstants.keyUserId,
       AppConstants.keyUserRole,
+      AppConstants.keyUserProfileCache,
       if (!preserveLastPhone) AppConstants.keyLastLoginPhone,
     ];
 

@@ -447,17 +447,23 @@ export class PaymentManualService implements OnModuleDestroy {
 
     const artisanUserId = payment.subscription?.artisan_profile?.user_id;
     if (artisanUserId) {
-      await this.notificationsService.create({
-        userId: artisanUserId,
-        type: 'PAYMENT_MANUAL_VALIDATED',
-        title: 'Paiement valide',
-        body: 'Votre paiement manuel a ete valide. Abonnement actif pour 30 jours.',
-        data: {
-          paymentId: payment.id,
-          transactionId: payment.transaction_id,
-          status: payment.status,
-        },
-      });
+      try {
+        await this.notificationsService.create({
+          userId: artisanUserId,
+          type: 'PAYMENT_MANUAL_VALIDATED',
+          title: 'Paiement valide',
+          body: 'Votre paiement manuel a ete valide. Abonnement actif pour 30 jours.',
+          data: {
+            paymentId: payment.id,
+            transactionId: payment.transaction_id,
+            status: payment.status,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Notification non bloquante ignoree pour paymentId=${payment.id} type=PAYMENT_MANUAL_VALIDATED: ${error}`,
+        );
+      }
     }
 
     this.analyticsService

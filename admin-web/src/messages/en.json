@@ -78,6 +78,8 @@
     "status_refund_required": "Refund required",
     "timeline": "Timeline",
     "proofs": "Proofs",
+    "no_proof_submitted": "No proof submitted yet",
+    "pending_without_proof_hint": "This request has only been initiated by the artisan. Validate/reject actions become available after a proof is submitted.",
     "fraud_alert": "Fraud suspicion",
     "no_data": "No manual payments found"
   },

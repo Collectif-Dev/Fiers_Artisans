@@ -79,7 +79,7 @@ export default function PaymentManualPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState("PENDING_ADMIN");
 
   const [selected, setSelected] = useState<PaymentManualRecord | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -422,7 +422,7 @@ export default function PaymentManualPage() {
                   </button>
                 ) : (
                   <div className="h-[240px] rounded border flex items-center justify-center text-muted-foreground text-sm">
-                    {t("proofs")}
+                    {t("no_proof_submitted")}
                   </div>
                 )}
 
@@ -435,6 +435,11 @@ export default function PaymentManualPage() {
               </div>
 
               <div className="space-y-3 text-sm">
+                {!proofPreviewUrl && selected.status === "PENDING" && (
+                  <div className="rounded border border-yellow-400/40 bg-yellow-500/10 p-2 text-yellow-700 text-xs">
+                    {t("pending_without_proof_hint")}
+                  </div>
+                )}
                 <p>
                   <strong>{t("status")}:</strong> {selected.status}
                 </p>
@@ -479,7 +484,8 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
-                selected.status !== "PENDING_ADMIN"
+                selected.status !== "PENDING_ADMIN" ||
+                (selected.proofs?.length ?? 0) === 0
               }
             >
               {t("validate")}
@@ -490,7 +496,8 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
-                selected.status !== "PENDING_ADMIN"
+                selected.status !== "PENDING_ADMIN" ||
+                (selected.proofs?.length ?? 0) === 0
               }
             >
               {t("reject")}

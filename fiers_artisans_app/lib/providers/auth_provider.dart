@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/errors/error_mapper.dart';
+import '../core/errors/app_error.dart';
 import '../core/storage/secure_storage.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';
@@ -62,28 +65,52 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> checkAuth() async {
-    final isLoggedIn = await SecureStorage.isLoggedIn();
-    if (isLoggedIn) {
-      try {
-        final user = await _repo.getProfile();
-        if (!user.isPhoneVerified) {
-          debugPrint('[Auth] checkAuth: phone not verified → OTP required');
-          await SecureStorage.clearAuthSession();
-          state = const AuthState(status: AuthStatus.unauthenticated);
-          return;
-        }
-        state = AuthState(status: AuthStatus.authenticated, user: user);
-        PushNotificationService().initialize().catchError((_) {});
-        _connectRealtime(user.id);
-      } catch (e) {
-        final appError = mapException(e);
+    final accessToken = await SecureStorage.getAccessToken();
+    if ((accessToken ?? '').isEmpty) {
+      state = const AuthState(status: AuthStatus.unauthenticated);
+      return;
+    }
+
+    final cached = await _restoreCachedUser();
+    if (cached != null && cached.isPhoneVerified) {
+      state = AuthState(status: AuthStatus.authenticated, user: cached);
+      PushNotificationService().initialize().catchError((_) {});
+      _connectRealtime(cached.id);
+      unawaited(_refreshProfileInBackground());
+      return;
+    }
+
+    try {
+      final user = await _repo.getProfile();
+      if (!user.isPhoneVerified) {
+        debugPrint('[Auth] checkAuth: phone not verified → OTP required');
+        await SecureStorage.clearAuthSession();
+        state = const AuthState(status: AuthStatus.unauthenticated);
+        return;
+      }
+      await _persistUserSnapshot(user);
+      state = AuthState(status: AuthStatus.authenticated, user: user);
+      PushNotificationService().initialize().catchError((_) {});
+      _connectRealtime(user.id);
+    } catch (e) {
+      final appError = mapException(e);
+      if (_isHardAuthFailure(appError)) {
         if (appError.isOtpRequired) {
           debugPrint('[Auth] checkAuth: OTP required (code=${appError.code})');
         }
         await SecureStorage.clearAuthSession();
         state = const AuthState(status: AuthStatus.unauthenticated);
+        return;
       }
-    } else {
+
+      final fallbackUser = await _buildFallbackUserFromStorage();
+      if (fallbackUser != null) {
+        state = AuthState(status: AuthStatus.authenticated, user: fallbackUser);
+        PushNotificationService().initialize().catchError((_) {});
+        _connectRealtime(fallbackUser.id);
+        return;
+      }
+
       state = const AuthState(status: AuthStatus.unauthenticated);
     }
   }
@@ -113,6 +140,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       final user = UserModel.fromJson(userMap);
+      await _persistUserSnapshot(user);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       PushNotificationService().initialize().catchError((_) {});
       _connectRealtime(userId);
@@ -208,6 +236,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       final user = UserModel.fromJson(userMap);
+      await _persistUserSnapshot(user);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       PushNotificationService().initialize().catchError((_) {});
       _connectRealtime(userId);
@@ -262,6 +291,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       final user = UserModel.fromJson(userMap);
+      await _persistUserSnapshot(user);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       PushNotificationService().initialize().catchError((_) {});
       _connectRealtime(userId);
@@ -324,6 +354,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       final user = UserModel.fromJson(userMap);
+      await _persistUserSnapshot(user);
       state = AuthState(status: AuthStatus.authenticated, user: user);
       PushNotificationService().initialize().catchError((_) {});
       _connectRealtime(user.id);
@@ -364,5 +395,69 @@ class AuthNotifier extends StateNotifier<AuthState> {
       debugPrint('[Auth] ⚠️ access_token is empty in response: ${data.keys}');
     }
     return (access, refresh);
+  }
+
+  Future<void> _persistUserSnapshot(UserModel user) async {
+    await SecureStorage.saveUserInfo(userId: user.id, role: user.role);
+    await SecureStorage.saveUserProfileCache(user.toJson());
+  }
+
+  Future<UserModel?> _restoreCachedUser() async {
+    final cachedJson = await SecureStorage.getUserProfileCache();
+    if (cachedJson == null || cachedJson.isEmpty) {
+      return null;
+    }
+    try {
+      return UserModel.fromJson(cachedJson);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<UserModel?> _buildFallbackUserFromStorage() async {
+    final userId = await SecureStorage.getUserId();
+    final role = await SecureStorage.getUserRole();
+    if ((userId ?? '').isEmpty || (role ?? '').isEmpty) {
+      return null;
+    }
+    final phone = await SecureStorage.getLastLoginPhone() ?? '';
+    return UserModel(
+      id: userId!,
+      phone: phone,
+      firstName: '',
+      lastName: '',
+      role: role!,
+      isPhoneVerified: true,
+      isActive: true,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  bool _isHardAuthFailure(AppError appError) {
+    return appError.code == AppErrorCode.authOtpRequired ||
+        appError.code == AppErrorCode.authPinSetupRequired ||
+        appError.code == AppErrorCode.authPinBlocked ||
+        appError.code == AppErrorCode.authAccountDisabled ||
+        appError.code == AppErrorCode.authInvalidToken;
+  }
+
+  Future<void> _refreshProfileInBackground() async {
+    try {
+      final user = await _repo.getProfile();
+      if (!user.isPhoneVerified) {
+        await SecureStorage.clearAuthSession();
+        state = const AuthState(status: AuthStatus.unauthenticated);
+        return;
+      }
+      await _persistUserSnapshot(user);
+      state = AuthState(status: AuthStatus.authenticated, user: user);
+      _connectRealtime(user.id);
+    } catch (e) {
+      final appError = mapException(e);
+      if (_isHardAuthFailure(appError)) {
+        await SecureStorage.clearAuthSession();
+        state = const AuthState(status: AuthStatus.unauthenticated);
+      }
+    }
   }
 }

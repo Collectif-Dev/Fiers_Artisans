@@ -12,11 +12,17 @@ class PushNotificationService {
 
   final ApiClient _api = ApiClient();
   bool _initialized = false;
+  bool _isAppInForeground = true;
 
   /// Callback invoked when a verification-related push arrives.
   VoidCallback? onVerificationUpdate;
   VoidCallback? onReviewUpdate;
   VoidCallback? onSubscriptionUpdate;
+  VoidCallback? onNotificationTapped;
+
+  void setAppInForeground(bool inForeground) {
+    _isAppInForeground = inForeground;
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
@@ -41,6 +47,13 @@ class PushNotificationService {
       return;
     }
 
+    // Foreground: keep UX in-app only, avoid duplicated system banners.
+    await messaging.setForegroundNotificationPresentationOptions(
+      alert: false,
+      badge: false,
+      sound: false,
+    );
+
     // Get token and register with backend
     final token = await messaging.getToken();
     if (token != null) {
@@ -53,10 +66,20 @@ class PushNotificationService {
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
+    // Open app from push tap (background/terminated)
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+    final initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      _handleMessageOpenedApp(initialMessage);
+    }
+
     _initialized = true;
   }
 
   void _handleForegroundMessage(RemoteMessage message) {
+    if (!_isAppInForeground) {
+      return;
+    }
     debugPrint('FCM foreground: ${message.notification?.title}');
     final type = message.data['type'] as String?;
     if (type == 'DOCUMENT_APPROVED' || type == 'DOCUMENT_REJECTED') {
@@ -64,8 +87,7 @@ class PushNotificationService {
       return;
     }
 
-    if (
-        type == 'REVIEW_UPDATED' ||
+    if (type == 'REVIEW_UPDATED' ||
         type == 'REVIEW_CREATED' ||
         type == 'REVIEW_DELETED') {
       onReviewUpdate?.call();
@@ -77,11 +99,13 @@ class PushNotificationService {
     }
   }
 
+  void _handleMessageOpenedApp(RemoteMessage message) {
+    onNotificationTapped?.call();
+  }
+
   Future<void> _registerToken(String token) async {
     try {
-      await _api.put(ApiEndpoints.updateFcmToken, data: {
-        'fcmToken': token,
-      });
+      await _api.put(ApiEndpoints.updateFcmToken, data: {'fcmToken': token});
       debugPrint('FCM token registered');
     } catch (e) {
       debugPrint('FCM token registration failed: $e');

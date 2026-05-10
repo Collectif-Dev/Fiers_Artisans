@@ -6,6 +6,7 @@ class AppConstants {
   static const String keyRefreshToken = 'refresh_token';
   static const String keyUserId = 'user_id';
   static const String keyUserRole = 'user_role';
+  static const String keyUserProfileCache = 'user_profile_cache';
   static const String keyLastLoginPhone = 'last_login_phone';
   static const String keyThemeMode = 'theme_mode';
   static const String keyLocale = 'locale';

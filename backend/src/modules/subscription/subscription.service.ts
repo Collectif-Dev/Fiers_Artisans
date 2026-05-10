@@ -84,13 +84,19 @@ export class SubscriptionService {
     if (!artisanProfile?.user_id) {
       return;
     }
-    await this.notificationsService.create({
-      userId: artisanProfile.user_id,
-      type,
-      title,
-      body,
-      data,
-    });
+    try {
+      await this.notificationsService.create({
+        userId: artisanProfile.user_id,
+        type,
+        title,
+        body,
+        data,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Notification non bloquante ignoree pour artisan=${artisanProfile.id} type=${type}: ${error}`,
+      );
+    }
   }
 
   async initiatePayment(userId: string): Promise<WaveCheckoutSession> {
@@ -363,18 +369,24 @@ export class SubscriptionService {
     });
 
     if (payload.artisanUserId) {
-      await this.notificationsService.create({
-        userId: payload.artisanUserId,
-        type: 'SUBSCRIPTION_UPDATED',
-        title: 'Abonnement active',
-        body: 'Votre abonnement manuel est actif pour 30 jours.',
-        data: {
-          subscriptionId: payload.subscriptionId,
-          status: SubscriptionStatus.ACTIVE,
-          source: 'MANUAL_PAYMENT',
-          paymentManualId,
-        },
-      });
+      try {
+        await this.notificationsService.create({
+          userId: payload.artisanUserId,
+          type: 'SUBSCRIPTION_UPDATED',
+          title: 'Abonnement active',
+          body: 'Votre abonnement manuel est actif pour 30 jours.',
+          data: {
+            subscriptionId: payload.subscriptionId,
+            status: SubscriptionStatus.ACTIVE,
+            source: 'MANUAL_PAYMENT',
+            paymentManualId,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Notification non bloquante ignoree pour user=${payload.artisanUserId} type=SUBSCRIPTION_UPDATED: ${error}`,
+        );
+      }
 
       this.emitSubscriptionRealtimeEvent({
         artisanUserId: payload.artisanUserId,

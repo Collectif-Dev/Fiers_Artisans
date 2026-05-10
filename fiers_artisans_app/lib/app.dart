@@ -8,6 +8,7 @@ import 'providers/app_providers.dart';
 import 'providers/payment_manual_provider.dart';
 import 'services/app_icon_service.dart';
 import 'services/chat_realtime_service.dart';
+import 'services/push_notification_service.dart';
 import 'presentation/common/app_snackbar.dart';
 
 class FiersArtisansApp extends ConsumerStatefulWidget {
@@ -17,12 +18,14 @@ class FiersArtisansApp extends ConsumerStatefulWidget {
   ConsumerState<FiersArtisansApp> createState() => _FiersArtisansAppState();
 }
 
-class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
+class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp>
+    with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
   final ChatRealtimeService _realtime = ChatRealtimeService();
   StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
   bool? _lastDarkIconValue;
+  bool _isForeground = true;
 
   void _syncHomeIconWithTheme(ThemeMode themeMode, BuildContext context) {
     final systemBrightness = MediaQuery.platformBrightnessOf(context);
@@ -43,6 +46,13 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    PushNotificationService().setAppInForeground(true);
+    PushNotificationService().onNotificationTapped = () {
+      if (!mounted) return;
+      appRouter.push('/notifications');
+    };
+
     ref.listenManual<PaymentManualState>(paymentManualProvider, (
       previous,
       next,
@@ -60,11 +70,26 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    PushNotificationService().onNotificationTapped = null;
     _realtimeSub?.cancel();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isForeground = state == AppLifecycleState.resumed;
+    if (_isForeground == isForeground) {
+      return;
+    }
+    _isForeground = isForeground;
+    PushNotificationService().setAppInForeground(isForeground);
+  }
+
   void _handleRealtimeEvent(ChatRealtimeEvent event) {
+    if (!_isForeground) {
+      return;
+    }
     if (!mounted || event.event != 'notificationCreated') {
       return;
     }

@@ -985,78 +985,98 @@ class _SubscriptionCard extends StatelessWidget {
                       : AppTheme.error.withValues(alpha: 0.5),
                 ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isActive
-                    ? Colors.black.withValues(alpha: 0.15)
-                    : (isManualPending
-                          ? AppTheme.warning.withValues(alpha: 0.15)
-                          : AppTheme.error.withValues(alpha: 0.1)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                isActive
-                    ? Icons.workspace_premium_rounded
-                    : (isManualPending
-                          ? Icons.hourglass_top_rounded
-                          : Icons.warning_amber_rounded),
-                color: isActive
-                    ? Colors.black
-                    : (isManualPending ? AppTheme.warning : AppTheme.error),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'subscription.title'.tr(),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: isActive ? Colors.black : null,
-                      fontWeight: FontWeight.w600,
-                    ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? Colors.black.withValues(alpha: 0.15)
+                        : (isManualPending
+                              ? AppTheme.warning.withValues(alpha: 0.15)
+                              : AppTheme.error.withValues(alpha: 0.1)),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    statusText,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isActive
-                          ? Colors.black87
-                          : (isManualPending
-                                ? AppTheme.warning
-                                : AppTheme.error),
-                    ),
+                  child: Icon(
+                    isActive
+                        ? Icons.workspace_premium_rounded
+                        : (isManualPending
+                              ? Icons.hourglass_top_rounded
+                              : Icons.warning_amber_rounded),
+                    color: isActive
+                        ? Colors.black
+                        : (isManualPending ? AppTheme.warning : AppTheme.error),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'subscription.title'.tr(),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: isActive ? Colors.black : null,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        statusText,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isActive
+                              ? Colors.black87
+                              : (isManualPending
+                                    ? AppTheme.warning
+                                    : AppTheme.error),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isActive)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 10),
+                    child: Icon(Icons.chevron_right, color: Colors.black54),
+                  ),
+              ],
             ),
-            if (!isActive)
+            if (!isActive) ...[
+              const SizedBox(height: 10),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 14,
-                  vertical: 8,
+                  vertical: 10,
                 ),
                 decoration: BoxDecoration(
                   color: AppTheme.gold,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   actionText,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.black,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
+                    height: 1.25,
                   ),
                 ),
-              )
-            else
-              const Icon(Icons.chevron_right, color: Colors.black54),
+              ),
+            ],
           ],
         ),
       ),

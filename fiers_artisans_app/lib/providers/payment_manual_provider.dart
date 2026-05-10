@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/errors/error_mapper.dart';
 import '../data/models/manual_payment_model.dart';
 import '../data/repositories/payment_manual_repository.dart';
 import '../services/chat_realtime_service.dart';
@@ -103,14 +105,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
         _pollingTimer?.cancel();
       }
     } catch (e) {
-      String errorMessage;
-      if (e is DioException && e.response?.data is Map) {
-        final data = e.response!.data as Map;
-        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
-      } else {
-        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
-      }
-      state = state.copyWith(isLoading: false, error: errorMessage);
+      state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
   }
 
@@ -125,14 +120,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
       );
       _startPolling();
     } catch (e) {
-      String errorMessage;
-      if (e is DioException && e.response?.data is Map) {
-        final data = e.response!.data as Map;
-        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
-      } else {
-        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
-      }
-      state = state.copyWith(isLoading: false, error: errorMessage);
+      state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
   }
 
@@ -152,14 +140,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
         _pollingTimer?.cancel();
       }
     } catch (e) {
-      String errorMessage;
-      if (e is DioException && e.response?.data is Map) {
-        final data = e.response!.data as Map;
-        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
-      } else {
-        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
-      }
-      state = state.copyWith(isLoading: false, error: errorMessage);
+      state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
   }
 
@@ -235,14 +216,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
       await fetchStatus();
       _startPolling();
     } catch (e) {
-      String errorMessage;
-      if (e is DioException && e.response?.data is Map) {
-        final data = e.response!.data as Map;
-        errorMessage = (data['message'] ?? 'Erreur inconnue').toString();
-      } else {
-        errorMessage = 'Erreur de connexion. Verifiez votre reseau.';
-      }
-      state = state.copyWith(isLoading: false, error: errorMessage);
+      state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
   }
 
@@ -260,6 +234,93 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     _pollingTimer = Timer.periodic(pollingInterval, (_) {
       fetchStatus();
     });
+  }
+
+  String _toUserFacingError(Object error) {
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      final data = error.response?.data;
+      final transportMessage = (error.message ?? '').toLowerCase();
+      final payloadText = data == null ? '' : data.toString().toLowerCase();
+
+      String backendCode = '';
+      String backendMessage = '';
+
+      if (data is Map) {
+        final rawCode = data['code'];
+        if (rawCode != null) {
+          backendCode = rawCode.toString();
+        }
+
+        final rawMessage = data['message'];
+        if (rawMessage is List && rawMessage.isNotEmpty) {
+          backendMessage = rawMessage.first.toString();
+        } else if (rawMessage != null) {
+          backendMessage = rawMessage.toString();
+        }
+      }
+
+      final signature =
+          '${backendCode.toLowerCase()} ${backendMessage.toLowerCase()} $transportMessage $payloadText';
+
+      if (status == 429 ||
+          signature.contains('too many requests') ||
+          signature.contains('rate_limit') ||
+          backendCode == 'PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT' ||
+          backendCode == 'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT') {
+        return 'Trop de tentatives en peu de temps. Patientez un moment puis reessayez.';
+      }
+
+      if (signature.contains('socketexception') &&
+          signature.contains('too many requests')) {
+        return 'Trop de tentatives en peu de temps. Patientez un moment puis reessayez.';
+      }
+
+      if (backendCode == 'PAYMENT_MANUAL_MAX_ATTEMPTS') {
+        return 'Vous avez atteint la limite de tentatives pour cette transaction.';
+      }
+
+      if (signature.contains('type de fichier invalide') ||
+          signature.contains('mime') ||
+          signature.contains('format non pris en charge')) {
+        return 'La capture selectionnee n\'est pas valide. Utilisez une image JPG, PNG ou WEBP.';
+      }
+
+      if (signature.contains('heic') || signature.contains('heif')) {
+        return 'Le format HEIC/HEIF n\'est pas pris en charge. Convertissez la capture en JPG ou PNG puis reessayez.';
+      }
+
+      if (signature.contains('image trop lourde') ||
+          signature.contains('max 5 mo')) {
+        return 'La capture est trop lourde. Taille maximale: 5 Mo.';
+      }
+
+      if (signature.contains('resolution insuffisante')) {
+        return 'La capture est trop petite ou peu lisible. Prenez une image plus claire.';
+      }
+
+      if (signature.contains('image corrompue') ||
+          signature.contains('illisible')) {
+        return 'La capture est illisible. Reprenez une capture nette.';
+      }
+
+      if (signature.contains('expediteur') ||
+          signature.contains('sender_number')) {
+        return 'Le numero expediteur est invalide. Saisissez un numero ivoirien valide (07, 05 ou 01 + 8 chiffres).';
+      }
+
+      if (status == 401 || status == 403) {
+        return 'Votre session a expire. Reconnectez-vous puis reessayez.';
+      }
+
+      if (kDebugMode) {
+        debugPrint(
+          '[payment_manual_provider] raw error: status=$status code=$backendCode message=$backendMessage',
+        );
+      }
+    }
+
+    return mapException(error).userMessage;
   }
 
   String _statusMessage(

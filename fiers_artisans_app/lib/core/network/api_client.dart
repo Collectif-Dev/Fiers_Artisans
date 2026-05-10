@@ -128,7 +128,7 @@ class _AuthInterceptor extends Interceptor {
   Future<bool> _refreshToken() async {
     try {
       final refreshToken = await SecureStorage.getRefreshToken();
-      if (refreshToken == null) return false;
+      if (refreshToken == null || refreshToken.isEmpty) return false;
 
       final response = await Dio(
         BaseOptions(baseUrl: AppConfig.apiBaseUrl),
@@ -148,8 +148,13 @@ class _AuthInterceptor extends Interceptor {
         );
         return true;
       }
-    } catch (_) {
-      await SecureStorage.clearAuthSession();
+    } catch (e) {
+      if (e is DioException) {
+        final status = e.response?.statusCode;
+        if (status == 401 || status == 403) {
+          await SecureStorage.clearAuthSession();
+        }
+      }
     }
     return false;
   }
