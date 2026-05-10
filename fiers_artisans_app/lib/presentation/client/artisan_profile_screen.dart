@@ -681,10 +681,6 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
     if (rawDigits.isEmpty) return '';
     if (rawDigits.startsWith(prefixDigits)) return rawDigits;
 
-    if (rawDigits.startsWith('0') && rawDigits.length > 1) {
-      return '$prefixDigits${rawDigits.substring(1)}';
-    }
-
     return '$prefixDigits$rawDigits';
   }
 
