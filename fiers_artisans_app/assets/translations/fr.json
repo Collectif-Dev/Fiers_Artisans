@@ -152,7 +152,13 @@
     "contact": {
       "whatsapp": "Contacter sur WhatsApp",
       "call": "Appeler",
-      "chat": "Envoyer un message"
+      "chat": "Envoyer un message",
+      "whatsapp_prefill": "Bonjour, je vous contacte depuis l'application Fiers Artisans. Etes-vous disponible pour des services ?",
+      "invalid_phone": "Numero de telephone invalide.",
+      "phone_unavailable": "Impossible de lancer l'appel sur cet appareil.",
+      "phone_unavailable_web": "L'appel telephonique n'est pas disponible dans cet environnement web.",
+      "whatsapp_unavailable": "Impossible d'ouvrir WhatsApp ou le lien web.",
+      "whatsapp_browser_fallback": "WhatsApp non detecte. Ouverture via le navigateur."
     },
     "verification": {
       "title": "Vérification",
@@ -358,6 +364,10 @@
     "error_permission_denied_forever": "La permission de localisation est refusee de facon permanente. Activez-la dans les reglages de l'application.",
     "error_position_failed": "Impossible de recuperer votre position actuelle. Verifiez votre GPS puis reessayez.",
     "error_reverse_geocoding_failed": "Position recuperee, mais impossible de determiner la ville/commune automatiquement."
+  },
+  "contact": {
+    "phone": "Telephone",
+    "whatsapp": "WhatsApp"
   },
   "error": {
     "generic": "Une erreur est survenue. Veuillez réessayer.",

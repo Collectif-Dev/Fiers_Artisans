@@ -1,10 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { PaymentMinioIndicator } from './indicators/payment-minio.indicator';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly paymentMinioIndicator: PaymentMinioIndicator) {}
+  constructor(
+    private readonly paymentMinioIndicator: PaymentMinioIndicator,
+    private readonly analyticsService: AnalyticsService,
+  ) {}
 
   @Get()
   @SkipThrottle()
@@ -12,6 +16,7 @@ export class HealthController {
     const paymentProofsBucket = await this.paymentMinioIndicator
       .check()
       .catch(() => ({ bucket: 'payment-proofs', exists: false }));
+    const activityLogsTtl = await this.analyticsService.getLogRetentionStatus();
 
     return {
       status: 'ok',
@@ -20,6 +25,9 @@ export class HealthController {
       uptime: process.uptime(),
       storage: {
         paymentProofsBucket,
+      },
+      analytics: {
+        activityLogsTtl,
       },
     };
   }

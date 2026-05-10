@@ -35,6 +35,10 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
   bool _isAvailable = true;
   bool _isReviewMetricsLoading = true;
   bool _isStatsLoading = true;
+  bool _hasStatsData = false;
+  bool _hasReviewMetricsData = false;
+  bool _isStatsBackgroundRefreshing = false;
+  bool _isReviewMetricsBackgroundRefreshing = false;
   double _avgRating = 0;
   int _totalReviews = 0;
   int _experienceYears = 0;
@@ -128,13 +132,26 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
           .loadCurrentTransaction(refresh: true),
       ref.read(chatProvider.notifier).loadConversations(),
       ref.read(verificationProvider.notifier).refresh(),
-      _loadArtisanStats(),
-      _loadReviewMetrics(),
+      _loadArtisanStats(silentRefresh: true),
+      _loadReviewMetrics(silentRefresh: true),
     ]);
   }
 
-  Future<void> _loadArtisanStats() async {
-    setState(() => _isStatsLoading = true);
+  Future<void> _loadArtisanStats({bool silentRefresh = false}) async {
+    final shouldShowInitialLoader = !_hasStatsData && !silentRefresh;
+
+    if (mounted) {
+      setState(() {
+        if (shouldShowInitialLoader) {
+          _isStatsLoading = true;
+        }
+
+        if (silentRefresh && _hasStatsData) {
+          _isStatsBackgroundRefreshing = true;
+        }
+      });
+    }
+
     try {
       final response = await _api.get(ApiEndpoints.artisanStats);
       final data = response.data as Map<String, dynamic>;
@@ -145,15 +162,33 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       setState(() {
         _profileViews48h = _toInt(profileViewsRaw) ?? 0;
         _isStatsLoading = false;
+        _isStatsBackgroundRefreshing = false;
+        _hasStatsData = true;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isStatsLoading = false);
+      setState(() {
+        _isStatsLoading = false;
+        _isStatsBackgroundRefreshing = false;
+      });
     }
   }
 
-  Future<void> _loadReviewMetrics() async {
-    setState(() => _isReviewMetricsLoading = true);
+  Future<void> _loadReviewMetrics({bool silentRefresh = false}) async {
+    final shouldShowInitialLoader = !_hasReviewMetricsData && !silentRefresh;
+
+    if (mounted) {
+      setState(() {
+        if (shouldShowInitialLoader) {
+          _isReviewMetricsLoading = true;
+        }
+
+        if (silentRefresh && _hasReviewMetricsData) {
+          _isReviewMetricsBackgroundRefreshing = true;
+        }
+      });
+    }
+
     try {
       final profile = await _artisanRepository.getMyArtisanProfile();
       final categoryName = _cleanString(profile.categoryName);
@@ -171,10 +206,15 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
         _subcategoryName = subcategoryName;
         _businessName = businessName;
         _isReviewMetricsLoading = false;
+        _isReviewMetricsBackgroundRefreshing = false;
+        _hasReviewMetricsData = true;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isReviewMetricsLoading = false);
+      setState(() {
+        _isReviewMetricsLoading = false;
+        _isReviewMetricsBackgroundRefreshing = false;
+      });
     }
   }
 
@@ -203,8 +243,8 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
           .read(paymentManualProvider.notifier)
           .loadCurrentTransaction(refresh: true);
       _syncLocationToBackend();
-      _loadArtisanStats();
-      _loadReviewMetrics();
+      _loadArtisanStats(silentRefresh: true);
+      _loadReviewMetrics(silentRefresh: true);
     }
   }
 
@@ -240,8 +280,8 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
 
     if (!shouldRefresh) return;
 
-    _loadArtisanStats();
-    _loadReviewMetrics();
+    _loadArtisanStats(silentRefresh: true);
+    _loadReviewMetrics(silentRefresh: true);
     ref.read(subscriptionProvider.notifier).loadStatus();
     ref.read(verificationProvider.notifier).refresh();
   }
@@ -287,6 +327,8 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       0,
       (sum, c) => sum + c.unreadCount,
     );
+    final isKpiRefreshingInBackground =
+        _isStatsBackgroundRefreshing || _isReviewMetricsBackgroundRefreshing;
 
     return Scaffold(
       body: SafeArea(
@@ -400,9 +442,24 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    child: Text(
-                      'dashboard.artisan.performance'.tr(),
-                      style: theme.textTheme.headlineMedium,
+                    child: Row(
+                      children: [
+                        Text(
+                          'dashboard.artisan.performance'.tr(),
+                          style: theme.textTheme.headlineMedium,
+                        ),
+                        if (isKpiRefreshingInBackground) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),

@@ -43,7 +43,7 @@ export class ActivityLog extends Document {
 
   @Prop({
     default: () => new Date(),
-    index: { expireAfterSeconds: 7776000 }, // 90 jours
+    index: { expireAfterSeconds: 1209600 }, // 14 jours
   })
   timestamp: Date;
 }

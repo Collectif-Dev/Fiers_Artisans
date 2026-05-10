@@ -184,6 +184,7 @@ export default function ArtisansPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('name')}</TableHead>
+                      <TableHead>{t('phone')}</TableHead>
                       <TableHead>{t('business')}</TableHead>
                       <TableHead>{t('city')}</TableHead>
                       <TableHead>{t('category')}</TableHead>
@@ -200,6 +201,7 @@ export default function ArtisansPage() {
                         <TableCell className="font-medium">
                           {a.first_name} {a.last_name}
                         </TableCell>
+                        <TableCell>{a.user?.phone_number || '—'}</TableCell>
                         <TableCell>{a.business_name}</TableCell>
                         <TableCell>{a.city}, {a.commune}</TableCell>
                         <TableCell>{a.category?.name || '—'}</TableCell>

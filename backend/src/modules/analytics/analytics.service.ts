@@ -7,6 +7,7 @@ import { AdminRealtimeService } from '../../common/realtime/admin-realtime.servi
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
+  private static readonly activityLogTtlSeconds = 1209600;
 
   constructor(
     @InjectModel(ActivityLog.name)
@@ -102,5 +103,35 @@ export class AnalyticsService {
     ]);
 
     return { data, total, page, limit };
+  }
+
+  async getLogRetentionStatus(): Promise<{
+    expectedTtlSeconds: number;
+    indexFound: boolean;
+    actualTtlSeconds?: number;
+  }> {
+    try {
+      const indexes = await this.activityLogModel.collection.indexes();
+      const ttlIndex = indexes.find((index: any) => {
+        const timestampKey = index?.key?.timestamp;
+        const hasTtl = typeof index?.expireAfterSeconds === 'number';
+        return timestampKey === 1 && hasTtl;
+      });
+
+      return {
+        expectedTtlSeconds: AnalyticsService.activityLogTtlSeconds,
+        indexFound: Boolean(ttlIndex),
+        actualTtlSeconds:
+          typeof ttlIndex?.expireAfterSeconds === 'number'
+              ? ttlIndex.expireAfterSeconds
+              : undefined,
+      };
+    } catch (error) {
+      this.logger.warn(`Unable to inspect activity log TTL index: ${error}`);
+      return {
+        expectedTtlSeconds: AnalyticsService.activityLogTtlSeconds,
+        indexFound: false,
+      };
+    }
   }
 }

@@ -4,9 +4,10 @@ import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';
 import { MediaModule } from '../media/media.module';
 import { PaymentMinioIndicator } from './indicators/payment-minio.indicator';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, AnalyticsModule],
   controllers: [HealthController, MetricsController],
   providers: [MetricsService, PaymentMinioIndicator],
 })

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
@@ -34,6 +37,17 @@ class ArtisanProfileScreen extends ConsumerStatefulWidget {
 class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
   bool _isOpeningChat = false;
   final ScrollController _portfolioScrollController = ScrollController();
+  Timer? _portfolioAutoScrollTimer;
+  Timer? _portfolioAutoScrollResumeTimer;
+  bool _portfolioUserInteracting = false;
+  double _portfolioScrollStep = 300;
+  int _portfolioItemCount = 0;
+
+  static const Duration _portfolioAutoScrollInterval = Duration(seconds: 4);
+  static const Duration _portfolioResumeDelay = Duration(seconds: 5);
+
+  bool get _reduceMotionRequested =>
+      MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
   @override
   void initState() {
@@ -50,8 +64,91 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
 
   @override
   void dispose() {
+    _portfolioAutoScrollTimer?.cancel();
+    _portfolioAutoScrollResumeTimer?.cancel();
     _portfolioScrollController.dispose();
     super.dispose();
+  }
+
+  void _syncPortfolioAutoScrollConfig({
+    required int itemCount,
+    required double cardWidth,
+  }) {
+    _portfolioItemCount = itemCount;
+    _portfolioScrollStep = cardWidth + 12;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _updatePortfolioAutoScrollTimer();
+    });
+  }
+
+  void _updatePortfolioAutoScrollTimer() {
+    final canRun =
+        _portfolioItemCount > 1 &&
+        !_portfolioUserInteracting &&
+        !_reduceMotionRequested &&
+        _portfolioScrollController.hasClients &&
+        _portfolioScrollController.position.maxScrollExtent > 0;
+
+    if (!canRun) {
+      _portfolioAutoScrollTimer?.cancel();
+      _portfolioAutoScrollTimer = null;
+      return;
+    }
+
+    _portfolioAutoScrollTimer ??= Timer.periodic(
+      _portfolioAutoScrollInterval,
+      (_) => _autoScrollPortfolioOnce(),
+    );
+  }
+
+  Future<void> _autoScrollPortfolioOnce() async {
+    if (!mounted || _portfolioUserInteracting) return;
+    if (!_portfolioScrollController.hasClients) return;
+
+    final position = _portfolioScrollController.position;
+    if (position.maxScrollExtent <= 0) return;
+
+    final target = (position.pixels + _portfolioScrollStep).clamp(
+      0.0,
+      position.maxScrollExtent,
+    );
+    final shouldLoop = target >= position.maxScrollExtent - 2;
+    final nextOffset = shouldLoop ? 0.0 : target;
+
+    await _portfolioScrollController.animateTo(
+      nextOffset,
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _registerPortfolioInteraction() {
+    _portfolioUserInteracting = true;
+    _portfolioAutoScrollTimer?.cancel();
+    _portfolioAutoScrollTimer = null;
+    _portfolioAutoScrollResumeTimer?.cancel();
+
+    _portfolioAutoScrollResumeTimer = Timer(_portfolioResumeDelay, () {
+      if (!mounted) return;
+      _portfolioUserInteracting = false;
+      _updatePortfolioAutoScrollTimer();
+    });
+  }
+
+  bool _handlePortfolioScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.horizontal) return false;
+
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _registerPortfolioInteraction();
+    } else if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null) {
+      _registerPortfolioInteraction();
+    }
+
+    return false;
   }
 
   @override
@@ -296,11 +393,13 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
                         children: [
                           _ContactIcon(
                             icon: Icons.phone_outlined,
+                            tooltip: 'contact.phone'.tr(),
                             onTap: () => _launchPhone(artisan.phone),
                           ),
                           const SizedBox(width: 8),
                           _ContactIcon(
                             icon: Icons.message_outlined, // WhatsApp
+                            tooltip: 'contact.whatsapp'.tr(),
                             onTap: () => _launchWhatsApp(artisan.phone),
                           ),
                         ],
@@ -351,6 +450,10 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
                             : (maxWidth * 0.76).clamp(220.0, 300.0);
                         final cardHeight = textScale > 1.15 ? 280.0 : 260.0;
                         const scrollAreaExtraHeight = 24.0;
+                        _syncPortfolioAutoScrollConfig(
+                          itemCount: state.portfolio.length,
+                          cardWidth: cardWidth,
+                        );
                         final styledScrollbarTheme = theme.scrollbarTheme
                             .copyWith(
                               thumbVisibility: const WidgetStatePropertyAll(
@@ -401,24 +504,31 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
                                     ScrollbarOrientation.bottom,
                                 child: Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
-                                  child: ListView.separated(
-                                    controller: _portfolioScrollController,
-                                    scrollDirection: Axis.horizontal,
-                                    physics: const BouncingScrollPhysics(),
-                                    itemCount: state.portfolio.length,
-                                    separatorBuilder: (context, index) =>
-                                        const SizedBox(width: 12),
-                                    itemBuilder: (ctx, i) {
-                                      final item = state.portfolio[i];
-                                      return SizedBox(
-                                        width: cardWidth,
-                                        child: PortfolioItemCard(
-                                          key: ValueKey(item.id),
-                                          item: item,
+                                  child:
+                                      NotificationListener<ScrollNotification>(
+                                        onNotification:
+                                            _handlePortfolioScrollNotification,
+                                        child: ListView.separated(
+                                          controller:
+                                              _portfolioScrollController,
+                                          scrollDirection: Axis.horizontal,
+                                          physics:
+                                              const BouncingScrollPhysics(),
+                                          itemCount: state.portfolio.length,
+                                          separatorBuilder: (context, index) =>
+                                              const SizedBox(width: 12),
+                                          itemBuilder: (ctx, i) {
+                                            final item = state.portfolio[i];
+                                            return SizedBox(
+                                              width: cardWidth,
+                                              child: PortfolioItemCard(
+                                                key: ValueKey(item.id),
+                                                item: item,
+                                              ),
+                                            );
+                                          },
                                         ),
-                                      );
-                                    },
-                                  ),
+                                      ),
                                 ),
                               ),
                             ),
@@ -470,7 +580,7 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        review.clientName ?? 'Client',
+                                        review.clientName ?? 'auth.client'.tr(),
                                         style: theme.textTheme.bodyMedium
                                             ?.copyWith(
                                               fontWeight: FontWeight.w600,
@@ -560,14 +670,53 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
 
   final AnalyticsRepository _analytics = AnalyticsRepository();
 
+  String _digitsOnly(String value) {
+    return value.replaceAll(RegExp(r'\D'), '');
+  }
+
+  String _normalizePhoneWithPrefix(String phone) {
+    final prefixDigits = _digitsOnly(AppConfig.phonePrefix);
+    final rawDigits = _digitsOnly(phone);
+
+    if (rawDigits.isEmpty) return '';
+    if (rawDigits.startsWith(prefixDigits)) return rawDigits;
+
+    if (rawDigits.startsWith('0') && rawDigits.length > 1) {
+      return '$prefixDigits${rawDigits.substring(1)}';
+    }
+
+    return '$prefixDigits$rawDigits';
+  }
+
   Future<void> _launchPhone(String phone) async {
     _analytics.logEvent(
       action: 'CONTACT_CLICK',
       targetId: widget.userId,
       metadata: {'method': 'phone'},
     );
-    final uri = Uri.parse('tel:${AppConfig.phonePrefix}$phone');
-    if (await canLaunchUrl(uri)) await launchUrl(uri);
+
+    final normalized = _normalizePhoneWithPrefix(phone);
+    if (normalized.isEmpty) {
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          message: 'artisan.contact.invalid_phone'.tr(),
+        );
+      }
+      return;
+    }
+
+    final uri = Uri.parse('tel:+$normalized');
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    if (!launched && mounted) {
+      AppSnackBar.show(
+        context,
+        message: kIsWeb
+            ? 'artisan.contact.phone_unavailable_web'.tr()
+            : 'artisan.contact.phone_unavailable'.tr(),
+      );
+    }
   }
 
   Future<void> _launchWhatsApp(String phone) async {
@@ -576,9 +725,52 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
       targetId: widget.userId,
       metadata: {'method': 'whatsapp'},
     );
-    final uri = Uri.parse('https://wa.me/${AppConfig.phonePrefix}$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    final normalized = _normalizePhoneWithPrefix(phone);
+    if (normalized.isEmpty) {
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          message: 'artisan.contact.invalid_phone'.tr(),
+        );
+      }
+      return;
+    }
+
+    final message = 'artisan.contact.whatsapp_prefill'.tr();
+    final encodedMessage = Uri.encodeComponent(message);
+    final appUri = Uri.parse(
+      'whatsapp://send?phone=$normalized&text=$encodedMessage',
+    );
+    final webUri = Uri.parse('https://wa.me/$normalized?text=$encodedMessage');
+
+    var launched = false;
+    if (!kIsWeb) {
+      launched = await launchUrl(appUri, mode: LaunchMode.externalApplication);
+    }
+
+    if (!launched) {
+      final openedInBrowser = await launchUrl(
+        webUri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!openedInBrowser) {
+        if (mounted) {
+          AppSnackBar.show(
+            context,
+            message: 'artisan.contact.whatsapp_unavailable'.tr(),
+          );
+        }
+        return;
+      }
+
+      if (mounted && !kIsWeb) {
+        AppSnackBar.show(
+          context,
+          message: 'artisan.contact.whatsapp_browser_fallback'.tr(),
+        );
+      }
     }
   }
 
@@ -637,26 +829,38 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
 
 class _ContactIcon extends StatelessWidget {
   final IconData icon;
+  final String tooltip;
   final VoidCallback onTap;
 
-  const _ContactIcon({required this.icon, required this.onTap});
+  const _ContactIcon({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardTheme.color,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Theme.of(context).dividerColor),
+    return Tooltip(
+      message: tooltip,
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        child: GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTap();
+          },
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardTheme.color,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Theme.of(context).dividerColor),
+            ),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+          ),
         ),
-        child: Icon(icon, color: Theme.of(context).colorScheme.primary),
       ),
     );
   }

@@ -113,6 +113,7 @@
     "title": "Artisans",
     "subtitle": "Registered artisans list",
     "name": "Name",
+    "phone": "Phone",
     "business": "Business",
     "city": "City",
     "category": "Category",

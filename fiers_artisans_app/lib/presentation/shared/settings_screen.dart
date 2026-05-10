@@ -47,8 +47,11 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.language_rounded,
             title: 'settings.language'.tr(),
             subtitle: 'language.${context.locale.languageCode}'.tr(),
-            onTap: () =>
-                ref.read(localeProvider.notifier).toggleLocale(context),
+            onTap: () => _openLanguageSelector(
+              context,
+              ref,
+              context.locale.languageCode,
+            ),
           ),
 
           _SettingsTile(
@@ -164,6 +167,52 @@ class SettingsScreen extends ConsumerWidget {
                     : null,
                 onTap: () {
                   ref.read(themeProvider.notifier).setLight();
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openLanguageSelector(
+    BuildContext context,
+    WidgetRef ref,
+    String selectedLanguageCode,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.language_rounded),
+                title: Text('language.select'.tr()),
+              ),
+              ListTile(
+                leading: const Icon(Icons.flag_rounded),
+                title: Text('language.fr'.tr()),
+                trailing: selectedLanguageCode == 'fr'
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () {
+                  ref.read(localeProvider.notifier).setFrench(context);
+                  Navigator.of(sheetContext).pop();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.flag_circle_rounded),
+                title: Text('language.en'.tr()),
+                trailing: selectedLanguageCode == 'en'
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () {
+                  ref.read(localeProvider.notifier).setEnglish(context);
                   Navigator.of(sheetContext).pop();
                 },
               ),

@@ -113,6 +113,7 @@
     "title": "Artisans",
     "subtitle": "Liste des artisans inscrits",
     "name": "Nom",
+    "phone": "Téléphone",
     "business": "Activité",
     "city": "Ville",
     "category": "Catégorie",
