@@ -106,16 +106,29 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    if (err.response?.statusCode == 401) {
+    if (err.response?.statusCode == 401 &&
+        err.requestOptions.extra['didRefreshRetry'] != true) {
       // Try refresh token
       final refreshed = await _refreshToken();
       if (refreshed) {
         // Retry original request
         final opts = err.requestOptions;
         final token = await SecureStorage.getAccessToken();
+        if ((token ?? '').isEmpty) {
+          return handler.next(err);
+        }
+        opts.extra = Map<String, dynamic>.from(opts.extra)
+          ..['didRefreshRetry'] = true;
         opts.headers['Authorization'] = 'Bearer $token';
         try {
-          final response = await Dio().fetch(opts);
+          final retryDio = Dio(
+            BaseOptions(
+              baseUrl: AppConfig.apiBaseUrl,
+              connectTimeout: AppConfig.connectTimeout,
+              receiveTimeout: AppConfig.receiveTimeout,
+            ),
+          )..interceptors.add(_UnwrapInterceptor());
+          final response = await retryDio.fetch(opts);
           return handler.resolve(response);
         } catch (e) {
           return handler.next(err);
@@ -132,7 +145,11 @@ class _AuthInterceptor extends Interceptor {
 
       final response = await Dio(
         BaseOptions(baseUrl: AppConfig.apiBaseUrl),
-      ).post(ApiEndpoints.refreshToken, data: {'refresh_token': refreshToken});
+      ).post(
+        ApiEndpoints.refreshToken,
+        data: {'refresh_token': refreshToken},
+        options: Options(headers: {'Authorization': 'Bearer $refreshToken'}),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Unwrap l'enveloppe backend {statusCode, data, timestamp}

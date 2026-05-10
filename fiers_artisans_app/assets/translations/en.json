@@ -332,7 +332,7 @@
     "language": "Language",
     "theme": "Theme",
     "notifications_system": "System notifications",
-    "notifications_hint": "Manage phone alerts even when the app is closed",
+    "notifications_hint": "Manage phone alerts",
     "notifications_enabled": "System notifications enabled.",
     "notifications_open_settings_fail": "Unable to open system settings.",
     "profile": "My profile",

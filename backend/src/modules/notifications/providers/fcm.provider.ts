@@ -49,8 +49,25 @@ export class FcmProvider implements OnModuleInit {
         token: fcmToken,
         notification: { title, body },
         data: data || {},
-        android: { priority: 'high' },
-        apns: { payload: { aps: { sound: 'default', badge: 1 } } },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'fiers_artisans_high_importance',
+            sound: 'default',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+          },
+        },
+        apns: {
+          headers: { 'apns-priority': '10' },
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+              contentAvailable: true,
+            },
+          },
+        },
       });
       this.logger.debug(`Push sent to ${fcmToken.slice(0, 10)}…`);
       return true;

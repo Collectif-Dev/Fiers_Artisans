@@ -138,9 +138,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
         authRequired: false,
       );
     } catch (e) {
+      final authRequired = await _isUnauthorizedError(e);
       state = state.copyWith(
         isLoading: false,
-        authRequired: _isUnauthorizedError(e),
+        authRequired: authRequired,
         errorMessage: 'Impossible de charger les conversations.',
       );
     }
@@ -166,9 +167,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
         authRequired: false,
       );
     } catch (e) {
+      final authRequired = await _isUnauthorizedError(e);
       state = state.copyWith(
         isLoading: false,
-        authRequired: _isUnauthorizedError(e),
+        authRequired: authRequired,
         errorMessage: 'Impossible de charger les messages.',
       );
     }
@@ -227,8 +229,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
       _applyConversationPreview(sent);
       return sent;
     } catch (e) {
+      final authRequired = await _isUnauthorizedError(e);
       state = state.copyWith(
-        authRequired: _isUnauthorizedError(e),
+        authRequired: authRequired,
         errorMessage: 'Envoi du message impossible.',
       );
       rethrow;
@@ -244,8 +247,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
       state = state.copyWith(conversations: merged, authRequired: false);
       return convo;
     } catch (e) {
+      final authRequired = await _isUnauthorizedError(e);
       state = state.copyWith(
-        authRequired: _isUnauthorizedError(e),
+        authRequired: authRequired,
         errorMessage: 'Impossible de demarrer la conversation.',
       );
       rethrow;
@@ -301,11 +305,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(errorMessage: null);
   }
 
-  bool _isUnauthorizedError(Object error) {
+  Future<bool> _isUnauthorizedError(Object error) async {
     if (error is DioException) {
-      return error.response?.statusCode == 401;
+      if (error.response?.statusCode != 401) {
+        return false;
+      }
+      final refreshToken = await SecureStorage.getRefreshToken();
+      return (refreshToken ?? '').isEmpty;
     }
-    return error.toString().contains('401');
+    return false;
   }
 
   List<ConversationModel> _upsertConversation(

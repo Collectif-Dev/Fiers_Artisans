@@ -66,9 +66,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> checkAuth() async {
     final accessToken = await SecureStorage.getAccessToken();
-    if ((accessToken ?? '').isEmpty) {
+    final refreshToken = await SecureStorage.getRefreshToken();
+    if ((accessToken ?? '').isEmpty && (refreshToken ?? '').isEmpty) {
       state = const AuthState(status: AuthStatus.unauthenticated);
       return;
+    }
+
+    // Recover an access token from refresh token before declaring the user logged out.
+    if ((accessToken ?? '').isEmpty && (refreshToken ?? '').isNotEmpty) {
+      final recovered = await _recoverSessionFromRefresh(refreshToken!);
+      if (!recovered) {
+        final fallbackUser = await _restoreCachedUser();
+        if (fallbackUser != null && fallbackUser.isPhoneVerified) {
+          state = AuthState(status: AuthStatus.authenticated, user: fallbackUser);
+          PushNotificationService().initialize().catchError((_) {});
+          _connectRealtime(fallbackUser.id);
+          unawaited(_refreshProfileInBackground());
+          return;
+        }
+      }
     }
 
     final cached = await _restoreCachedUser();
@@ -458,6 +474,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await SecureStorage.clearAuthSession();
         state = const AuthState(status: AuthStatus.unauthenticated);
       }
+    }
+  }
+
+  Future<bool> _recoverSessionFromRefresh(String refreshToken) async {
+    try {
+      final data = await _repo.refreshToken(refreshToken);
+      final tokens = _extractTokens(data);
+      if (tokens.$1.isEmpty || tokens.$2.isEmpty) {
+        return false;
+      }
+      await SecureStorage.saveTokens(
+        accessToken: tokens.$1,
+        refreshToken: tokens.$2,
+      );
+
+      final userMap = data['user'] as Map<String, dynamic>?;
+      if (userMap != null && userMap.isNotEmpty) {
+        final user = UserModel.fromJson(userMap);
+        await _persistUserSnapshot(user);
+      }
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 }

@@ -332,7 +332,7 @@
     "language": "Langue",
     "theme": "Thème",
     "notifications_system": "Notifications système",
-    "notifications_hint": "Gérer les alertes du téléphone même hors application",
+    "notifications_hint": "Gérer les alertes du téléphone",
     "notifications_enabled": "Notifications système activées.",
     "notifications_open_settings_fail": "Impossible d'ouvrir les paramètres système.",
     "profile": "Mon profil",
