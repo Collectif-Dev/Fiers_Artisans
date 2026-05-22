@@ -7,6 +7,7 @@ import '../data/models/conversation_model.dart';
 import '../data/models/message_model.dart';
 import '../data/repositories/chat_repository.dart';
 import '../providers/auth_provider.dart';
+import '../providers/session_scope_provider.dart';
 import '../services/chat_realtime_service.dart';
 
 class ChatState {
@@ -62,6 +63,7 @@ class ChatState {
 }
 
 final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
+  ref.watch(sessionEpochProvider);
   final authSnapshot = ref.watch(
     authProvider.select((state) => (state.status, state.user?.id)),
   );

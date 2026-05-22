@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:fiers_artisans_app/data/models/manual_payment_model.dart';
 import 'package:fiers_artisans_app/data/repositories/payment_manual_repository.dart';
 import 'package:fiers_artisans_app/providers/payment_manual_provider.dart';
@@ -11,11 +12,13 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
     required this.initiateResult,
     required this.statusResult,
     this.currentResult,
+    this.submitProofError,
   });
 
   final ManualPaymentModel initiateResult;
   ManualPaymentModel statusResult;
   ManualPaymentModel? currentResult;
+  Object? submitProofError;
   int fetchStatusCalls = 0;
   int submitProofCalls = 0;
 
@@ -45,6 +48,9 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
     DateTime? declaredPaymentTime,
   }) async {
     submitProofCalls += 1;
+    if (submitProofError != null) {
+      throw submitProofError!;
+    }
   }
 }
 
@@ -204,4 +210,61 @@ void main() {
       await events.close();
     },
   );
+
+  test('maps retry-after header for 429 proof submissions', () async {
+    final requestOptions = RequestOptions(
+      path: '/payments/manual/tx/submit-proof',
+    );
+    final repo = FakePaymentManualRepository(
+      initiateResult: const ManualPaymentModel(
+        transactionId: 'TX-RL',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      statusResult: const ManualPaymentModel(
+        transactionId: 'TX-RL',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      currentResult: const ManualPaymentModel(
+        transactionId: 'TX-RL',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      submitProofError: DioException(
+        requestOptions: requestOptions,
+        response: Response(
+          requestOptions: requestOptions,
+          statusCode: 429,
+          headers: Headers.fromMap(<String, List<String>>{
+            'retry-after': <String>['120'],
+          }),
+        ),
+        type: DioExceptionType.badResponse,
+      ),
+    );
+    final events = StreamController<ChatRealtimeEvent>.broadcast();
+    final notifier = PaymentManualNotifier(
+      repository: repo,
+      domainEvents: events.stream,
+    );
+
+    await notifier.loadCurrentTransaction(refresh: true);
+    await notifier.submitProof(
+      filePath: '/tmp/proof.png',
+      senderNumber: '0700000000',
+    );
+
+    expect(
+      notifier.state.error,
+      'Trop de tentatives. Reessayez dans 2 minute(s).',
+    );
+    expect(repo.submitProofCalls, 1);
+
+    notifier.dispose();
+    await events.close();
+  });
 }

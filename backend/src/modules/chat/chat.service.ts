@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Model } from 'mongoose';
 import { Repository, In } from 'typeorm';
 import { Conversation } from './schemas/conversation.schema';
-import { Message } from './schemas/message.schema';
+import { Message, MessageType } from './schemas/message.schema';
 import { User, UserRole } from '../users/entities/user.entity';
 import { ArtisanProfile } from '../users/entities/artisan-profile.entity';
 import { ClientProfile } from '../users/entities/client-profile.entity';
@@ -194,7 +194,7 @@ export class ChatService {
     conversationId: string,
     senderId: string,
     content: string,
-    type = 'TEXT',
+    type: string | MessageType = MessageType.TEXT,
     mediaUrl?: string,
   ): Promise<Message> {
     const conversation = await this.getConversationForParticipant(
@@ -206,7 +206,7 @@ export class ChatService {
       conversationId,
       senderId,
       content,
-      type,
+      type: this.resolveMessageType(type),
       mediaUrl,
     });
 
@@ -220,6 +220,15 @@ export class ChatService {
     });
 
     return message;
+  }
+
+  private resolveMessageType(type?: string): MessageType {
+    if (!type) return MessageType.TEXT;
+
+    const normalized = type.toUpperCase();
+    if (normalized === MessageType.IMAGE) return MessageType.IMAGE;
+    if (normalized === MessageType.SYSTEM) return MessageType.SYSTEM;
+    return MessageType.TEXT;
   }
 
   async markAsRead(conversationId: string, userId: string): Promise<void> {

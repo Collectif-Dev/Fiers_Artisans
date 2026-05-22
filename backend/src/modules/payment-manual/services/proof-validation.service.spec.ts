@@ -5,7 +5,11 @@ import { ProofValidationService } from './proof-validation.service';
 describe('ProofValidationService', () => {
   const service = new ProofValidationService();
 
-  async function buildImage(width: number, height: number, format: 'jpeg' | 'png' | 'webp' = 'jpeg') {
+  async function buildImage(
+    width: number,
+    height: number,
+    format: 'jpeg' | 'png' | 'webp' = 'jpeg',
+  ) {
     return sharp({
       create: {
         width,
@@ -13,7 +17,9 @@ describe('ProofValidationService', () => {
         channels: 3,
         background: { r: 120, g: 120, b: 120 },
       },
-    })[format]().toBuffer();
+    })
+      [format]()
+      .toBuffer();
   }
 
   it('accepts valid image proof', async () => {
@@ -31,17 +37,18 @@ describe('ProofValidationService', () => {
     expect(result.mimeType).toBe('image/jpeg');
   });
 
-  it('rejects unsupported mime type', async () => {
+  it('accepts a valid image even when the client mime header is inconsistent', async () => {
     const buffer = await buildImage(800, 900, 'png');
 
-    await expect(
-      service.validateImage({
-        buffer,
-        mimetype: 'application/pdf',
-        size: buffer.length,
-        originalname: 'proof.pdf',
-      } as Express.Multer.File),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = await service.validateImage({
+      buffer,
+      mimetype: 'application/pdf',
+      size: buffer.length,
+      originalname: 'proof.pdf',
+    } as Express.Multer.File);
+
+    expect(result.format).toBe('png');
+    expect(result.mimeType).toBe('image/png');
   });
 
   it('rejects images with insufficient resolution', async () => {

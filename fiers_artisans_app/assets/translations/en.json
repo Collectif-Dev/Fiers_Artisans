@@ -248,6 +248,8 @@
     "proof_already_pending": "Your proof is already pending validation.",
     "proof_required": "Please select a screenshot of your payment proof.",
     "sender_invalid": "Invalid sender number. Enter a 10-digit local number (07, 05 or 01).",
+    "sender_invalid_for_provider": "Invalid sender number for {provider}. Allowed prefixes: {prefixes}.",
+    "sender_provider_unknown": "Unknown payment method. Please regenerate the transaction.",
     "proof_sent": "Proof sent.",
     "step1_title": "1. Choose an operator",
     "step1_body": "Select the Mobile Money channel and check the recipient number.",

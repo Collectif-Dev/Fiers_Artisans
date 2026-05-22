@@ -235,9 +235,10 @@ class SettingsScreen extends ConsumerWidget {
             child: Text('common.cancel'.tr()),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ref.read(authProvider.notifier).logout();
+              await ref.read(authProvider.notifier).logout();
+              if (!context.mounted) return;
               context.go('/login');
             },
             child: Text(

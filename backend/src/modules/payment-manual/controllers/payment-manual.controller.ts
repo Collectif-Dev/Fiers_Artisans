@@ -91,7 +91,6 @@ export class PaymentManualController {
   }
 
   @Post(':transactionId/submit-proof')
-  @Throttle({ default: { limit: 3, ttl: 24 * 60 * 60 * 1000 } })
   @UseInterceptors(FileInterceptor('file'))
   async submitProof(
     @Param('transactionId') transactionId: string,

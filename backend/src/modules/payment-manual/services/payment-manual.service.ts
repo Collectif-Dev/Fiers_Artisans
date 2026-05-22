@@ -129,6 +129,81 @@ export class PaymentManualService implements OnModuleDestroy {
     }
   }
 
+  private async resolvePreferredArtisanProfileForUser(
+    userId: string,
+  ): Promise<ArtisanProfile> {
+    const profiles = await this.artisanProfileRepository.find({
+      where: { user_id: userId },
+      select: [
+        'id',
+        'user_id',
+        'is_subscription_active',
+        'created_at',
+        'updated_at',
+      ],
+      order: {
+        updated_at: 'DESC',
+        created_at: 'DESC',
+      },
+    });
+
+    if (!profiles.length) {
+      throw new BusinessException(
+        'PAYMENT_MANUAL_ARTISAN_REQUIRED',
+        'Seuls les artisans peuvent initier un paiement manuel.',
+      );
+    }
+
+    if (profiles.length > 1) {
+      this.logger.error(
+        `Data integrity violation: multiple artisan profiles for user=${userId} ids=${profiles
+          .map((profile) => profile.id)
+          .join(',')}`,
+      );
+    }
+
+    const activeProfile = profiles.find(
+      (profile) => profile.is_subscription_active,
+    );
+    if (activeProfile) {
+      return activeProfile;
+    }
+
+    const profileIds = profiles.map((profile) => profile.id);
+    const [latestSubscription] = await this.subscriptionRepository.find({
+      where: { artisan_profile_id: In(profileIds) },
+      select: [
+        'id',
+        'status',
+        'artisan_profile_id',
+        'amount_fcfa',
+        'created_at',
+      ],
+      order: { created_at: 'DESC' },
+      take: 1,
+    });
+
+    if (latestSubscription) {
+      const subscriptionProfile = profiles.find(
+        (profile) => profile.id === latestSubscription.artisan_profile_id,
+      );
+      if (subscriptionProfile) {
+        this.logger.warn(
+          `Legacy duplicate artisan profiles resolved for manual payment user=${userId} preferredProfile=${subscriptionProfile.id}`,
+        );
+        return subscriptionProfile;
+      }
+    }
+
+    if (profiles.length > 1) {
+      this.logger.warn(
+        `Legacy duplicate artisan profiles resolved for manual payment user=${userId} preferredProfile=${profiles[0].id}`,
+      );
+    }
+
+    return profiles[0];
+  }
+
   async initiatePayment(
     userId: string,
     provider: PaymentProviderManual,
@@ -140,17 +215,8 @@ export class PaymentManualService implements OnModuleDestroy {
       );
     }
 
-    const artisanProfile = await this.artisanProfileRepository.findOne({
-      where: { user_id: userId },
-      select: ['id', 'user_id', 'is_subscription_active'],
-    });
-
-    if (!artisanProfile) {
-      throw new BusinessException(
-        'PAYMENT_MANUAL_ARTISAN_REQUIRED',
-        'Seuls les artisans peuvent initier un paiement manuel.',
-      );
-    }
+    const artisanProfile =
+      await this.resolvePreferredArtisanProfileForUser(userId);
 
     if (artisanProfile.is_subscription_active) {
       throw new BusinessException(
@@ -589,11 +655,11 @@ export class PaymentManualService implements OnModuleDestroy {
     const expiresAtAdmin = new Date(
       now.getTime() + this.expiryHours * 60 * 60 * 1000,
     );
+    const hasRetainedProofs = activeProofs.length > 0;
 
-    payment.status =
-      activeProofs.length > 0
-        ? PaymentManualStatus.PENDING_ADMIN
-        : PaymentManualStatus.PENDING;
+    payment.status = hasRetainedProofs
+      ? PaymentManualStatus.PENDING_ADMIN
+      : PaymentManualStatus.PENDING;
     payment.rejected_at = null;
     payment.rejection_reason = null;
     payment.refund_required = false;
@@ -614,8 +680,12 @@ export class PaymentManualService implements OnModuleDestroy {
       await this.notificationsService.create({
         userId: artisanUserId,
         type: 'PAYMENT_MANUAL_REOPENED',
-        title: 'Preuve a soumettre de nouveau',
-        body: 'Votre paiement manuel a ete rouvert. Vous pouvez soumettre une nouvelle preuve.',
+        title: hasRetainedProofs
+          ? 'Paiement manuel rouvert'
+          : 'Preuve a soumettre de nouveau',
+        body: hasRetainedProofs
+          ? 'Votre paiement manuel a ete rouvert. La preuve deja soumise est de nouveau en cours de verification.'
+          : 'Votre paiement manuel a ete rouvert. Vous pouvez soumettre une nouvelle preuve.',
         data: {
           paymentId: payment.id,
           transactionId: payment.transaction_id,

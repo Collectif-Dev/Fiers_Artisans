@@ -1,6 +1,9 @@
 import { Repository } from 'typeorm';
 import { PaymentManualService } from './payment-manual.service';
-import { PaymentManualStatus, PaymentProviderManual } from '../entities/payment-manual.entity';
+import {
+  PaymentManualStatus,
+  PaymentProviderManual,
+} from '../entities/payment-manual.entity';
 import { BusinessException } from '../../../common/exceptions/business.exception';
 
 describe('PaymentManualService', () => {
@@ -25,12 +28,14 @@ describe('PaymentManualService', () => {
 
   const subscriptionRepository = {
     findOne: jest.fn(),
+    find: jest.fn(),
     save: jest.fn(),
     create: jest.fn((payload) => payload),
   } as unknown as Repository<any>;
 
   const artisanProfileRepository = {
     findOne: jest.fn(),
+    find: jest.fn(),
   } as unknown as Repository<any>;
 
   const userRepository = {
@@ -90,7 +95,7 @@ describe('PaymentManualService', () => {
   });
 
   it('throws when artisan profile is missing', async () => {
-    artisanProfileRepository.findOne = jest.fn().mockResolvedValue(null);
+    artisanProfileRepository.find = jest.fn().mockResolvedValue([]);
 
     await expect(
       service.initiatePayment('user-1', PaymentProviderManual.ORANGE_MONEY),
@@ -98,17 +103,20 @@ describe('PaymentManualService', () => {
   });
 
   it('returns existing pending payment instead of creating duplicate', async () => {
-    artisanProfileRepository.findOne = jest.fn().mockResolvedValue({
-      id: 'artisan-1',
-      user_id: 'user-1',
-      is_subscription_active: false,
-    });
+    artisanProfileRepository.find = jest.fn().mockResolvedValue([
+      {
+        id: 'artisan-1',
+        user_id: 'user-1',
+        is_subscription_active: false,
+      },
+    ]);
     subscriptionRepository.findOne = jest.fn().mockResolvedValue({
       id: 'sub-1',
       status: 'PENDING',
       artisan_profile_id: 'artisan-1',
       amount_fcfa: 5000,
     });
+    subscriptionRepository.find = jest.fn().mockResolvedValue([]);
     paymentManualRepository.findOne = jest.fn().mockResolvedValue({
       id: 'pm-1',
       transaction_id: 'TX-1',
@@ -126,10 +134,18 @@ describe('PaymentManualService', () => {
   });
 
   it('returns operator-specific recipient numbers', () => {
-    expect(service.getRecipientNumberForProvider(PaymentProviderManual.ORANGE_MONEY)).toBe('0703063570');
-    expect(service.getRecipientNumberForProvider(PaymentProviderManual.MTN_MOMO)).toBe('0503265984');
-    expect(service.getRecipientNumberForProvider(PaymentProviderManual.WAVE)).toBe('0703063570');
-    expect(service.getRecipientNumberForProvider(PaymentProviderManual.MOOV_MONEY)).toBeNull();
+    expect(
+      service.getRecipientNumberForProvider(PaymentProviderManual.ORANGE_MONEY),
+    ).toBe('0703063570');
+    expect(
+      service.getRecipientNumberForProvider(PaymentProviderManual.MTN_MOMO),
+    ).toBe('0503265984');
+    expect(
+      service.getRecipientNumberForProvider(PaymentProviderManual.WAVE),
+    ).toBe('0703063570');
+    expect(
+      service.getRecipientNumberForProvider(PaymentProviderManual.MOOV_MONEY),
+    ).toBeNull();
   });
 
   it('rejects initiation when provider is unavailable', async () => {

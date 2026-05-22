@@ -4,6 +4,7 @@ import '../core/errors/error_mapper.dart';
 import '../core/storage/secure_storage.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';
+import 'session_scope_provider.dart';
 import '../services/chat_realtime_service.dart';
 import '../services/push_notification_service.dart';
 
@@ -51,23 +52,35 @@ class AuthState {
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier();
+  return AuthNotifier(ref);
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
+  final Ref _ref;
   final AuthRepository _repo = AuthRepository();
+  late final Future<void> _bootstrapFuture;
 
-  AuthNotifier() : super(const AuthState()) {
-    checkAuth();
+  AuthNotifier(this._ref) : super(const AuthState()) {
+    _bootstrapFuture = checkAuth();
   }
 
   Future<void> checkAuth() async {
     // Back to explicit-login mode: no automatic session restoration on app start.
-    await SecureStorage.clearAuthSession();
+    // Guard with timeout so startup cannot stay blocked on storage edge cases.
+    try {
+      await SecureStorage.clearAuthSession().timeout(
+        const Duration(seconds: 3),
+      );
+    } catch (e) {
+      debugPrint('[Auth] checkAuth fallback after storage error/timeout: $e');
+    }
+    _rotateSessionScope();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
   Future<bool> login({required String phone, required String pinCode}) async {
+    await _bootstrapFuture;
+    await _prepareFreshSession();
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       final data = await _repo.login(phone: phone, pinCode: pinCode);
@@ -155,6 +168,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? description,
     int? experienceYears,
   }) async {
+    await _bootstrapFuture;
+    await _prepareFreshSession();
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       final data = await _repo.registerArtisan(
@@ -215,6 +230,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     double? longitude,
     String? email,
   }) async {
+    await _bootstrapFuture;
+    await _prepareFreshSession();
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       final data = await _repo.registerClient(
@@ -282,6 +299,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String code,
     required String pinCode,
   }) async {
+    await _bootstrapFuture;
+    await _prepareFreshSession();
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       final data = await _repo.setupPin(
@@ -323,8 +342,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    await _bootstrapFuture;
     ChatRealtimeService().disconnect();
     await SecureStorage.clearAuthSession();
+    _rotateSessionScope();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
@@ -352,5 +373,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _persistUserSnapshot(UserModel user) async {
     await SecureStorage.saveUserInfo(userId: user.id, role: user.role);
     await SecureStorage.saveUserProfileCache(user.toJson());
+  }
+
+  void _rotateSessionScope() {
+    _ref.read(sessionEpochProvider.notifier).bump();
+  }
+
+  Future<void> _prepareFreshSession() async {
+    ChatRealtimeService().disconnect();
+    await SecureStorage.clearAuthSession();
+    _rotateSessionScope();
   }
 }

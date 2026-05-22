@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/errors/error_mapper.dart';
 import '../data/models/manual_payment_model.dart';
 import '../data/repositories/payment_manual_repository.dart';
+import 'session_scope_provider.dart';
 import '../services/chat_realtime_service.dart';
 
 class PaymentManualState {
@@ -50,6 +51,7 @@ class PaymentManualState {
 
 final paymentManualProvider =
     StateNotifierProvider<PaymentManualNotifier, PaymentManualState>((ref) {
+      ref.watch(sessionEpochProvider);
       return PaymentManualNotifier();
     });
 
@@ -263,11 +265,39 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
       final signature =
           '${backendCode.toLowerCase()} ${backendMessage.toLowerCase()} $transportMessage $payloadText';
 
+      String formatRetryAfter(String secondsRaw) {
+        final seconds = int.tryParse(secondsRaw.trim());
+        if (seconds == null || seconds <= 0) {
+          return 'Trop de tentatives en peu de temps. Patientez un moment puis reessayez.';
+        }
+        if (seconds < 60) {
+          return 'Trop de tentatives. Reessayez dans ${seconds}s.';
+        }
+        final minutes = (seconds / 60).ceil();
+        if (minutes < 60) {
+          return 'Trop de tentatives. Reessayez dans $minutes minute(s).';
+        }
+        final hours = (minutes / 60).ceil();
+        return 'Trop de tentatives. Reessayez dans $hours heure(s).';
+      }
+
       if (status == 429 ||
           signature.contains('too many requests') ||
           signature.contains('rate_limit') ||
           backendCode == 'PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT' ||
           backendCode == 'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT') {
+        if (backendCode == 'PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT' &&
+            backendMessage.trim().isNotEmpty) {
+          return backendMessage;
+        }
+        if (backendCode == 'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT' &&
+            backendMessage.trim().isNotEmpty) {
+          return backendMessage;
+        }
+        final retryAfter = error.response?.headers.value('retry-after');
+        if ((retryAfter ?? '').trim().isNotEmpty) {
+          return formatRetryAfter(retryAfter!);
+        }
         return 'Trop de tentatives en peu de temps. Patientez un moment puis reessayez.';
       }
 

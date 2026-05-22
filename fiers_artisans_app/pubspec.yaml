@@ -90,6 +90,8 @@ flutter_launcher_icons:
 flutter_native_splash:
   color: "#E8A020"
   image: assets/branding/splash_icon.png
+  ios_content_mode: scaleAspectFit
+  web_image_mode: contain
   android_12:
     color: "#E8A020"
     image: assets/branding/splash_icon.png

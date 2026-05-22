@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repositories/verification_repository.dart';
+import 'session_scope_provider.dart';
 import '../services/push_notification_service.dart';
 import '../services/chat_realtime_service.dart';
 
@@ -83,12 +84,15 @@ class VerificationState {
 class VerificationNotifier extends StateNotifier<VerificationState> {
   final VerificationRepository _repo;
   final ChatRealtimeService _realtime = ChatRealtimeService();
+  final PushNotificationService _push = PushNotificationService();
   StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
+  late final void Function() _onVerificationUpdate;
 
   VerificationNotifier(this._repo) : super(const VerificationState()) {
     // Global FCM bridge: any DOCUMENT_APPROVED/REJECTED push triggers refresh
     // regardless of which screen is currently active.
-    PushNotificationService().onVerificationUpdate = () => refresh();
+    _onVerificationUpdate = () => refresh();
+    _push.onVerificationUpdate = _onVerificationUpdate;
     _realtimeSub = _realtime.domainEvents.listen((event) {
       if (event.event == 'verificationStatusUpdated' ||
           (event.event == 'notificationCreated' &&
@@ -100,6 +104,9 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
 
   @override
   void dispose() {
+    if (identical(_push.onVerificationUpdate, _onVerificationUpdate)) {
+      _push.onVerificationUpdate = null;
+    }
     _realtimeSub?.cancel();
     super.dispose();
   }
@@ -114,7 +121,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
       final data = await _repo.getVerificationStatus();
       final docs =
           (data['documents'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ??
-              [];
+          [];
 
       // Backend returns DESC by submitted_at — first match per family is most recent.
       DocFamilyStatus idStatus = DocFamilyStatus.none;
@@ -127,8 +134,7 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
         final rawStatus = (doc['status'] as String?) ?? '';
         final reason = doc['rejection_reason'] as String?;
 
-        if (_identityTypes.contains(type) &&
-            idStatus == DocFamilyStatus.none) {
+        if (_identityTypes.contains(type) && idStatus == DocFamilyStatus.none) {
           idStatus = _parseStatus(rawStatus);
           idReason = reason;
         } else if (_diplomaTypes.contains(type) &&
@@ -190,5 +196,6 @@ class VerificationNotifier extends StateNotifier<VerificationState> {
 
 final verificationProvider =
     StateNotifierProvider<VerificationNotifier, VerificationState>((ref) {
-  return VerificationNotifier(VerificationRepository());
-});
+      ref.watch(sessionEpochProvider);
+      return VerificationNotifier(VerificationRepository());
+    });

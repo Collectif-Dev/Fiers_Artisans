@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository, LessThan } from 'typeorm';
+import { DataSource, Repository, LessThan, In } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   Subscription,
@@ -99,13 +99,86 @@ export class SubscriptionService {
     }
   }
 
-  async initiatePayment(userId: string): Promise<WaveCheckoutSession> {
-    const profile = await this.artisanProfileRepository.findOne({
+  private async loadArtisanProfilesForUser(
+    userId: string,
+  ): Promise<ArtisanProfile[]> {
+    const profiles = await this.artisanProfileRepository.find({
       where: { user_id: userId },
+      order: {
+        updated_at: 'DESC',
+        created_at: 'DESC',
+      },
     });
-    if (!profile) {
+
+    if (!profiles.length) {
       throw new NotFoundException('Profil artisan non trouvé.');
     }
+
+    if (profiles.length > 1) {
+      this.logger.error(
+        `Data integrity violation: multiple artisan profiles for user=${userId} ids=${profiles
+          .map((profile) => profile.id)
+          .join(',')}`,
+      );
+    }
+
+    return profiles;
+  }
+
+  private async findLatestSubscriptionForProfileIds(
+    profileIds: string[],
+    withPayments = false,
+  ): Promise<Subscription | null> {
+    if (!profileIds.length) {
+      return null;
+    }
+
+    const [subscription] = await this.subscriptionRepository.find({
+      where: { artisan_profile_id: In(profileIds) },
+      relations: withPayments ? ['payments'] : [],
+      order: { created_at: 'DESC' },
+      take: 1,
+    });
+
+    return subscription ?? null;
+  }
+
+  private async resolveSubscriptionScope(userId: string): Promise<{
+    profiles: ArtisanProfile[];
+    profileIds: string[];
+    preferredProfile: ArtisanProfile;
+  }> {
+    const profiles = await this.loadArtisanProfilesForUser(userId);
+    const profileIds = profiles.map((profile) => profile.id);
+    const latestSubscription =
+      await this.findLatestSubscriptionForProfileIds(profileIds);
+    const activeProfile = profiles.find(
+      (profile) => profile.is_subscription_active,
+    );
+    const subscriptionProfile = latestSubscription
+      ? profiles.find(
+          (profile) => profile.id === latestSubscription.artisan_profile_id,
+        )
+      : undefined;
+    const preferredProfile =
+      activeProfile ?? subscriptionProfile ?? profiles[0];
+
+    if (profiles.length > 1) {
+      this.logger.warn(
+        `Legacy duplicate artisan profiles resolved for user=${userId} preferredProfile=${preferredProfile.id}`,
+      );
+    }
+
+    return {
+      profiles,
+      profileIds,
+      preferredProfile,
+    };
+  }
+
+  async initiatePayment(userId: string): Promise<WaveCheckoutSession> {
+    const { preferredProfile: profile } =
+      await this.resolveSubscriptionScope(userId);
 
     // Créer ou récupérer la subscription
     let subscription = await this.subscriptionRepository.findOne({
@@ -290,22 +363,21 @@ export class SubscriptionService {
   }
 
   async getStatus(userId: string) {
-    const profile = await this.artisanProfileRepository.findOne({
-      where: { user_id: userId },
-    });
-    if (!profile) {
-      throw new NotFoundException('Profil artisan non trouvé.');
-    }
-
-    const subscription = await this.subscriptionRepository.findOne({
-      where: { artisan_profile_id: profile.id },
-      relations: ['payments'],
-      order: { created_at: 'DESC' },
-    });
+    const { profiles, profileIds, preferredProfile } =
+      await this.resolveSubscriptionScope(userId);
+    const subscription = await this.findLatestSubscriptionForProfileIds(
+      profileIds,
+      true,
+    );
+    const effectiveProfile = subscription
+      ? (profiles.find(
+          (profile) => profile.id === subscription.artisan_profile_id,
+        ) ?? preferredProfile)
+      : preferredProfile;
 
     return {
       subscription,
-      is_active: profile.is_subscription_active,
+      is_active: effectiveProfile.is_subscription_active,
     };
   }
 

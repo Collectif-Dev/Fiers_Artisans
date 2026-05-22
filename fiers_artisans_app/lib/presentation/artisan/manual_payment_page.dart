@@ -17,7 +17,14 @@ class ManualPaymentPage extends ConsumerStatefulWidget {
 }
 
 class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
-  static final RegExp _ivorianMobilePattern = RegExp(r'^(07|05|01)\d{8}$');
+  static final RegExp _digits10Pattern = RegExp(r'^\d{10}$');
+  static const Map<String, List<String>> _allowedPrefixesByProvider = {
+    'ORANGE_MONEY': ['07'],
+    'MTN_MOMO': ['05'],
+    'WAVE': ['07', '05', '01'],
+    // Reserved for future activation.
+    'MOOV_MONEY': ['01'],
+  };
   static const Map<String, String?> _recipientByProvider = {
     'ORANGE_MONEY': '0703063570',
     'MTN_MOMO': '0503265984',
@@ -172,8 +179,31 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       return;
     }
 
-    if (!_ivorianMobilePattern.hasMatch(sender)) {
-      AppSnackBar.show(context, message: 'manual_payment.sender_invalid'.tr());
+    final providerForValidation = tx.provider.trim().isNotEmpty
+        ? tx.provider
+        : _provider;
+    final allowedPrefixes = _allowedPrefixesByProvider[providerForValidation];
+    if (allowedPrefixes == null || allowedPrefixes.isEmpty) {
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.sender_provider_unknown'.tr(),
+      );
+      return;
+    }
+
+    if (!_isValidSenderNumberForProvider(
+      sender,
+      provider: providerForValidation,
+    )) {
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.sender_invalid_for_provider'.tr(
+          namedArgs: {
+            'provider': _providerLabel(providerForValidation),
+            'prefixes': _prefixesLabel(allowedPrefixes),
+          },
+        ),
+      );
       return;
     }
 
@@ -188,7 +218,15 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     }
   }
 
-  Widget _stepItem(IconData icon, String title, String text) {
+  Widget _stepItem(
+    IconData icon,
+    String title,
+    String text, {
+    required Color iconBackgroundColor,
+    required Color iconColor,
+    required Color titleColor,
+    required Color bodyColor,
+  }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -196,10 +234,10 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: AppTheme.gold.withValues(alpha: 0.18),
+            color: iconBackgroundColor,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 20, color: AppTheme.gold),
+          child: Icon(icon, size: 20, color: iconColor),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -208,13 +246,13 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: titleColor,
                 ),
               ),
               const SizedBox(height: 2),
-              Text(text, style: const TextStyle(color: Colors.white70)),
+              Text(text, style: TextStyle(color: bodyColor)),
             ],
           ),
         ),
@@ -222,14 +260,55 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     );
   }
 
+  bool _isValidSenderNumberForProvider(
+    String sender, {
+    required String provider,
+  }) {
+    if (!_digits10Pattern.hasMatch(sender)) {
+      return false;
+    }
+    final allowedPrefixes = _allowedPrefixesByProvider[provider];
+    if (allowedPrefixes == null || allowedPrefixes.isEmpty) {
+      return false;
+    }
+    for (final prefix in allowedPrefixes) {
+      if (sender.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String _providerLabel(String provider) {
+    return switch (provider) {
+      'ORANGE_MONEY' => 'manual_payment.provider.orange'.tr(),
+      'MTN_MOMO' => 'manual_payment.provider.mtn'.tr(),
+      'MOOV_MONEY' => 'manual_payment.provider.moov_unavailable'.tr(),
+      'WAVE' => 'manual_payment.provider.wave_manual'.tr(),
+      _ => provider,
+    };
+  }
+
+  String _prefixesLabel(List<String> prefixes) {
+    if (prefixes.length == 1) {
+      return prefixes.first;
+    }
+    if (prefixes.length == 2) {
+      return '${prefixes[0]} ou ${prefixes[1]}';
+    }
+    final head = prefixes.sublist(0, prefixes.length - 1).join(', ');
+    return '$head ou ${prefixes.last}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final state = ref.watch(paymentManualProvider);
     final tx = state.currentTransaction;
 
     final providerUnavailable = _recipientByProvider[_provider] == null;
-    final isPendingAdminLocked =
-        tx != null && tx.isPendingAdmin && state.hasSubmittedProof;
+    final isPendingAdminLocked = tx != null && tx.isPendingAdmin;
 
     final canInitiate =
         !state.isLoading &&
@@ -249,6 +328,29 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     final formattedRecipient = selectedRecipient == null
         ? null
         : _formatPhoneSpaced(selectedRecipient);
+    final guideBackgroundColor = isDark
+        ? Colors.black.withValues(alpha: 0.28)
+        : theme.colorScheme.surfaceContainerHighest;
+    final guideBorderColor = isDark
+        ? AppTheme.gold.withValues(alpha: 0.32)
+        : theme.colorScheme.outlineVariant;
+    final guideTitleColor = isDark ? Colors.white : theme.colorScheme.onSurface;
+    final guideBodyColor = isDark
+        ? Colors.white70
+        : theme.colorScheme.onSurfaceVariant;
+    final noticeColor = isDark ? Colors.orangeAccent : Colors.orange.shade800;
+    final recipientCardColor = isDark
+        ? Colors.black.withValues(alpha: 0.36)
+        : theme.colorScheme.surfaceContainer;
+    final recipientHintColor = isDark
+        ? Colors.white70
+        : theme.colorScheme.onSurfaceVariant;
+    final recipientNumberColor = isDark
+        ? AppTheme.gold
+        : Colors.deepOrange.shade800;
+    final serverConfirmedColor = isDark
+        ? Colors.white54
+        : theme.colorScheme.onSurfaceVariant;
 
     return Scaffold(
       appBar: AppBar(title: Text('manual_payment.title'.tr())),
@@ -266,11 +368,9 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.28),
+                color: guideBackgroundColor,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: AppTheme.gold.withValues(alpha: 0.32),
-                ),
+                border: Border.all(color: guideBorderColor),
               ),
               child: Column(
                 children: [
@@ -278,24 +378,40 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                     Icons.looks_one_outlined,
                     'manual_payment.step1_title'.tr(),
                     'manual_payment.step1_body'.tr(),
+                    iconBackgroundColor: AppTheme.gold.withValues(alpha: 0.18),
+                    iconColor: AppTheme.gold,
+                    titleColor: guideTitleColor,
+                    bodyColor: guideBodyColor,
                   ),
                   const SizedBox(height: 10),
                   _stepItem(
                     Icons.looks_two_outlined,
                     'manual_payment.step2_title'.tr(),
                     'manual_payment.step2_body'.tr(),
+                    iconBackgroundColor: AppTheme.gold.withValues(alpha: 0.18),
+                    iconColor: AppTheme.gold,
+                    titleColor: guideTitleColor,
+                    bodyColor: guideBodyColor,
                   ),
                   const SizedBox(height: 10),
                   _stepItem(
                     Icons.looks_3_outlined,
                     'manual_payment.step3_title'.tr(),
                     'manual_payment.step3_body'.tr(),
+                    iconBackgroundColor: AppTheme.gold.withValues(alpha: 0.18),
+                    iconColor: AppTheme.gold,
+                    titleColor: guideTitleColor,
+                    bodyColor: guideBodyColor,
                   ),
                   const SizedBox(height: 10),
                   _stepItem(
                     Icons.looks_4_outlined,
                     'manual_payment.step4_title'.tr(),
                     'manual_payment.step4_body'.tr(),
+                    iconBackgroundColor: AppTheme.gold.withValues(alpha: 0.18),
+                    iconColor: AppTheme.gold,
+                    titleColor: guideTitleColor,
+                    bodyColor: guideBodyColor,
                   ),
                 ],
               ),
@@ -380,17 +496,19 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.36),
+                color: recipientCardColor,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: AppTheme.gold.withValues(alpha: 0.42),
+                  color: isDark
+                      ? AppTheme.gold.withValues(alpha: 0.42)
+                      : theme.colorScheme.outlineVariant,
                 ),
               ),
               child: selectedRecipient == null
                   ? Text(
                       'manual_payment.recipient_unavailable'.tr(),
-                      style: const TextStyle(
-                        color: Colors.orangeAccent,
+                      style: TextStyle(
+                        color: noticeColor,
                         fontWeight: FontWeight.w700,
                       ),
                     )
@@ -399,7 +517,7 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                       children: [
                         Text(
                           'manual_payment.send_exact_amount'.tr(),
-                          style: const TextStyle(color: Colors.white70),
+                          style: TextStyle(color: recipientHintColor),
                         ),
                         const SizedBox(height: 6),
                         Row(
@@ -408,7 +526,7 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                               child: Text(
                                 formattedRecipient ?? selectedRecipient,
                                 style: TextStyle(
-                                  color: AppTheme.gold,
+                                  color: recipientNumberColor,
                                   fontSize: 22,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 0.7,
@@ -421,7 +539,7 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                                   _copyRecipient(selectedRecipient),
                               icon: Icon(
                                 Icons.copy_rounded,
-                                color: AppTheme.gold,
+                                color: recipientNumberColor,
                               ),
                             ),
                           ],
@@ -429,8 +547,8 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                         if (recipientFromBackend)
                           Text(
                             'manual_payment.server_confirmed_number'.tr(),
-                            style: const TextStyle(
-                              color: Colors.white54,
+                            style: TextStyle(
+                              color: serverConfirmedColor,
                               fontSize: 12,
                             ),
                           ),
@@ -441,20 +559,20 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
               const SizedBox(height: 8),
               Text(
                 'manual_payment.moov_temporarily_unavailable'.tr(),
-                style: const TextStyle(color: Colors.orangeAccent),
+                style: TextStyle(color: noticeColor),
               ),
             ],
             if (tx != null && tx.isPendingAdmin) ...[
               const SizedBox(height: 8),
               Text(
                 'manual_payment.pending_admin_notice'.tr(),
-                style: const TextStyle(color: Colors.orangeAccent),
+                style: TextStyle(color: noticeColor),
               ),
             ] else if (tx != null && tx.isPending) ...[
               const SizedBox(height: 8),
               Text(
                 'manual_payment.transaction_initiated_notice'.tr(),
-                style: const TextStyle(color: Colors.orangeAccent),
+                style: TextStyle(color: noticeColor),
               ),
             ],
             const SizedBox(height: 12),

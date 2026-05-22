@@ -1,5 +1,6 @@
 import { ConflictException, HttpException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { BusinessException } from '../src/common/exceptions/business.exception';
 import { PaymentManualService } from '../src/modules/payment-manual/services/payment-manual.service';
 import {
   PaymentManualStatus,
@@ -53,7 +54,9 @@ function createHarness() {
       }
 
       if (where?.id) {
-        const payment = state.payments.find((p) => p.id === where.id && !p.deleted_at);
+        const payment = state.payments.find(
+          (p) => p.id === where.id && !p.deleted_at,
+        );
         if (!payment) return null;
         payment.subscription = state.subscriptions.find(
           (s) => s.id === payment.subscription_id,
@@ -68,7 +71,8 @@ function createHarness() {
             .filter((p) => p.payment_manual_id === payment.id && !p.deleted_at)
             .sort(
               (a, b) =>
-                new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
+                new Date(b.submitted_at).getTime() -
+                new Date(a.submitted_at).getTime(),
             );
         }
         return payment;
@@ -84,7 +88,9 @@ function createHarness() {
               (allowed.length === 0 || allowed.includes(p.status)),
           )
           .sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime(),
           )[0];
         if (!payment) return null;
         if (relations?.includes('proofs')) {
@@ -101,7 +107,8 @@ function createHarness() {
       if (Array.isArray(payload)) {
         for (const row of payload) {
           const idx = state.payments.findIndex((p) => p.id === row.id);
-          if (idx >= 0) state.payments[idx] = { ...state.payments[idx], ...row };
+          if (idx >= 0)
+            state.payments[idx] = { ...state.payments[idx], ...row };
         }
         return payload;
       }
@@ -122,7 +129,11 @@ function createHarness() {
 
       const idx = state.payments.findIndex((p) => p.id === payload.id);
       if (idx >= 0) {
-        state.payments[idx] = { ...state.payments[idx], ...payload, updated_at: new Date() };
+        state.payments[idx] = {
+          ...state.payments[idx],
+          ...payload,
+          updated_at: new Date(),
+        };
         return state.payments[idx];
       }
       state.payments.push(payload);
@@ -134,12 +145,9 @@ function createHarness() {
       const now = new Date();
       const list = state.payments.filter((p) => {
         const expired =
-          p.expires_at_admin && new Date(p.expires_at_admin).getTime() < now.getTime();
-        return (
-          p.status === where.status &&
-          expired &&
-          !p.deleted_at
-        );
+          p.expires_at_admin &&
+          new Date(p.expires_at_admin).getTime() < now.getTime();
+        return p.status === where.status && expired && !p.deleted_at;
       });
       return list.slice(0, take || list.length);
     }),
@@ -150,7 +158,9 @@ function createHarness() {
     findOne: jest.fn(async ({ where }: AnyRecord) => {
       if (where?.image_hash_sha256) {
         return (
-          state.proofs.find((p) => p.image_hash_sha256 === where.image_hash_sha256) || null
+          state.proofs.find(
+            (p) => p.image_hash_sha256 === where.image_hash_sha256,
+          ) || null
         );
       }
       if (where?.id) {
@@ -239,7 +249,9 @@ function createHarness() {
 
   const artisanProfileRepository = {
     findOne: jest.fn(async ({ where }: AnyRecord) => {
-      return state.artisanProfiles.find((a) => a.user_id === where.user_id) || null;
+      return (
+        state.artisanProfiles.find((a) => a.user_id === where.user_id) || null
+      );
     }),
   } as any;
 
@@ -269,12 +281,14 @@ function createHarness() {
       streamFile: jest.fn(),
     } as any,
     {
-      activateSubscriptionFromManualPayment: jest.fn(async (subscriptionId: string) => {
-        const sub = state.subscriptions.find((s) => s.id === subscriptionId);
-        if (sub) {
-          sub.status = SubscriptionStatus.ACTIVE;
-        }
-      }),
+      activateSubscriptionFromManualPayment: jest.fn(
+        async (subscriptionId: string) => {
+          const sub = state.subscriptions.find((s) => s.id === subscriptionId);
+          if (sub) {
+            sub.status = SubscriptionStatus.ACTIVE;
+          }
+        },
+      ),
     } as any,
     notificationsService,
     analyticsService,
@@ -326,6 +340,7 @@ function createHarness() {
     service,
     state,
     paymentProofRepository,
+    notificationsService,
     mockFile,
   };
 }
@@ -334,7 +349,10 @@ describe('Payment Manual (e2e scenarios)', () => {
   it('Scenario 1: initiate -> submit proof -> admin validates -> subscription active', async () => {
     const { service, state, mockFile } = createHarness();
 
-    const initiated = await service.initiatePayment('user-1', PaymentProviderManual.ORANGE_MONEY);
+    const initiated = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.ORANGE_MONEY,
+    );
     expect(initiated.transaction_id).toMatch(/^TX-/);
 
     await service.submitProof({
@@ -351,7 +369,9 @@ describe('Payment Manual (e2e scenarios)', () => {
 
     await service.validateProof(initiated.id, 'admin-1', 'ok');
     const updated = state.payments.find((p) => p.id === initiated.id);
-    const subscription = state.subscriptions.find((s) => s.id === initiated.subscription_id);
+    const subscription = state.subscriptions.find(
+      (s) => s.id === initiated.subscription_id,
+    );
 
     expect(updated?.status).toBe(PaymentManualStatus.COMPLETED);
     expect(subscription?.status).toBe(SubscriptionStatus.ACTIVE);
@@ -359,7 +379,10 @@ describe('Payment Manual (e2e scenarios)', () => {
 
   it('Scenario 2: reject proof -> resubmit -> validate', async () => {
     const { service, state, mockFile } = createHarness();
-    const initiated = await service.initiatePayment('user-1', PaymentProviderManual.MTN_MOMO);
+    const initiated = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.MTN_MOMO,
+    );
 
     await service.submitProof({
       transactionId: initiated.transaction_id,
@@ -374,7 +397,6 @@ describe('Payment Manual (e2e scenarios)', () => {
     });
 
     await service.rejectProof(initiated.id, 'admin-1', 'proof unclear');
-    await service.reopenProof(initiated.id, 'admin-1', 'moderation mistake');
 
     await service.submitProof({
       transactionId: initiated.transaction_id,
@@ -431,7 +453,10 @@ describe('Payment Manual (e2e scenarios)', () => {
 
   it('Scenario 4: duplicate proof hash returns 409 conflict', async () => {
     const { service, state, mockFile } = createHarness();
-    const initiated = await service.initiatePayment('user-1', PaymentProviderManual.ORANGE_MONEY);
+    const initiated = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.ORANGE_MONEY,
+    );
 
     await service.submitProof({
       transactionId: initiated.transaction_id,
@@ -445,7 +470,6 @@ describe('Payment Manual (e2e scenarios)', () => {
       senderNumber: '0700000000',
     });
     await service.rejectProof(initiated.id, 'admin-1', 'retry requested');
-    await service.reopenProof(initiated.id, 'admin-1', 'allow correction');
 
     await expect(
       service.submitProof({
@@ -464,9 +488,60 @@ describe('Payment Manual (e2e scenarios)', () => {
     expect(state.proofs.length).toBe(1);
   });
 
-  it('Scenario 5: upload attempts over limit return 429', async () => {
+  it('Scenario 5: reopening a rejected payment keeps the proof under review and blocks resubmission', async () => {
+    const { service, state, notificationsService, mockFile } = createHarness();
+    const initiated = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.ORANGE_MONEY,
+    );
+
+    await service.submitProof({
+      transactionId: initiated.transaction_id,
+      userId: 'user-1',
+      file: {
+        buffer: mockFile,
+        mimetype: 'image/jpeg',
+        size: mockFile.length,
+        originalname: 'proof-1.jpg',
+      } as Express.Multer.File,
+      senderNumber: '0700000000',
+    });
+    await service.rejectProof(initiated.id, 'admin-1', 'proof unclear');
+    await service.reopenProof(initiated.id, 'admin-1', 'moderation review');
+
+    const reopened = state.payments.find((p) => p.id === initiated.id);
+    expect(reopened?.status).toBe(PaymentManualStatus.PENDING_ADMIN);
+
+    expect(notificationsService.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'PAYMENT_MANUAL_REOPENED',
+        title: 'Paiement manuel rouvert',
+        body: 'Votre paiement manuel a ete rouvert. La preuve deja soumise est de nouveau en cours de verification.',
+      }),
+    );
+
+    await expect(
+      service.submitProof({
+        transactionId: initiated.transaction_id,
+        userId: 'user-1',
+        file: {
+          buffer: Buffer.concat([mockFile, Buffer.from('aa', 'hex')]),
+          mimetype: 'image/jpeg',
+          size: mockFile.length + 1,
+          originalname: 'proof-2.jpg',
+        } as Express.Multer.File,
+        senderNumber: '0700000000',
+      }),
+    ).rejects.toBeInstanceOf(BusinessException);
+  });
+
+  it('Scenario 6: upload attempts over limit return 429', async () => {
     const { service, state } = createHarness();
-    const initiated = await service.initiatePayment('user-1', PaymentProviderManual.ORANGE_MONEY);
+    const initiated = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.ORANGE_MONEY,
+    );
     const payment = state.payments.find((p) => p.id === initiated.id)!;
     payment.status = PaymentManualStatus.REJECTED;
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/artisan_model.dart';
 import '../data/repositories/favorites_repository.dart';
+import 'session_scope_provider.dart';
 import '../services/chat_realtime_service.dart';
 
 class FavoritesState {
@@ -39,6 +40,7 @@ class FavoritesState {
 
 final favoritesProvider =
     StateNotifierProvider<FavoritesNotifier, FavoritesState>((ref) {
+      ref.watch(sessionEpochProvider);
       return FavoritesNotifier();
     });
 
@@ -149,10 +151,7 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
       return updated;
     } catch (e) {
       final afterLoading = {...state.loadingUserIds}..remove(artisanUserId);
-      state = state.copyWith(
-        loadingUserIds: afterLoading,
-        error: e.toString(),
-      );
+      state = state.copyWith(loadingUserIds: afterLoading, error: e.toString());
       return current;
     }
   }
@@ -180,9 +179,6 @@ class FavoritesNotifier extends StateNotifier<FavoritesState> {
       favorites.removeWhere((item) => item.userId == artisanUserId);
     }
 
-    state = state.copyWith(
-      favoriteUserIds: ids,
-      favorites: favorites,
-    );
+    state = state.copyWith(favoriteUserIds: ids, favorites: favorites);
   }
 }

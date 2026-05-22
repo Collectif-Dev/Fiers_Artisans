@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
-import '../presentation/auth/splash_screen.dart';
 import '../presentation/auth/onboarding_screen.dart';
 import '../presentation/auth/login_screen.dart';
 import '../presentation/auth/register_choice_screen.dart';
@@ -28,11 +27,15 @@ final _clientShellKey = GlobalKey<NavigatorState>(debugLabel: 'clientShell');
 final _artisanShellKey = GlobalKey<NavigatorState>(debugLabel: 'artisanShell');
 
 // Custom slide+fade transition
-CustomTransitionPage<void> _buildTransition(GoRouterState state, Widget child) {
+CustomTransitionPage<void> _buildTransition(
+  GoRouterState state,
+  Widget child, {
+  Duration duration = const Duration(milliseconds: 350),
+}) {
   return CustomTransitionPage(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 350),
+    transitionDuration: duration,
     transitionsBuilder: (context, animation, secondary, child) {
       return FadeTransition(
         opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
@@ -52,20 +55,18 @@ CustomTransitionPage<void> _buildTransition(GoRouterState state, Widget child) {
 }
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/onboarding',
   routes: [
-    // Splash
-    GoRoute(
-      path: '/',
-      pageBuilder: (context, state) =>
-          _buildTransition(state, const SplashScreen()),
-    ),
+    GoRoute(path: '/', redirect: (context, state) => '/onboarding'),
 
     // Onboarding
     GoRoute(
       path: '/onboarding',
-      pageBuilder: (context, state) =>
-          _buildTransition(state, const OnboardingScreen()),
+      pageBuilder: (context, state) => _buildTransition(
+        state,
+        const OnboardingScreen(),
+        duration: const Duration(milliseconds: 240),
+      ),
     ),
 
     // Auth

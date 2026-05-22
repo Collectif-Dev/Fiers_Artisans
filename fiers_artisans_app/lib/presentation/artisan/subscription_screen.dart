@@ -43,6 +43,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final subState = ref.watch(subscriptionProvider);
     final manualState = ref.watch(paymentManualProvider);
     final subscription = subState.subscription;
@@ -54,11 +55,12 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
     final manualInProgress =
         manualTx != null && (manualTx.isPending || manualTx.isPendingAdmin);
     final manualRejected = manualTx?.isRejected == true;
-    final hasExpiredSubscription = subscription != null && !subscription.isPending;
+    final hasExpiredSubscription =
+        subscription != null && !subscription.isPending;
 
     final statusText = isActive
         ? 'subscription.active'.tr()
-      : !hasExpiredSubscription
+        : !hasExpiredSubscription
         ? 'subscription.none'.tr()
         : 'subscription.expired'.tr();
 
@@ -75,6 +77,24 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
         : manualRejected
         ? 'subscription.manual.retry_payment'.tr()
         : 'subscription.manual.start_payment'.tr();
+    final manualCardBackgroundColor = isDark
+        ? Colors.black.withValues(alpha: 0.28)
+        : theme.colorScheme.surfaceContainerHighest;
+    final manualCardBorderColor = isDark
+        ? AppTheme.gold.withValues(alpha: 0.35)
+        : theme.colorScheme.outlineVariant;
+    final manualCardTitleColor = isDark
+        ? Colors.white
+        : theme.colorScheme.onSurface;
+    final manualCardBodyColor = isDark
+        ? Colors.white70
+        : theme.colorScheme.onSurfaceVariant;
+    final manualCardIconColor = isDark
+        ? AppTheme.gold
+        : Colors.deepOrange.shade800;
+    final manualCardIconBackgroundColor = isDark
+        ? AppTheme.gold.withValues(alpha: 0.15)
+        : Colors.deepOrange.shade50;
 
     return Scaffold(
       appBar: AppBar(title: Text('subscription.title'.tr())),
@@ -228,20 +248,26 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.28),
+                            color: manualCardBackgroundColor,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: AppTheme.gold.withValues(alpha: 0.35),
-                            ),
+                            border: Border.all(color: manualCardBorderColor),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 children: [
-                                  Icon(
-                                    Icons.account_balance_wallet_outlined,
-                                    color: AppTheme.gold,
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: manualCardIconBackgroundColor,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      Icons.account_balance_wallet_outlined,
+                                      color: manualCardIconColor,
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -250,7 +276,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                                           .tr(),
                                       style: TextStyle(
                                         fontWeight: FontWeight.w700,
-                                        color: Colors.white,
+                                        color: manualCardTitleColor,
                                       ),
                                     ),
                                   ),
@@ -260,7 +286,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                               Text(
                                 'subscription.manual.instructions'.tr(),
                                 style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white70,
+                                  color: manualCardBodyColor,
                                 ),
                               ),
                               if (isActive) ...[
