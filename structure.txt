@@ -1,0 +1,720 @@
+.
+├── admin-web
+│   ├── public
+│   │   ├── file.svg
+│   │   ├── globe.svg
+│   │   ├── next.svg
+│   │   ├── vercel.svg
+│   │   └── window.svg
+│   ├── src
+│   │   ├── app
+│   │   │   ├── (dashboard)
+│   │   │   │   ├── analytics
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── artisans
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── clients
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── logs
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── payments
+│   │   │   │   │   └── manual
+│   │   │   │   │       ├── page-client.tsx
+│   │   │   │   │       └── page.tsx
+│   │   │   │   ├── reviews
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── subscriptions
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── verifications
+│   │   │   │   │   └── page.tsx
+│   │   │   │   ├── layout.tsx
+│   │   │   │   └── page.tsx
+│   │   │   ├── login
+│   │   │   │   └── page.tsx
+│   │   │   ├── favicon.ico
+│   │   │   ├── globals.css
+│   │   │   └── layout.tsx
+│   │   ├── components
+│   │   │   ├── dashboard
+│   │   │   │   ├── kpi-card.tsx
+│   │   │   │   ├── mobile-sidebar.tsx
+│   │   │   │   ├── sidebar.tsx
+│   │   │   │   └── topbar.tsx
+│   │   │   └── ui
+│   │   │       ├── avatar.tsx
+│   │   │       ├── badge.tsx
+│   │   │       ├── button.tsx
+│   │   │       ├── card.tsx
+│   │   │       ├── dialog.tsx
+│   │   │       ├── dropdown-menu.tsx
+│   │   │       ├── input.tsx
+│   │   │       ├── label.tsx
+│   │   │       ├── select.tsx
+│   │   │       ├── separator.tsx
+│   │   │       ├── sheet.tsx
+│   │   │       ├── skeleton.tsx
+│   │   │       ├── sonner.tsx
+│   │   │       ├── table.tsx
+│   │   │       └── textarea.tsx
+│   │   ├── hooks
+│   │   │   ├── use-admin-sse.ts
+│   │   │   ├── use-auth.ts
+│   │   │   └── use-translations.ts
+│   │   ├── lib
+│   │   │   ├── api.ts
+│   │   │   ├── auth.ts
+│   │   │   └── utils.ts
+│   │   ├── messages
+│   │   │   ├── en.json
+│   │   │   └── fr.json
+│   │   ├── providers
+│   │   │   ├── locale-provider.tsx
+│   │   │   └── theme-provider.tsx
+│   │   ├── types
+│   │   │   └── index.ts
+│   │   └── i18n.ts
+│   ├── AGENTS.md
+│   ├── CLAUDE.md
+│   ├── components.json
+│   ├── Dockerfile
+│   ├── eslint.config.mjs
+│   ├── next.config.ts
+│   ├── next-env.d.ts
+│   ├── package.json
+│   ├── postcss.config.mjs
+│   ├── tsconfig.json
+│   └── tsconfig.tsbuildinfo
+├── ajout_ref_fiers_Art_pay_methode
+│   ├── payment_system_enriched_map.txt
+│   └── payment_system_map.txt
+├── backend
+│   ├── src
+│   │   ├── common
+│   │   │   ├── decorators
+│   │   │   │   ├── current-user.decorator.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   └── roles.decorator.ts
+│   │   │   ├── dto
+│   │   │   │   ├── index.ts
+│   │   │   │   └── pagination.dto.ts
+│   │   │   ├── exceptions
+│   │   │   │   ├── business.exception.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── filters
+│   │   │   │   ├── global-exception.filter.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── guards
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── phone-verified.guard.ts
+│   │   │   │   └── roles.guard.ts
+│   │   │   ├── interceptors
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── logging.interceptor.ts
+│   │   │   │   └── transform.interceptor.ts
+│   │   │   └── realtime
+│   │   │       ├── admin-realtime.events.ts
+│   │   │       ├── admin-realtime.module.ts
+│   │   │       └── admin-realtime.service.ts
+│   │   ├── config
+│   │   │   ├── app.config.ts
+│   │   │   ├── database-mongo.config.ts
+│   │   │   ├── database-postgres.config.ts
+│   │   │   ├── index.ts
+│   │   │   ├── jwt.config.ts
+│   │   │   ├── minio.config.ts
+│   │   │   ├── providers.config.ts
+│   │   │   ├── redis.config.ts
+│   │   │   ├── wave.config.ts
+│   │   │   └── whatsapp.config.ts
+│   │   ├── database
+│   │   │   ├── migrations
+│   │   │   │   └── CreatePaymentManual1699999999999.ts
+│   │   │   └── seeds
+│   │   │       ├── categories.seed.ts
+│   │   │       └── run-seed.ts
+│   │   ├── modules
+│   │   │   ├── admin
+│   │   │   │   ├── admin.controller.ts
+│   │   │   │   ├── admin.module.ts
+│   │   │   │   └── admin.service.ts
+│   │   │   ├── analytics
+│   │   │   │   ├── schemas
+│   │   │   │   │   └── activity-log.schema.ts
+│   │   │   │   ├── analytics.controller.ts
+│   │   │   │   ├── analytics.module.ts
+│   │   │   │   └── analytics.service.ts
+│   │   │   ├── auth
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── auth.dto.ts
+│   │   │   │   │   └── index.ts
+│   │   │   │   ├── otp
+│   │   │   │   │   ├── otp.service.ts
+│   │   │   │   │   └── whatsapp-otp.provider.ts
+│   │   │   │   ├── strategies
+│   │   │   │   │   ├── jwt-refresh.strategy.ts
+│   │   │   │   │   └── jwt.strategy.ts
+│   │   │   │   ├── auth.controller.ts
+│   │   │   │   ├── auth.module.ts
+│   │   │   │   ├── auth.service.ts
+│   │   │   │   └── pin-login-guard.service.ts
+│   │   │   ├── categories
+│   │   │   │   ├── entities
+│   │   │   │   │   ├── category.entity.ts
+│   │   │   │   │   └── subcategory.entity.ts
+│   │   │   │   ├── categories.controller.ts
+│   │   │   │   ├── categories.module.ts
+│   │   │   │   └── categories.service.ts
+│   │   │   ├── chat
+│   │   │   │   ├── schemas
+│   │   │   │   │   ├── conversation.schema.ts
+│   │   │   │   │   └── message.schema.ts
+│   │   │   │   ├── chat.controller.ts
+│   │   │   │   ├── chat-events.bridge.ts
+│   │   │   │   ├── chat.gateway.ts
+│   │   │   │   ├── chat.module.ts
+│   │   │   │   └── chat.service.ts
+│   │   │   ├── dev
+│   │   │   │   ├── dev.module.ts
+│   │   │   │   └── dev-otp.controller.ts
+│   │   │   ├── health
+│   │   │   │   ├── indicators
+│   │   │   │   │   └── payment-minio.indicator.ts
+│   │   │   │   ├── health.controller.ts
+│   │   │   │   ├── health.module.ts
+│   │   │   │   ├── metrics.controller.ts
+│   │   │   │   └── metrics.service.ts
+│   │   │   ├── media
+│   │   │   │   ├── schemas
+│   │   │   │   │   └── media-file.schema.ts
+│   │   │   │   ├── media.controller.ts
+│   │   │   │   ├── media.module.ts
+│   │   │   │   └── media.service.ts
+│   │   │   ├── notifications
+│   │   │   │   ├── providers
+│   │   │   │   │   └── fcm.provider.ts
+│   │   │   │   ├── schemas
+│   │   │   │   │   └── notification.schema.ts
+│   │   │   │   ├── notifications.controller.ts
+│   │   │   │   ├── notifications.module.ts
+│   │   │   │   └── notifications.service.ts
+│   │   │   ├── payment-manual
+│   │   │   │   ├── controllers
+│   │   │   │   │   ├── payment-manual-admin.controller.ts
+│   │   │   │   │   ├── payment-manual.controller.spec.ts
+│   │   │   │   │   └── payment-manual.controller.ts
+│   │   │   │   ├── cron
+│   │   │   │   │   └── payment-expiration.cron.ts
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── admin-filter.dto.ts
+│   │   │   │   │   ├── create-payment-manual.dto.ts
+│   │   │   │   │   ├── reject-proof.dto.ts
+│   │   │   │   │   ├── reopen-proof.dto.ts
+│   │   │   │   │   ├── submit-proof.dto.ts
+│   │   │   │   │   └── validate-proof.dto.ts
+│   │   │   │   ├── entities
+│   │   │   │   │   ├── payment-manual.entity.ts
+│   │   │   │   │   └── payment-proof.entity.ts
+│   │   │   │   ├── events
+│   │   │   │   │   ├── payment.events.ts
+│   │   │   │   │   └── payment-realtime.service.ts
+│   │   │   │   ├── services
+│   │   │   │   │   ├── exif-extractor.service.spec.ts
+│   │   │   │   │   ├── exif-extractor.service.ts
+│   │   │   │   │   ├── fraud-detection.service.ts
+│   │   │   │   │   ├── payment-manual.service.spec.ts
+│   │   │   │   │   ├── payment-manual.service.ts
+│   │   │   │   │   ├── proof-validation.service.spec.ts
+│   │   │   │   │   └── proof-validation.service.ts
+│   │   │   │   └── payment-manual.module.ts
+│   │   │   ├── portfolio
+│   │   │   │   ├── schemas
+│   │   │   │   │   └── portfolio-item.schema.ts
+│   │   │   │   ├── portfolio.controller.ts
+│   │   │   │   ├── portfolio.module.ts
+│   │   │   │   └── portfolio.service.ts
+│   │   │   ├── reviews
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── create-review.dto.ts
+│   │   │   │   │   └── reply-review.dto.ts
+│   │   │   │   ├── entities
+│   │   │   │   │   └── review.entity.ts
+│   │   │   │   ├── reviews.controller.ts
+│   │   │   │   ├── reviews.module.ts
+│   │   │   │   └── reviews.service.ts
+│   │   │   ├── search
+│   │   │   │   ├── dto
+│   │   │   │   │   └── search-artisans.dto.ts
+│   │   │   │   ├── search.controller.ts
+│   │   │   │   ├── search.module.ts
+│   │   │   │   └── search.service.ts
+│   │   │   ├── subscription
+│   │   │   │   ├── entities
+│   │   │   │   │   ├── payment.entity.ts
+│   │   │   │   │   └── subscription.entity.ts
+│   │   │   │   ├── providers
+│   │   │   │   │   └── wave.provider.ts
+│   │   │   │   ├── payment-providers.config.ts
+│   │   │   │   ├── subscription.controller.ts
+│   │   │   │   ├── subscription.module.ts
+│   │   │   │   ├── subscription.service.spec.ts
+│   │   │   │   └── subscription.service.ts
+│   │   │   ├── users
+│   │   │   │   ├── dto
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   ├── update-artisan-profile.dto.ts
+│   │   │   │   │   ├── update-client-profile.dto.ts
+│   │   │   │   │   └── update-location.dto.ts
+│   │   │   │   ├── entities
+│   │   │   │   │   ├── artisan-profile.entity.ts
+│   │   │   │   │   ├── client-profile.entity.ts
+│   │   │   │   │   ├── favorite-artisan.entity.ts
+│   │   │   │   │   ├── index.ts
+│   │   │   │   │   └── user.entity.ts
+│   │   │   │   ├── map-visibility.gateway.ts
+│   │   │   │   ├── users.controller.ts
+│   │   │   │   ├── users.module.ts
+│   │   │   │   └── users.service.ts
+│   │   │   └── verification
+│   │   │       ├── dto
+│   │   │       │   ├── review-document.dto.ts
+│   │   │       │   └── submit-document.dto.ts
+│   │   │       ├── entities
+│   │   │       │   ├── verification-document.entity.ts
+│   │   │       │   └── verification-document-page.entity.ts
+│   │   │       ├── verification.controller.ts
+│   │   │       ├── verification.module.ts
+│   │   │       └── verification.service.ts
+│   │   ├── app.module.ts
+│   │   ├── load-env.ts
+│   │   └── main.ts
+│   ├── test
+│   │   ├── app.e2e-spec.ts
+│   │   ├── jest-e2e.json
+│   │   └── payment-manual.e2e-spec.ts
+│   ├── Dockerfile
+│   ├── eslint.config.mjs
+│   ├── nest-cli.json
+│   ├── package.json
+│   ├── tsconfig.build.json
+│   └── tsconfig.json
+├── fiers_artisans_app
+│   ├── android
+│   │   ├── app
+│   │   │   ├── src
+│   │   │   │   ├── debug
+│   │   │   │   │   └── AndroidManifest.xml
+│   │   │   │   ├── main
+│   │   │   │   │   ├── java
+│   │   │   │   │   │   └── io
+│   │   │   │   │   │       └── flutter
+│   │   │   │   │   │           └── plugins
+│   │   │   │   │   │               └── GeneratedPluginRegistrant.java
+│   │   │   │   │   ├── kotlin
+│   │   │   │   │   │   └── com
+│   │   │   │   │   │       └── fiersartisans
+│   │   │   │   │   │           └── fiers_artisans_app
+│   │   │   │   │   │               └── MainActivity.kt
+│   │   │   │   │   ├── res
+│   │   │   │   │   │   ├── animator
+│   │   │   │   │   │   ├── drawable
+│   │   │   │   │   │   │   ├── background.png
+│   │   │   │   │   │   │   └── launch_background.xml
+│   │   │   │   │   │   ├── drawable-hdpi
+│   │   │   │   │   │   │   ├── android12splash.png
+│   │   │   │   │   │   │   ├── ic_launcher_foreground.png
+│   │   │   │   │   │   │   └── splash.png
+│   │   │   │   │   │   ├── drawable-mdpi
+│   │   │   │   │   │   │   ├── android12splash.png
+│   │   │   │   │   │   │   ├── ic_launcher_foreground.png
+│   │   │   │   │   │   │   └── splash.png
+│   │   │   │   │   │   ├── drawable-night
+│   │   │   │   │   │   ├── drawable-night-hdpi
+│   │   │   │   │   │   │   └── android12splash.png
+│   │   │   │   │   │   ├── drawable-night-mdpi
+│   │   │   │   │   │   │   └── android12splash.png
+│   │   │   │   │   │   ├── drawable-night-xhdpi
+│   │   │   │   │   │   │   └── android12splash.png
+│   │   │   │   │   │   ├── drawable-night-xxhdpi
+│   │   │   │   │   │   │   └── android12splash.png
+│   │   │   │   │   │   ├── drawable-night-xxxhdpi
+│   │   │   │   │   │   │   └── android12splash.png
+│   │   │   │   │   │   ├── drawable-v21
+│   │   │   │   │   │   │   ├── background.png
+│   │   │   │   │   │   │   └── launch_background.xml
+│   │   │   │   │   │   ├── drawable-xhdpi
+│   │   │   │   │   │   │   ├── android12splash.png
+│   │   │   │   │   │   │   ├── ic_launcher_foreground.png
+│   │   │   │   │   │   │   └── splash.png
+│   │   │   │   │   │   ├── drawable-xxhdpi
+│   │   │   │   │   │   │   ├── android12splash.png
+│   │   │   │   │   │   │   ├── ic_launcher_foreground.png
+│   │   │   │   │   │   │   └── splash.png
+│   │   │   │   │   │   ├── drawable-xxxhdpi
+│   │   │   │   │   │   │   ├── android12splash.png
+│   │   │   │   │   │   │   ├── ic_launcher_foreground.png
+│   │   │   │   │   │   │   └── splash.png
+│   │   │   │   │   │   ├── mipmap-anydpi-v26
+│   │   │   │   │   │   │   └── ic_launcher.xml
+│   │   │   │   │   │   ├── mipmap-hdpi
+│   │   │   │   │   │   │   ├── ic_launcher.png
+│   │   │   │   │   │   │   └── ic_launcher_round.png
+│   │   │   │   │   │   ├── mipmap-mdpi
+│   │   │   │   │   │   │   ├── ic_launcher.png
+│   │   │   │   │   │   │   └── ic_launcher_round.png
+│   │   │   │   │   │   ├── mipmap-xhdpi
+│   │   │   │   │   │   │   ├── ic_launcher.png
+│   │   │   │   │   │   │   └── ic_launcher_round.png
+│   │   │   │   │   │   ├── mipmap-xxhdpi
+│   │   │   │   │   │   │   ├── ic_launcher.png
+│   │   │   │   │   │   │   └── ic_launcher_round.png
+│   │   │   │   │   │   ├── mipmap-xxxhdpi
+│   │   │   │   │   │   │   ├── ic_launcher.png
+│   │   │   │   │   │   │   └── ic_launcher_round.png
+│   │   │   │   │   │   ├── values
+│   │   │   │   │   │   │   ├── colors.xml
+│   │   │   │   │   │   │   └── styles.xml
+│   │   │   │   │   │   ├── values-night
+│   │   │   │   │   │   │   ├── colors.xml
+│   │   │   │   │   │   │   └── styles.xml
+│   │   │   │   │   │   ├── values-night-v31
+│   │   │   │   │   │   │   └── styles.xml
+│   │   │   │   │   │   ├── values-v31
+│   │   │   │   │   │   │   └── styles.xml
+│   │   │   │   │   │   └── xml
+│   │   │   │   │   │       └── network_security_config.xml
+│   │   │   │   │   └── AndroidManifest.xml
+│   │   │   │   └── profile
+│   │   │   │       └── AndroidManifest.xml
+│   │   │   ├── build.gradle.kts
+│   │   │   └── google-services.json
+│   │   ├── build.gradle.kts
+│   │   ├── gradle.properties
+│   │   ├── gradlew
+│   │   ├── gradlew.bat
+│   │   ├── local.properties
+│   │   └── settings.gradle.kts
+│   ├── assets
+│   │   ├── animations
+│   │   ├── branding
+│   │   │   ├── ic_launcher_source.png
+│   │   │   ├── logo_app_dark.png
+│   │   │   ├── logo_app.png
+│   │   │   ├── logo_lockup_dark.png
+│   │   │   ├── logo_lockup_light.png
+│   │   │   ├── splash_dark_layer_1.png
+│   │   │   └── splash_icon.png
+│   │   ├── icons
+│   │   ├── images
+│   │   └── translations
+│   │       ├── en.json
+│   │       └── fr.json
+│   ├── ios
+│   │   ├── Flutter
+│   │   │   ├── ephemeral
+│   │   │   │   ├── flutter_lldb_helper.py
+│   │   │   │   └── flutter_lldbinit
+│   │   │   ├── AppFrameworkInfo.plist
+│   │   │   ├── Debug.xcconfig
+│   │   │   ├── flutter_export_environment.sh
+│   │   │   ├── Generated.xcconfig
+│   │   │   └── Release.xcconfig
+│   │   ├── Runner
+│   │   │   ├── Assets.xcassets
+│   │   │   │   ├── AppIcon.appiconset
+│   │   │   │   │   ├── Contents.json
+│   │   │   │   │   ├── Icon-App-1024x1024@1x.png
+│   │   │   │   │   ├── Icon-App-20x20@1x.png
+│   │   │   │   │   ├── Icon-App-20x20@2x.png
+│   │   │   │   │   ├── Icon-App-20x20@3x.png
+│   │   │   │   │   ├── Icon-App-29x29@1x.png
+│   │   │   │   │   ├── Icon-App-29x29@2x.png
+│   │   │   │   │   ├── Icon-App-29x29@3x.png
+│   │   │   │   │   ├── Icon-App-40x40@1x.png
+│   │   │   │   │   ├── Icon-App-40x40@2x.png
+│   │   │   │   │   ├── Icon-App-40x40@3x.png
+│   │   │   │   │   ├── Icon-App-60x60@2x.png
+│   │   │   │   │   ├── Icon-App-60x60@3x.png
+│   │   │   │   │   ├── Icon-App-76x76@1x.png
+│   │   │   │   │   ├── Icon-App-76x76@2x.png
+│   │   │   │   │   └── Icon-App-83.5x83.5@2x.png
+│   │   │   │   ├── AppIconDark.appiconset
+│   │   │   │   │   ├── Contents.json
+│   │   │   │   │   ├── Icon-App-1024x1024@1x.png
+│   │   │   │   │   ├── Icon-App-20x20@1x.png
+│   │   │   │   │   ├── Icon-App-20x20@2x.png
+│   │   │   │   │   ├── Icon-App-20x20@3x.png
+│   │   │   │   │   ├── Icon-App-29x29@1x.png
+│   │   │   │   │   ├── Icon-App-29x29@2x.png
+│   │   │   │   │   ├── Icon-App-29x29@3x.png
+│   │   │   │   │   ├── Icon-App-40x40@1x.png
+│   │   │   │   │   ├── Icon-App-40x40@2x.png
+│   │   │   │   │   ├── Icon-App-40x40@3x.png
+│   │   │   │   │   ├── Icon-App-60x60@2x.png
+│   │   │   │   │   ├── Icon-App-60x60@3x.png
+│   │   │   │   │   ├── Icon-App-76x76@1x.png
+│   │   │   │   │   ├── Icon-App-76x76@2x.png
+│   │   │   │   │   └── Icon-App-83.5x83.5@2x.png
+│   │   │   │   ├── LaunchBackground.imageset
+│   │   │   │   │   ├── background.png
+│   │   │   │   │   └── Contents.json
+│   │   │   │   └── LaunchImage.imageset
+│   │   │   │       ├── Contents.json
+│   │   │   │       ├── LaunchImage@2x.png
+│   │   │   │       ├── LaunchImage@3x.png
+│   │   │   │       ├── LaunchImage.png
+│   │   │   │       └── README.md
+│   │   │   ├── Base.lproj
+│   │   │   │   ├── LaunchScreen.storyboard
+│   │   │   │   └── Main.storyboard
+│   │   │   ├── AppDelegate.swift
+│   │   │   ├── GeneratedPluginRegistrant.h
+│   │   │   ├── GeneratedPluginRegistrant.m
+│   │   │   ├── GoogleService-Info.plist
+│   │   │   ├── Info.plist
+│   │   │   ├── Runner-Bridging-Header.h
+│   │   │   └── SceneDelegate.swift
+│   │   ├── RunnerTests
+│   │   │   └── RunnerTests.swift
+│   │   ├── Runner.xcodeproj
+│   │   │   ├── project.xcworkspace
+│   │   │   │   ├── xcshareddata
+│   │   │   │   │   ├── IDEWorkspaceChecks.plist
+│   │   │   │   │   └── WorkspaceSettings.xcsettings
+│   │   │   │   └── contents.xcworkspacedata
+│   │   │   ├── xcshareddata
+│   │   │   │   └── xcschemes
+│   │   │   │       └── Runner.xcscheme
+│   │   │   └── project.pbxproj
+│   │   └── Runner.xcworkspace
+│   │       ├── xcshareddata
+│   │       │   ├── IDEWorkspaceChecks.plist
+│   │       │   └── WorkspaceSettings.xcsettings
+│   │       └── contents.xcworkspacedata
+│   ├── lib
+│   │   ├── config
+│   │   │   ├── app_config.dart
+│   │   │   ├── constants.dart
+│   │   │   ├── routes.dart
+│   │   │   └── theme.dart
+│   │   ├── core
+│   │   │   ├── errors
+│   │   │   │   ├── app_error.dart
+│   │   │   │   └── error_mapper.dart
+│   │   │   ├── network
+│   │   │   │   ├── api_client.dart
+│   │   │   │   └── api_endpoints.dart
+│   │   │   ├── storage
+│   │   │   │   ├── secure_storage.dart
+│   │   │   │   ├── web_local_storage_stub.dart
+│   │   │   │   └── web_local_storage_web.dart
+│   │   │   └── utils
+│   │   │       ├── formatters.dart
+│   │   │       └── validators.dart
+│   │   ├── data
+│   │   │   ├── models
+│   │   │   │   ├── artisan_model.dart
+│   │   │   │   ├── category_model.dart
+│   │   │   │   ├── conversation_model.dart
+│   │   │   │   ├── manual_payment_model.dart
+│   │   │   │   ├── message_model.dart
+│   │   │   │   ├── portfolio_model.dart
+│   │   │   │   ├── review_model.dart
+│   │   │   │   ├── subscription_model.dart
+│   │   │   │   └── user_model.dart
+│   │   │   └── repositories
+│   │   │       ├── analytics_repository.dart
+│   │   │       ├── artisan_repository.dart
+│   │   │       ├── auth_repository.dart
+│   │   │       ├── chat_repository.dart
+│   │   │       ├── favorites_repository.dart
+│   │   │       ├── notification_repository.dart
+│   │   │       ├── payment_manual_repository.dart
+│   │   │       ├── search_repository.dart
+│   │   │       ├── subscription_repository.dart
+│   │   │       └── verification_repository.dart
+│   │   ├── presentation
+│   │   │   ├── artisan
+│   │   │   │   ├── artisan_dashboard.dart
+│   │   │   │   ├── artisan_reviews_history_screen.dart
+│   │   │   │   ├── manual_payment_page.dart
+│   │   │   │   ├── payment_status_widget.dart
+│   │   │   │   ├── portfolio_screen.dart
+│   │   │   │   ├── subscription_screen.dart
+│   │   │   │   └── verification_screen.dart
+│   │   │   ├── auth
+│   │   │   │   ├── login_screen.dart
+│   │   │   │   ├── onboarding_screen.dart
+│   │   │   │   ├── otp_verification_screen.dart
+│   │   │   │   ├── pin_setup_screen.dart
+│   │   │   │   ├── register_artisan_screen.dart
+│   │   │   │   ├── register_choice_screen.dart
+│   │   │   │   └── register_client_screen.dart
+│   │   │   ├── chat
+│   │   │   │   ├── chat_screen.dart
+│   │   │   │   └── conversations_list.dart
+│   │   │   ├── client
+│   │   │   │   ├── artisan_profile_screen.dart
+│   │   │   │   ├── client_dashboard.dart
+│   │   │   │   ├── review_screen.dart
+│   │   │   │   └── search_screen.dart
+│   │   │   ├── common
+│   │   │   │   ├── app_button.dart
+│   │   │   │   ├── app_snackbar.dart
+│   │   │   │   ├── app_text_field.dart
+│   │   │   │   ├── artisan_card.dart
+│   │   │   │   ├── availability_badge.dart
+│   │   │   │   ├── badge_verified.dart
+│   │   │   │   ├── category_chip.dart
+│   │   │   │   ├── empty_state.dart
+│   │   │   │   ├── loading_overlay.dart
+│   │   │   │   ├── pin_code_field.dart
+│   │   │   │   ├── portfolio_item_card.dart
+│   │   │   │   ├── rating_stars.dart
+│   │   │   │   ├── recent_conversation_tile.dart
+│   │   │   │   └── skeleton_loader.dart
+│   │   │   └── shared
+│   │   │       ├── notifications_screen.dart
+│   │   │       └── settings_screen.dart
+│   │   ├── providers
+│   │   │   ├── app_providers.dart
+│   │   │   ├── artisan_provider.dart
+│   │   │   ├── auth_provider.dart
+│   │   │   ├── categories_provider.dart
+│   │   │   ├── chat_provider.dart
+│   │   │   ├── favorites_provider.dart
+│   │   │   ├── payment_manual_provider.dart
+│   │   │   ├── search_provider.dart
+│   │   │   ├── session_scope_provider.dart
+│   │   │   ├── subscription_provider.dart
+│   │   │   └── verification_provider.dart
+│   │   ├── services
+│   │   │   ├── app_icon_service.dart
+│   │   │   ├── chat_realtime_service.dart
+│   │   │   ├── location_service.dart
+│   │   │   ├── map_visibility_realtime_service.dart
+│   │   │   └── push_notification_service.dart
+│   │   ├── app.dart
+│   │   └── main.dart
+│   ├── linux
+│   │   ├── flutter
+│   │   │   ├── ephemeral
+│   │   │   │   ├── flutter_linux
+│   │   │   │   │   ├── fl_application.h
+│   │   │   │   │   ├── fl_basic_message_channel.h
+│   │   │   │   │   ├── fl_binary_codec.h
+│   │   │   │   │   ├── fl_binary_messenger.h
+│   │   │   │   │   ├── fl_dart_project.h
+│   │   │   │   │   ├── fl_engine.h
+│   │   │   │   │   ├── fl_event_channel.h
+│   │   │   │   │   ├── fl_json_message_codec.h
+│   │   │   │   │   ├── fl_json_method_codec.h
+│   │   │   │   │   ├── fl_message_codec.h
+│   │   │   │   │   ├── fl_method_call.h
+│   │   │   │   │   ├── fl_method_channel.h
+│   │   │   │   │   ├── fl_method_codec.h
+│   │   │   │   │   ├── fl_method_response.h
+│   │   │   │   │   ├── fl_pixel_buffer_texture.h
+│   │   │   │   │   ├── fl_plugin_registrar.h
+│   │   │   │   │   ├── fl_plugin_registry.h
+│   │   │   │   │   ├── fl_standard_message_codec.h
+│   │   │   │   │   ├── fl_standard_method_codec.h
+│   │   │   │   │   ├── fl_string_codec.h
+│   │   │   │   │   ├── fl_texture_gl.h
+│   │   │   │   │   ├── fl_texture.h
+│   │   │   │   │   ├── fl_texture_registrar.h
+│   │   │   │   │   ├── flutter_linux.h
+│   │   │   │   │   ├── fl_value.h
+│   │   │   │   │   └── fl_view.h
+│   │   │   │   ├── generated_config.cmake
+│   │   │   │   ├── icudtl.dat
+│   │   │   │   └── libflutter_linux_gtk.so
+│   │   │   ├── CMakeLists.txt
+│   │   │   ├── generated_plugin_registrant.cc
+│   │   │   ├── generated_plugin_registrant.h
+│   │   │   └── generated_plugins.cmake
+│   │   ├── runner
+│   │   │   ├── CMakeLists.txt
+│   │   │   ├── main.cc
+│   │   │   ├── my_application.cc
+│   │   │   └── my_application.h
+│   │   └── CMakeLists.txt
+│   ├── test
+│   │   ├── presentation
+│   │   │   └── common
+│   │   │       └── portfolio_item_card_test.dart
+│   │   ├── manual_payment_model_test.dart
+│   │   ├── payment_manual_provider_test.dart
+│   │   ├── payment_status_widget_test.dart
+│   │   └── subscription_provider_test.dart
+│   ├── web
+│   │   ├── icons
+│   │   │   ├── Icon-192.png
+│   │   │   ├── Icon-512.png
+│   │   │   ├── Icon-dark-192.png
+│   │   │   ├── Icon-dark-512.png
+│   │   │   ├── Icon-light-192.png
+│   │   │   ├── Icon-light-512.png
+│   │   │   ├── Icon-maskable-192.png
+│   │   │   └── Icon-maskable-512.png
+│   │   ├── splash
+│   │   │   └── img
+│   │   │       ├── dark-1x.png
+│   │   │       ├── dark-2x.png
+│   │   │       ├── dark-3x.png
+│   │   │       ├── dark-4x.png
+│   │   │       ├── light-1x.png
+│   │   │       ├── light-2x.png
+│   │   │       ├── light-3x.png
+│   │   │       └── light-4x.png
+│   │   ├── favicon-dark.png
+│   │   ├── favicon-light.png
+│   │   ├── index.html
+│   │   └── manifest.json
+│   ├── analysis_options.yaml
+│   ├── devtools_options.yaml
+│   └── pubspec.yaml
+├── infrastructure
+│   ├── mongodb
+│   │   └── init.js
+│   ├── monitoring
+│   │   ├── grafana
+│   │   │   ├── dashboards
+│   │   │   │   └── fiers-overview.json
+│   │   │   └── provisioning
+│   │   │       ├── alerting
+│   │   │       │   └── empty-rules.yaml
+│   │   │       ├── dashboards
+│   │   │       │   └── dashboards.yml
+│   │   │       ├── datasources
+│   │   │       │   └── prometheus.yml
+│   │   │       └── plugins
+│   │   └── prometheus.yml
+│   ├── nginx
+│   │   ├── ssl
+│   │   │   ├── fullchain.pem
+│   │   │   └── privkey.pem
+│   │   └── nginx.conf
+│   ├── postgres
+│   │   ├── migrations
+│   │   │   ├── 20260413_add_review_reply_and_favorites.sql
+│   │   │   └── 20260415_add_artisan_subcategory.sql
+│   │   └── init.sql
+│   ├── scripts
+│   │   ├── backup.sh
+│   │   ├── deploy.sh
+│   │   ├── generate_global_fusion.py
+│   │   ├── generate-portainer-stack.sh
+│   │   ├── reset_clean_environment.sh
+│   │   ├── setup_dev_stack_root.sh
+│   │   └── setup_dev_stack_user.sh
+│   ├── docker-compose.dev.yml
+│   ├── docker-compose.portainer.yml
+│   ├── docker-compose.yml
+│   ├── FORMATION_DOCKER_POUR_EQUIPE.md
+│   └── stack.portainer-managed.yml
+├── README.md
+├── RÈGLES GLOBALES.md
+├── SECURITY_ARCHITECTURE.md
+└── structure.txt
+
+194 directories, 524 files
