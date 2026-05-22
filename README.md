@@ -1,79 +1,223 @@
 # Fiers Artisans - Source de verite projet
 
-Ce `README.md` est l'unique source de verite documentaire du depot.
+Ce `README.md` est le point d'entree documentaire principal du depot.
+Il decrit l'etat actuel exploitable du monorepo, les commandes reelles,
+la stack active, les scripts utiles, et les documents de gouvernance.
 
-Document critique conserve a part (ne pas supprimer/deplacer):
+## Documents de reference
+
+- `README.md`
+  Vue d'ensemble du projet, architecture actuelle, commandes, tests, scripts
+- `DOCUMENTATION_DOCKER.md`
+  Runbook Docker complet : stack, nettoyage, volumes, diagnostic Portainer
 - `SECURITY_ARCHITECTURE.md`
+  Politique stricte de securite, preservation de l'architecture, verification factuelle, tests
+- `RÈGLES GLOBALES.md`
+  Pipeline IA, gouvernance multi-phases, validation humaine, anti-hallucination
+- `globaliste/global_fusion.txt`
+  Export fusionne du depot, genere par script, utile pour analyse externe
 
 ## Vue d'ensemble
 
-Fiers Artisans est une marketplace mobile qui met en relation des clients avec des artisans verifies/certifies, avec recherche geolocalisee, messagerie temps reel, verification documentaire et abonnement artisan.
+Fiers Artisans est une marketplace multi-clients centree sur la mise en relation entre clients et artisans verifies, avec :
 
-Composants du monorepo:
-- `backend/` : API NestJS (REST + WebSocket + SSE admin)
-- `fiers_artisans_app/` : app Flutter (client + artisan)
-- `admin-web/` : panel admin Next.js
-- `infrastructure/` : Docker Compose, Nginx, monitoring, scripts de deploiement
+- recherche geolocalisee
+- verification documentaire artisan
+- abonnement artisan
+- paiement Wave
+- paiement manuel avec preuve de paiement
+- chat temps reel
+- notifications
+- panel d'administration
+- infrastructure Docker avec monitoring
 
-## Architecture globale
+## Monorepo actuel
 
-### Stack principale
+| Dossier | Role principal | Stack |
+|---|---|---|
+| `backend/` | API metier, auth, realtime, paiements, admin API | NestJS 11, TypeORM, Mongoose |
+| `fiers_artisans_app/` | Application mobile client + artisan | Flutter, Riverpod, Dio, GoRouter |
+| `admin-web/` | Back-office d'administration | Next.js 16.2.6, React 19.2.6 |
+| `infrastructure/` | Compose, Nginx, monitoring, scripts | Docker Compose, Prometheus, Grafana, Portainer |
+| `globaliste/` | Exports documentaires consolides | `global_fusion.txt` genere |
 
-- Backend: NestJS 11, TypeScript, TypeORM, Mongoose
-- BDD relationnelle: PostgreSQL 16 + PostGIS
-- BDD documentaire: MongoDB 7
-- Cache/pub-sub: Redis 7
-- Stockage objets: MinIO (S3-compatible)
-- Front mobile: Flutter 3.41+, Riverpod, Dio, GoRouter
-- Front admin: Next.js 16, React 19, Axios
-- Infra: Docker Compose, Nginx, Prometheus, Grafana
+## Demarrage rapide
 
-### Repartition des donnees
+### Mode recommande : stack dev Docker complete
 
-- PostgreSQL: users, profils, categories, verification, reviews, subscriptions, payments
-- MongoDB: chat, conversations, notifications (TTL), analytics (TTL), portfolio, metadonnees media
-- Redis: OTP (TTL), anti brute-force OTP/PIN, sessions, pub/sub temps reel
-- MinIO:
-	- `portfolio` : images portfolio artisans (public)
-	- `profiles` : photos de profil utilisateurs (public)
-	- `media` : pieces jointes de chat, medias conversations (prive - JWT)
-	- `documents` : pieces d'identite, diplomes (prive - JWT + admin)
-	- `payment-proofs` : preuves de paiement manuel (prive - JWT + admin)
+Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
 
-Regle de coherence cross-bases:
-- toute reference PostgreSQL stockee en MongoDB doit etre validee cote backend avant insertion.
+```bash
+docker compose --env-file .env \
+  -f infrastructure/docker-compose.yml \
+  -f infrastructure/docker-compose.dev.yml \
+  -f infrastructure/docker-compose.portainer.yml \
+  up -d --build
+```
+
+Verifier l'etat :
+
+```bash
+docker compose --env-file .env \
+  -f infrastructure/docker-compose.yml \
+  -f infrastructure/docker-compose.dev.yml \
+  -f infrastructure/docker-compose.portainer.yml \
+  ps
+```
+
+Arreter proprement :
+
+```bash
+docker compose --env-file .env \
+  -f infrastructure/docker-compose.yml \
+  -f infrastructure/docker-compose.dev.yml \
+  -f infrastructure/docker-compose.portainer.yml \
+  down --remove-orphans
+```
+
+### Mode prod-like local avec Nginx
+
+Depuis la racine :
+
+```bash
+COMPOSE_PROFILES=prod-only docker compose --env-file .env \
+  -f infrastructure/docker-compose.yml \
+  -f infrastructure/docker-compose.portainer.yml \
+  up -d --build
+```
+
+### Mode hybride : infra Docker + apps lancees localement
+
+Utiliser ce mode si tu veux debugger `backend/`, `admin-web/` ou Flutter hors conteneur tout en gardant les bases et services infra dans Docker.
+
+Exemple :
+
+```bash
+# 1. Demarrer l'infra et les services de donnees
+docker compose --env-file .env \
+  -f infrastructure/docker-compose.yml \
+  -f infrastructure/docker-compose.dev.yml \
+  -f infrastructure/docker-compose.portainer.yml \
+  up -d postgres mongodb redis minio grafana portainer
+
+# 2. Lancer les apps localement selon le besoin
+cd backend && npm ci && npm run start:dev
+cd admin-web && npm ci && npm run dev
+cd fiers_artisans_app && flutter pub get && flutter run
+```
+
+## Stack technique actuelle
+
+### Backend
+
+- NestJS `^11.0.1`
+- TypeORM `^0.3.28`
+- Mongoose `^9.3.3`
+- PostgreSQL 16 + PostGIS
+- MongoDB 7
+- Redis 7
+- MinIO
+- JWT + refresh tokens
+- WebSocket + SSE admin
+
+### Mobile Flutter
+
+- Flutter SDK `^3.11`
+- Riverpod
+- GoRouter
+- Dio
+- EasyLocalization
+- FlutterSecureStorage
+- SharedPreferences
+- Firebase Messaging
+
+### Admin Web
+
+- Next.js `16.2.6`
+- React `19.2.6`
+- Axios
+- next-intl
+- next-themes
+- Recharts
+
+### Infrastructure
+
+- Docker Compose
+- Nginx
+- Prometheus
+- Grafana
+- Portainer
+
+## Architecture fonctionnelle
+
+### Roles metier principaux
+
+- `CLIENT`
+  recherche, consultation profil artisan, reviews, conversations
+- `ARTISAN`
+  verification, portfolio, abonnement, paiement, statut de visibilite
+- `ADMIN`
+  moderation, verifications, reviews, analytics, paiements manuels, logs
+
+### Flux majeurs
+
+- Authentification et verification telephone
+- Verification artisan et moderation admin
+- Abonnement artisan via Wave
+- Paiement manuel avec upload de preuve et validation admin
+- Chat temps reel et notifications
+- Recherche geolocalisee et navigation profil artisan
+
+## Repartition des donnees
+
+| Systeme | Donnees principales |
+|---|---|
+| PostgreSQL | users, profils, categories, verification, reviews, subscriptions, payment_manual, payment_proofs |
+| MongoDB | chat, conversations, notifications, analytics TTL, portfolio metadata, media metadata |
+| Redis | OTP TTL, anti brute-force, sessions, pub/sub, rate limit, cache et synchronisations |
+| MinIO | `portfolio`, `profiles`, `media`, `documents`, `payment-proofs` |
+
+Regle de coherence :
+
+- toute reference croisee entre PostgreSQL, MongoDB, Redis et MinIO doit etre validee cote backend
+- aucun client ne doit considerer une action comme reussie sans confirmation du backend
 
 ## Backend
 
 ### Cible technique
 
-- Prefixe global API: `/api/v1`
-- Swagger (hors prod): `/api/docs`
-- `rawBody: true` active pour verification webhook Wave
-- Intercepteurs globaux: logging + format standard des reponses
-- Filtre global: format standard des erreurs
-- CORS configurable via `CORS_ORIGINS`
+- Prefixe API global : `/api/v1`
+- Swagger : `/api/docs` hors prod
+- `rawBody: true` pour verification webhook Wave
+- Logging + format standard des reponses
+- Filtre global d'erreurs
+- Metriques Prometheus
+- WebSocket + SSE admin
 
-### Modules fonctionnels
+### Modules backend actuellement presents
 
-- `health`, `metrics`
-- `auth` (register/login/send-otp/verify-otp/refresh/logout)
+- `health`
+- `metrics`
+- `auth`
 - `users`
 - `categories`
 - `search`
 - `verification`
 - `reviews`
-- `subscription` (initiation + webhook Wave)
+- `subscription`
+- `payment-manual`
 - `portfolio`
 - `media`
-- `notifications` (interne)
-- `analytics` (interne)
-- `chat` (REST + gateway Socket.IO)
-- `admin` (dashboard, moderation, analytics + flux SSE)
+- `notifications`
+- `analytics`
+- `chat`
+- `admin`
+- `dev`
 
-### Routes majeures
+### Endpoints backend majeurs
 
-Auth:
+Auth :
+
 - `POST /api/v1/auth/register/artisan`
 - `POST /api/v1/auth/register/client`
 - `POST /api/v1/auth/send-otp`
@@ -82,12 +226,14 @@ Auth:
 - `POST /api/v1/auth/refresh`
 - `POST /api/v1/auth/logout`
 
-Recherche / metier:
+Recherche et catalogue :
+
 - `GET /api/v1/search/artisans`
 - `GET /api/v1/categories`
 - `GET /api/v1/categories/:slug`
 
-Verification / portfolio / reviews:
+Verification, portfolio, reviews :
+
 - `POST /api/v1/verification/submit`
 - `GET /api/v1/verification/status`
 - `GET /api/v1/portfolio`
@@ -98,443 +244,378 @@ Verification / portfolio / reviews:
 - `POST /api/v1/reviews`
 - `GET /api/v1/artisan/:id/reviews`
 
-Subscription / paiement:
+Subscription et paiement Wave :
+
 - `POST /api/v1/subscription/initiate`
 - `POST /api/v1/subscription/wave/webhook`
 - `GET /api/v1/subscription/status`
 - `GET /api/v1/subscription/providers`
 
-Admin:
-- `GET /api/v1/admin/dashboard`
-- `GET /api/v1/admin/verifications/pending`
-- `PUT /api/v1/admin/verifications/:id`
-- `GET /api/v1/admin/artisans`
-- `GET /api/v1/admin/analytics`
-- `GET /api/v1/admin/events` (SSE)
-- `GET /api/v1/admin/verifications/events` (fallback SSE)
+Paiement manuel artisan :
 
-### Temps reel
+- `POST /api/v1/payments/manual/initiate`
+- `GET /api/v1/payments/manual/current`
+- `GET /api/v1/payments/manual/:transactionId`
+- `POST /api/v1/payments/manual/:transactionId/submit-proof`
+- `GET /api/v1/payments/manual/:transactionId/proof/:proofId`
 
-- Chat Socket.IO: namespace `/ws/chat`
-- Visibilite map: namespace `/ws/map-visibility`
-- Admin SSE: dashboard + moderation
-- Notifications push: FCM (service interne, pas d'endpoint public dedie)
+Paiement manuel admin :
 
-### Config et variables d'environnement (backend)
+- `GET /api/v1/admin/payment-proofs`
+- `GET /api/v1/admin/payment-proofs/:id/details`
+- `PATCH /api/v1/admin/payment-proofs/:id/validate`
+- `PATCH /api/v1/admin/payment-proofs/:id/reject`
+- `PATCH /api/v1/admin/payment-proofs/:id/reopen`
+- `PATCH /api/v1/admin/payment-proofs/:id/mark-refunded`
+- `DELETE /api/v1/admin/payment-proofs/:id`
+- `GET /api/v1/admin/events`
+- `GET /api/v1/admin/verifications/events`
+- `GET /api/v1/admin/payment-events`
 
-Namespaces de config:
-- `app`, `database.postgres`, `database.mongo`, `redis`, `jwt`, `minio`, `whatsapp`, `wave`, `providers`
+Temps reel :
 
-Variables critiques:
-- PostgreSQL: `POSTGRES_*`, `DATABASE_POSTGRES_URL`
-- MongoDB: `MONGO_*`, `DATABASE_MONGO_URL`
-- Redis: `REDIS_*`, `REDIS_URL`
-- MinIO: `MINIO_*` + buckets (`MINIO_BUCKET_PORTFOLIO`, `MINIO_BUCKET_DOCUMENTS`, `MINIO_BUCKET_MEDIA`, `MINIO_PAYMENT_PROOF_BUCKET`)
-- JWT: `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRATION`, `JWT_REFRESH_EXPIRATION`
-- OTP WhatsApp: `WHATSAPP_API_*`, `WHATSAPP_OTP_TEMPLATE_NAME`
-- Paiement Wave: `WAVE_API_*`, `WAVE_WEBHOOK_SECRET`, `WAVE_MERCHANT_ID`
-- Paiement manuel MVP: `PAYMENT_MANUAL_AMOUNT_FCFA`, `PAYMENT_MANUAL_EXPIRY_HOURS`, `PAYMENT_MANUAL_RECIPIENT_NUMBER`, `PAYMENT_MANUAL_UPLOADS_PER_DAY_LIMIT`, `PAYMENT_MANUAL_SUBMIT_BURST_LIMIT`, `PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS`, `PAYMENT_MANUAL_EXPIRE_BATCH_LOOPS`, `PAYMENT_MANUAL_DISABLE_REDIS_RATE_LIMIT`
-- Application: `NODE_ENV`, `APP_PORT`, `APP_URL`, `CORS_ORIGINS`
+- chat Socket.IO : namespace `/ws/chat`
+- visibilite map : namespace `/ws/map-visibility`
+- SSE admin pour dashboards, moderation et paiements
 
-Flags providers documentes:
-- OTP: `WHATSAPP` actif, `SMS_TWILIO` optionnel (feature flag)
-- Paiement: `WAVE` actif, `ORANGE_MONEY` et `MTN_MOMO` prepares mais desactives
+### Variables backend critiques
 
-### Securite backend
+- PostgreSQL : `POSTGRES_*`, `DATABASE_POSTGRES_URL`
+- MongoDB : `MONGO_*`, `DATABASE_MONGO_URL`
+- Redis : `REDIS_*`, `REDIS_URL`
+- MinIO : `MINIO_*`, `MINIO_BUCKET_*`, `MINIO_PAYMENT_PROOF_BUCKET`, `MINIO_PROFILES_BUCKET`
+- JWT : `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRATION`, `JWT_REFRESH_EXPIRATION`
+- WhatsApp OTP : `WHATSAPP_API_*`, `WHATSAPP_OTP_TEMPLATE_NAME`
+- Wave : `WAVE_API_*`, `WAVE_WEBHOOK_SECRET`, `WAVE_MERCHANT_ID`
+- Paiement manuel : `PAYMENT_MANUAL_*`
+- App : `NODE_ENV`, `APP_PORT`, `APP_URL`, `CORS_*`
 
-- JWT access token: 15 min
-- JWT refresh token: 30 jours (secret distinct)
-- OTP: code 6 chiffres, TTL 5 min, anti brute-force
-- Wave webhook: signature HMAC obligatoire + idempotence transaction
-- Validation DTO stricte (`whitelist` + `forbidNonWhitelisted`)
-- Helmet + CORS restrictif + rate limit (30 req / 60s)
-- MinIO non expose en prod (signed URLs via backend)
-
-### Donnees de seed
-
-Commande:
-```bash
-cd backend
-npx ts-node src/database/seeds/run-seed.ts
-```
-
-Le seed insere 16 categories / 48 sous-categories:
-- Batiment/Construction, Menuiserie/Ebenisterie, Electricite, Plomberie
-- Peinture/Decoration, Architecture/Ingenierie, Textile/Mode, Metallurgie
-- Fleuriste/Paysagisme, Automobile, Services creatifs, Services domestiques
-- Beaute/Bien-etre, Restauration, Tech/Numerique, Ameublement
-
-### Lancement backend local
+### Commandes backend
 
 ```bash
 cd backend
 npm ci
+npm run build
 npm run start:dev
 ```
 
-Scripts utiles:
-- `npm run start`
-- `npm run start:dev`
-- `npm run start:debug`
-- `npm run build`
-- `npm run test`
-- `npm run test:e2e`
-- `npm run lint`
+Tests backend :
+
+```bash
+cd backend
+npm run build
+npm run test
+npm run test:e2e
+```
 
 ## Frontend App (Flutter)
 
-### Stack et architecture
+### Architecture Flutter
 
-- Flutter 3.41.4+, Dart 3.11+
-- Riverpod (state management)
-- GoRouter (navigation)
-- Dio (HTTP + refresh token automatique)
-- EasyLocalization (FR/EN)
-- FlutterSecureStorage + SharedPreferences
-- CachedNetworkImage, Geolocator, animations (Lottie/Shimmer)
+- `lib/config`
+- `lib/core`
+- `lib/data/models`
+- `lib/data/repositories`
+- `lib/providers`
+- `lib/presentation/auth`
+- `lib/presentation/client`
+- `lib/presentation/artisan`
+- `lib/presentation/chat`
+- `lib/presentation/shared`
 
-Structure logique:
-- `config/`
-- `core/` (network, storage, utils)
-- `data/` (models, repositories)
-- `providers/`
-- `presentation/`
+### Parcours et ecrans actuellement visibles dans le depot
 
-### Parcours et ecrans couverts
-
-- Auth: splash, onboarding, login, register artisan/client, OTP
-- Client: dashboard, recherche, profil artisan, avis
-- Artisan: dashboard, portfolio, verification, abonnement
-- Shared: conversations, chat, notifications, settings
-
-### Navigation principale
-
-Routes auth:
-- `/`, `/onboarding`, `/login`, `/register`, `/register/artisan`, `/register/client`, `/otp`
-
-Shell client:
-- `/client`, `/client/search`, `/client/artisan/:userId`, `/client/review/:artisanId`
-
-Shell artisan:
-- `/artisan`, `/artisan/portfolio`, `/artisan/verification`, `/artisan/subscription`
-
-Routes partagees:
-- `/chat`, `/chat/:conversationId`, `/notifications`, `/settings`
-
-Bottom navigation (app):
-- Accueil/Dashboard, Messages, Notifications, Parametres
-
-### Theme et i18n
-
-- Theme sombre et clair (palette noire/doree en priorite)
-- Police principale: Inter
-- Locales: FR (`fr.json`) et EN (`en.json`)
-- Changement langue/theme accessible onboarding + settings
+- Auth : onboarding, login, register client, register artisan, OTP
+- Client : recherche, detail artisan, reviews
+- Artisan : dashboard, portfolio, verification, subscription, paiement manuel
+- Shared : chat, notifications, settings
 
 ### Configuration reseau Flutter
 
-- Base attendue en emulateur Android: `http://10.0.2.2:3000/api/v1`
-- WebSocket: `ws://10.0.2.2:3000`
-- Variables utilisees: `API_HOST`, `API_PORT`, `API_SCHEME`, `WS_SCHEME`, `API_BASE_PATH`
+Valeurs usuelles en emulateur Android :
 
-### Lancement Flutter local
+- API : `http://10.0.2.2:3000/api/v1`
+- WebSocket : `ws://10.0.2.2:3000`
+
+Variables utilisees :
+
+- `API_HOST`
+- `API_PORT`
+- `API_SCHEME`
+- `WS_SCHEME`
+- `API_BASE_PATH`
+
+### Commandes Flutter
 
 ```bash
 cd fiers_artisans_app
 flutter pub get
 flutter analyze
+flutter test
 flutter run
 ```
 
-Build debug APK:
+Build debug :
+
 ```bash
+cd fiers_artisans_app
 flutter build apk --debug
 ```
 
 ## Admin Web
 
-### Stack et principes
+### Architecture admin
 
-- Next.js 16 (App Router) + React 19
-- Port application: `3002`
-- Client API centralise: `src/lib/api.ts`
-- Auth admin: token + refresh token en `localStorage`
-- Dashboard temps reel: SSE puis fallback polling 30s
+- App Router Next.js
+- `src/app/(dashboard)`
+- `src/components`
+- `src/lib`
+- `src/providers`
+- `src/messages`
+- `src/types`
 
-### Ecrans admin
+### Ecrans admin actuellement presents
 
-- `/login`
-- `/` (dashboard)
-- `/verifications`
-- `/artisans`
-- `/clients`
-- `/subscriptions`
-- `/reviews`
-- `/logs`
-- `/analytics`
+- login
+- dashboard
+- analytics
+- artisans
+- clients
+- logs
+- payments
+- reviews
+- subscriptions
+- verifications
 
-### Variables utiles admin-web
-
-- `NEXT_PUBLIC_API_URL`
-- `NEXT_PUBLIC_API_PORT` (defaut `3000`)
-- `NEXT_PUBLIC_API_BASE_PATH` (defaut `/api/v1`)
-- `NEXT_PUBLIC_DEFAULT_LOCALE` (defaut `fr`)
-
-### Lancement admin-web local
+### Commandes admin-web
 
 ```bash
 cd admin-web
 npm ci
+npm run lint
+npm run build
 npm run dev
 ```
 
-URL locale: `http://localhost:3002`
-
 ## Infrastructure
 
-### Compose et services
+### Fichiers Compose utilises
 
-Fichiers utilises:
 - `infrastructure/docker-compose.yml`
 - `infrastructure/docker-compose.dev.yml`
+- `infrastructure/docker-compose.portainer.yml`
 
-Demarrage complet dev (depuis racine):
+### Services Docker
+
+| Service | Role | Ports host en dev |
+|---|---|---|
+| `api` | API NestJS | `3000` |
+| `admin-web` | Back-office Next.js | `3002` |
+| `postgres` | Base relationnelle | `5434` |
+| `mongodb` | Base documentaire | `27018` |
+| `redis` | Cache / pub-sub | `6380` |
+| `minio` | Stockage objets | `9002` API, `9003` Console |
+| `grafana` | Dashboards | `3001` |
+| `portainer` | Gestion Docker | `9443` |
+| `nginx` | Reverse proxy | desactive en dev, actif en `prod-only` |
+| `prometheus` | Metrics | non expose sur l'hote dans le Compose actuel |
+
+### Volumes persistants critiques
+
+Ces volumes ne doivent jamais etre supprimes dans un nettoyage normal :
+
+- `postgres_data`
+- `mongo_data`
+- `redis_data`
+- `minio_data`
+- `grafana_data`
+- `prometheus_data`
+- `portainer_data`
+
+### Nettoyage Docker
+
+Script principal :
+
 ```bash
-docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml up -d --build
+./infrastructure/scripts/clean-docker.sh --dry-run
+./infrastructure/scripts/clean-docker.sh
+./infrastructure/scripts/clean-docker.sh --dry-run --all
+./infrastructure/scripts/clean-docker.sh --all
 ```
 
-Services et acces dev:
-- API: `http://localhost:3000/api/v1`
-- Health API: `http://localhost:3000/api/v1/health`
-- Admin web: `http://localhost:3002`
-- Grafana: `http://localhost:3001`
-- MinIO API (dev): `http://localhost:9002`
-- MinIO Console (dev): `http://localhost:9003`
+Ce script :
 
-Isolation de ports documentee pour eviter conflits locaux:
-- PostgreSQL `5434:5432`
-- MongoDB `27018:27017`
-- Redis `6380:6379`
+- supprime les conteneurs arretes
+- supprime les images dangling et, en `--all`, les images inutilisees
+- nettoie le build cache
+- supprime les reseaux orphelins
+- supprime les volumes anonymes orphelins
+- preserve les volumes nommes critiques
 
-En production:
-- Exposition hote limitee a Nginx (`80/443`)
-- MinIO reste interne au reseau Docker
-- Nginx route `/` -> `admin-web` et `/api/` -> backend
-- conserver `ADMIN_WEB_API_URL=/api/v1` pour eviter CORS
+Ne jamais utiliser :
 
-### Logs et verification rapide
-
-Logs stack:
 ```bash
-docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml logs -f api admin-web nginx
+docker system prune -a --volumes
+docker volume prune
 ```
 
-Logs cibles:
+Pour le runbook complet, voir `DOCUMENTATION_DOCKER.md`.
+
+### Commandes infrastructure frequentes
+
+Depuis la racine :
+
 ```bash
-docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml logs -f admin-web
-docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml logs -f api
-docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml logs -f nginx
+docker compose --env-file .env \
+  -f infrastructure/docker-compose.yml \
+  -f infrastructure/docker-compose.dev.yml \
+  -f infrastructure/docker-compose.portainer.yml \
+  logs -f api admin-web
 ```
 
-Etat des conteneurs:
+Validation de configuration Compose :
+
 ```bash
-docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml ps
+cd infrastructure
+docker compose --env-file ../.env \
+  -f docker-compose.yml \
+  -f docker-compose.dev.yml \
+  -f docker-compose.portainer.yml \
+  config
 ```
 
-### Portainer (option)
+## Observabilite et acces utiles
 
-Demarrage:
+En dev local :
+
+- API health : `http://localhost:3000/api/v1/health`
+- API base : `http://localhost:3000/api/v1`
+- Admin web : `http://localhost:3002`
+- Grafana : `http://localhost:3001`
+- MinIO API : `http://localhost:9002`
+- MinIO Console : `http://localhost:9003`
+- Portainer : `https://localhost:9443`
+
+Prometheus :
+
+- non expose directement sur l'hote dans les fichiers Compose actuels
+- accessible via le reseau Docker interne
+
+## Tests et quality gates
+
+### Minimum attendu par zone
+
+Backend :
+
 ```bash
-docker compose -f infrastructure/docker-compose.portainer.yml up -d
+cd backend
+npm run build
+npm run test
 ```
 
-Acces:
-- `https://localhost:9443`
+Backend critique ou contrat :
 
-Migration vers stack Portainer native:
-1. `infrastructure/scripts/generate-portainer-stack.sh`
-2. `docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml down --remove-orphans`
-3. Importer `infrastructure/stack.portainer-managed.yml` dans Portainer (`Stacks -> Add stack`)
-
-## Flux metier essentiels
-
-### Inscription artisan
-
-1. Flutter -> `POST /auth/register/artisan`
-2. Backend cree `User` + `ArtisanProfile` (PostgreSQL)
-3. Event admin temps reel `ARTISAN_REGISTERED`
-
-### Verification artisan
-
-1. Artisan soumet documents
-2. Backend stocke metadonnees + fichiers
-3. Admin valide/rejette via `/admin/verifications/*`
-4. Notifications + events temps reel
-
-### Abonnement
-
-1. `POST /subscription/initiate`
-2. Checkout Wave
-3. `POST /subscription/wave/webhook`
-4. Verification signature + idempotence
-5. Activation abonnement et visibilite profil
-
-### Chat
-
-1. REST pour conversation/historique
-2. Socket `/ws/chat` pour echanges live
-3. Redis pub/sub pour diffusion multi-instance
-
-## Vision produit et roadmap (consolidation implementation_plan.md)
-
-Cette section reprend les informations structurantes issues du plan historique.
-
-### Positionnement
-
-- Acteurs: Artisan, Client, Admin
-- Modele economique: abonnement artisan `5 000 FCFA / mois` (Wave)
-- Regle business cle: sans abonnement actif, profil non visible dans les recherches
-- Perimetre geographique: Phase 1 Cote d'Ivoire, extension Afrique de l'Ouest ensuite
-
-### Fonctionnalites a valeur ajoutee (historique)
-
-- Mode urgence
-- Badges de confiance (Verifie, Certifie, Top Artisan)
-- Dashboard artisan KPI
-- Zones de couverture
-- Alertes de proximite
-- Futures extensions: Orange Money, MTN MoMo, prise de rendez-vous, paiement in-app client, devis en ligne
-
-### Planning de reference (historique)
-
-- Phase 1 Fondations (2-3 semaines): infra + auth OTP
-- Phase 2 Core (3-4 semaines): profils, verification, categories, portfolio, recherche
-- Phase 3 Monetisation (1-2 semaines): Wave + webhook
-- Phase 4 Communication (2-3 semaines): chat + notifications
-- Phase 5 Mobile (4-6 semaines): app complete
-- Phase 6 Admin & Launch (3-4 semaines): panel admin, tests, CI/CD, deploy
-- Phase 7 HA (post-launch): warm standby
-- Phase 8 Extensions: features futures
-
-### Strategie tests (historique)
-
-- Unit tests backend (Jest)
-- Integration REST critiques (Supertest)
-- Tests Flutter widgets/providers
-- E2E parcours artisan + client
-- Priorite de test: `auth`, `otp`, `subscription`, `wave provider`, puis `verification/search/reviews`
-
-### CI/CD cible (historique)
-
-Pipeline GitHub Actions documente:
-1. lint/type-check
-2. tests (services postgres/mongo/redis)
-3. build image docker
-4. deploy SSH sur VPS (branche `main`)
-
-### Haute disponibilite (historique)
-
-Strategie warm standby progressive:
-- Phase initiale: backups auto
-- Ensuite: PostgreSQL replication, Mongo replica set, Redis Sentinel
-- Bascule via floating IP/keepalived
-- Objectif: failover auto <30s a maturite
-
-## Strategie communication video (consolidation plan_pub.md)
-
-Objectif: produire 2 pubs video verticales (9:16) basees sur captures reelles de l'app.
-
-### Video 1 - Session Artisan
-
-But: conversion artisans (inscription -> verification -> abonnement -> usage quotidien).
-
-Scenes obligatoires:
-- onboarding + role artisan
-- inscription complete + OTP/PIN
-- dashboard (disponibilite + KPI)
-- portfolio (ajout realisation)
-- verification documents + statuts
-- abonnement Wave `5000 FCFA/mois`
-- avis/reputation
-- messagerie
-- CTA final clair
-
-### Video 2 - Session Client
-
-But: conversion clients (telechargement -> recherche -> contact -> avis/favoris).
-
-Scenes obligatoires:
-- onboarding + inscription/login client
-- dashboard client
-- recherche multi-criteres + carte/liste
-- profil artisan (badges/portfolio/avis)
-- contact direct (appel/WhatsApp/chat)
-- favoris + depot d'avis
-- notifications
-- CTA final clair
-
-### Regles creatives communes
-
-- UI reelle uniquement (pas de redesign)
-- smartphone visible avec interactions naturelles
-- voix-off FR + sous-titres FR synchronises
-- musique motivante sous la voix
-- duree cible: 45 a 75 secondes par video
-- inclure une mini transition "ameliorations a venir"
-
-### Preparation assets captures
-
-Classement recommande:
-- `artisan/auth`, `artisan/dashboard`, `artisan/portfolio`, `artisan/verification`, `artisan/subscription`, `artisan/reviews`
-- `client/auth`, `client/home-search`, `client/profile-contact`, `client/favorites-reviews`
-- `common/chat-notifs-settings`
-
-Convention nommage conseillee:
-- `A01_splash.png`, `A02_register_artisan.png`, `C11_search_map.png`, etc.
-
-## Journal incidents (consolidation implementation_news.txt)
-
-Incident constate (log Flutter):
-- Type: `RenderFlex overflowed by 14 pixels on the right`
-- Ecran/source: `fiers_artisans_app/lib/presentation/common/app_button.dart:104`
-- Contexte de contrainte: largeur max ~`208.9`
-- Effet: debordement horizontal de `Row` sur certains layouts etroits
-
-Action recommande:
-- reviser le composant bouton (`Row`) avec `Expanded/Flexible` ou ajustement layout/typo pour petits ecrans.
-
-## Demarrage rapide global
-
-Prerequis:
-- Node.js 20+
-- npm 10+
-- Flutter SDK 3.41+
-- Docker + Docker Compose
-
-Preparation:
-1. Copier `.env.example` vers `.env`
-2. Copier `fiers_artisans_app/.env.example` vers `fiers_artisans_app/.env`
-3. Completer toutes les valeurs sensibles
-
-Lancer stack dev:
 ```bash
-docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml up -d --build
+cd backend
+npm run test:e2e
 ```
 
-Puis lancer les apps:
+Admin web :
+
 ```bash
-# backend
-cd backend && npm ci && npm run start:dev
-
-# admin web
-cd admin-web && npm ci && npm run dev
-
-# flutter
-cd fiers_artisans_app && flutter pub get && flutter run
+cd admin-web
+npm run lint
+npm run build
 ```
+
+Flutter :
+
+```bash
+cd fiers_artisans_app
+flutter analyze
+flutter test
+```
+
+Infrastructure :
+
+```bash
+cd infrastructure
+docker compose --env-file ../.env \
+  -f docker-compose.yml \
+  -f docker-compose.dev.yml \
+  -f docker-compose.portainer.yml \
+  config
+```
+
+### Regle transverse
+
+Si une modification touche plusieurs couches, ne pas s'arreter au test local de la couche modifiee.
+
+Cas typiques exigeant une validation plus large :
+
+- auth
+- OTP
+- paiement Wave
+- paiement manuel
+- verification artisan
+- chat / notifications
+- contrats API
+- Docker / variables d'environnement
+
+## Scripts utiles
+
+Dans `infrastructure/scripts/` :
+
+- `clean-docker.sh`
+  nettoyage Docker securise, sans suppression des volumes critiques
+- `backup.sh`
+  script de backup oriente serveur
+- `deploy.sh`
+  script de deploiement oriente serveur
+- `generate-portainer-stack.sh`
+  generation d'une stack cible Portainer
+- `generate_global_fusion.py`
+  regeneration de `globaliste/global_fusion.txt`
+- `reset_clean_environment.sh`
+  reset de donnees dynamique avec garde-fous
+- `setup_dev_stack_root.sh`
+  aide setup stack dev
+- `setup_dev_stack_user.sh`
+  aide setup stack dev user
+
+## Gouvernance IA et modification du code
+
+Ce depot impose une gouvernance stricte pour toute intervention IA ou humaine outillee :
+
+- `SECURITY_ARCHITECTURE.md`
+  politique de securite, verification des affirmations, evaluation multi-scenarios, obligation de tests
+- `RÈGLES GLOBALES.md`
+  pipeline IA multi-phases, validation humaine, anti-hallucination, QA, CTO validation
+
+Regles resumes :
+
+- patch minimal uniquement
+- jamais de refactor hors scope
+- verification factuelle avant decision
+- l'utilisateur peut se tromper
+- tests proportionnes au risque obligatoires
+- aucune decision d'architecture sans validation humaine
 
 ## Politique documentaire
 
-- Ce fichier `README.md` est la reference unique.
-- Les informations anciennes ont ete consolidees ici (architecture, roadmap, plan pub, incidents).
-- `SECURITY_ARCHITECTURE.md` reste volontairement separe et intact.
+- `README.md` doit rester la vue operationnelle actuelle du projet
+- `DOCUMENTATION_DOCKER.md` porte le detail infra et nettoyage
+- `SECURITY_ARCHITECTURE.md` porte la politique de preservation
+- `RÈGLES GLOBALES.md` porte le pipeline IA
+- `globaliste/global_fusion.txt` est genere automatiquement et ne doit pas etre edite a la main
+
+Si tu modifies :
+
+- un flux metier
+- un contrat API
+- une commande d'execution
+- une topologie Docker
+- un script critique
+- une regle de gouvernance
+
+alors la documentation associee doit etre mise a jour dans la meme chaine de travail.
