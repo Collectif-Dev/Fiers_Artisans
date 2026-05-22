@@ -12,12 +12,14 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
     required this.initiateResult,
     required this.statusResult,
     this.currentResult,
+    this.initiateError,
     this.submitProofError,
   });
 
   final ManualPaymentModel initiateResult;
   ManualPaymentModel statusResult;
   ManualPaymentModel? currentResult;
+  Object? initiateError;
   Object? submitProofError;
   int fetchStatusCalls = 0;
   int submitProofCalls = 0;
@@ -29,6 +31,9 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
 
   @override
   Future<ManualPaymentModel> initiatePayment({required String provider}) async {
+    if (initiateError != null) {
+      throw initiateError!;
+    }
     return initiateResult;
   }
 
@@ -81,6 +86,52 @@ void main() {
     expect(notifier.state.currentTransaction?.transactionId, 'TX-INIT-1');
     expect(notifier.state.error, isNull);
     expect(notifier.state.isLoading, isFalse);
+
+    notifier.dispose();
+    await events.close();
+  });
+
+  test('maps refund pending error when initiation is blocked', () async {
+    final requestOptions = RequestOptions(path: '/payments/manual/initiate');
+    final repo = FakePaymentManualRepository(
+      initiateResult: const ManualPaymentModel(
+        transactionId: 'TX-INIT-1',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      statusResult: const ManualPaymentModel(
+        transactionId: 'TX-INIT-1',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      initiateError: DioException(
+        requestOptions: requestOptions,
+        response: Response(
+          requestOptions: requestOptions,
+          statusCode: 409,
+          data: const {
+            'code': 'PAYMENT_MANUAL_REFUND_PENDING',
+            'message':
+                'Un remboursement est en cours. Vous ne pouvez pas creer une nouvelle demande.',
+          },
+        ),
+        type: DioExceptionType.badResponse,
+      ),
+    );
+    final events = StreamController<ChatRealtimeEvent>.broadcast();
+    final notifier = PaymentManualNotifier(
+      repository: repo,
+      domainEvents: events.stream,
+    );
+
+    await notifier.initiatePayment(provider: 'ORANGE_MONEY');
+
+    expect(
+      notifier.state.error,
+      'Un remboursement est en cours. Vous ne pouvez pas creer une nouvelle demande.',
+    );
 
     notifier.dispose();
     await events.close();
@@ -263,6 +314,60 @@ void main() {
       'Trop de tentatives. Reessayez dans 2 minute(s).',
     );
     expect(repo.submitProofCalls, 1);
+
+    notifier.dispose();
+    await events.close();
+  });
+
+  test('keeps backend cooldown message for rejected transaction cooldown', () async {
+    final requestOptions = RequestOptions(
+      path: '/payments/manual/tx/submit-proof',
+    );
+    final repo = FakePaymentManualRepository(
+      initiateResult: const ManualPaymentModel(
+        transactionId: 'TX-CD',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      statusResult: const ManualPaymentModel(
+        transactionId: 'TX-CD',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'REJECTED',
+      ),
+      currentResult: const ManualPaymentModel(
+        transactionId: 'TX-CD',
+        provider: 'ORANGE_MONEY',
+        amountFcfa: 5000,
+        status: 'REJECTED',
+      ),
+      submitProofError: DioException(
+        requestOptions: requestOptions,
+        response: Response(
+          requestOptions: requestOptions,
+          statusCode: 429,
+          data: const {
+            'code': 'PAYMENT_MANUAL_COOLDOWN_ACTIVE',
+            'message': 'Nouvelle soumission possible dans 5 h.',
+          },
+        ),
+        type: DioExceptionType.badResponse,
+      ),
+    );
+    final events = StreamController<ChatRealtimeEvent>.broadcast();
+    final notifier = PaymentManualNotifier(
+      repository: repo,
+      domainEvents: events.stream,
+    );
+
+    await notifier.loadCurrentTransaction(refresh: true);
+    await notifier.submitProof(
+      filePath: '/tmp/proof.png',
+      senderNumber: '0700000000',
+    );
+
+    expect(notifier.state.error, 'Nouvelle soumission possible dans 5 h.');
 
     notifier.dispose();
     await events.close();

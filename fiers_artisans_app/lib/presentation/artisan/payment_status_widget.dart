@@ -55,10 +55,43 @@ class PaymentStatusWidget extends StatelessWidget {
               namedArgs: {'id': transaction!.transactionId},
             ),
           ),
+          if (transaction!.requestNumber > 0)
+            Text(
+              'manual_payment.request_number'.tr(
+                namedArgs: {'number': '${transaction!.requestNumber}'},
+              ),
+            ),
+          if ((transaction!.isPending ||
+                  transaction!.isPendingAdmin ||
+                  transaction!.isRejected) &&
+              transaction!.currentAttemptNumber > 0)
+            Text(
+              'manual_payment.attempt_count'.tr(
+                namedArgs: {
+                  'attempt': '${transaction!.currentAttemptNumber}',
+                },
+              ),
+            ),
+          if (transaction!.isRejected && transaction!.isCooldownActive)
+            Text(
+              'manual_payment.cooldown_countdown'.tr(
+                namedArgs: {
+                  'remaining': _formatCooldown(transaction!.cooldownRemainingSeconds),
+                },
+              ),
+              style: TextStyle(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           if (transaction!.expiresAtAdmin != null)
             Text(
               'manual_payment.expiration'.tr(
-                namedArgs: {'date': '${transaction!.expiresAtAdmin}'},
+                namedArgs: {
+                  'date': DateFormat(
+                    'dd/MM/yyyy HH:mm',
+                  ).format(transaction!.expiresAtAdmin!.toLocal()),
+                },
               ),
             ),
         ],
@@ -89,5 +122,13 @@ class PaymentStatusWidget extends StatelessWidget {
       default:
         return theme.colorScheme.primary;
     }
+  }
+
+  String _formatCooldown(int totalSeconds) {
+    final safeSeconds = totalSeconds < 0 ? 0 : totalSeconds;
+    final hours = safeSeconds ~/ 3600;
+    final minutes = (safeSeconds % 3600) ~/ 60;
+    final seconds = safeSeconds % 60;
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}min ${seconds.toString().padLeft(2, '0')}s';
   }
 }

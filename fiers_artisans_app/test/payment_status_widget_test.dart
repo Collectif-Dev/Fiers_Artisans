@@ -22,6 +22,8 @@ void main() {
       provider: 'ORANGE_MONEY',
       amountFcfa: 5000,
       status: 'PENDING_ADMIN',
+      requestNumber: 2,
+      submittedProofCount: 1,
     );
 
     await tester.pumpWidget(
@@ -34,6 +36,8 @@ void main() {
           'manual_payment': {
             'status_label': 'Statut : {status}',
             'transaction_id': 'Transaction : {id}',
+            'request_number': 'Demande n°{number}',
+            'attempt_count': 'Tentative : {attempt}/3',
             'status': {'pending_admin': 'En attente admin'},
           },
         }),
@@ -51,5 +55,49 @@ void main() {
 
     expect(find.text('Statut : En attente admin'), findsOneWidget);
     expect(find.text('Transaction : TX-ABCD1234'), findsOneWidget);
+    expect(find.text('Demande n°2'), findsOneWidget);
+    expect(find.text('Tentative : 1/3'), findsOneWidget);
+  });
+
+  testWidgets('renders cooldown countdown for blocked rejected transaction', (
+    tester,
+  ) async {
+    final tx = ManualPaymentModel(
+      transactionId: 'TX-COOLDOWN-1',
+      provider: 'ORANGE_MONEY',
+      amountFcfa: 5000,
+      status: 'REJECTED',
+      cooldownUntil: DateTime.now().add(
+        const Duration(hours: 4, minutes: 23, seconds: 59),
+      ),
+    );
+
+    await tester.pumpWidget(
+      EasyLocalization(
+        supportedLocales: const [Locale('fr')],
+        path: 'unused',
+        fallbackLocale: const Locale('fr'),
+        startLocale: const Locale('fr'),
+        assetLoader: const _InlineAssetLoader({
+          'manual_payment': {
+            'status_label': 'Statut : {status}',
+            'transaction_id': 'Transaction : {id}',
+            'cooldown_countdown': 'Blocage actif : {remaining}',
+            'status': {'rejected': 'Rejete'},
+          },
+        }),
+        child: Builder(
+          builder: (context) => MaterialApp(
+            locale: context.locale,
+            supportedLocales: context.supportedLocales,
+            localizationsDelegates: context.localizationDelegates,
+            home: Scaffold(body: PaymentStatusWidget(transaction: tx)),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('Blocage actif : 4h 23min'), findsOneWidget);
   });
 }

@@ -29,6 +29,7 @@ export enum PaymentManualStatus {
 }
 
 @Index('IDX_PAYMENT_MANUAL_SUB_CREATED', ['subscription_id', 'created_at'])
+@Index('IDX_PAYMENT_MANUAL_SUB_REQUEST', ['subscription_id', 'request_number'])
 @Index('IDX_PAYMENT_MANUAL_STATUS_EXPIRES', ['status', 'expires_at_admin'])
 @Entity('payment_manual')
 export class PaymentManual {
@@ -84,11 +85,20 @@ export class PaymentManual {
   @Column({ type: 'text', nullable: true })
   rejection_reason: string | null;
 
+  @Column({ type: 'int', default: 1 })
+  request_number: number;
+
   @Column({ default: false })
   refund_required: boolean;
 
   @Column({ type: 'timestamp', nullable: true })
   refund_done_at: Date | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  cooldown_until: Date | null;
+
+  @Column({ type: 'int', default: 0 })
+  cooldown_cycle: number;
 
   @Column({ type: 'int', default: 0 })
   attempted_refund_count: number;

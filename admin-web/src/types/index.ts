@@ -213,8 +213,11 @@ export interface PaymentManualRecord {
   validated_at?: string | null;
   rejected_at?: string | null;
   rejection_reason?: string | null;
+  request_number: number;
   refund_required: boolean;
   refund_done_at?: string | null;
+  cooldown_until?: string | null;
+  cooldown_cycle?: number;
   attempted_refund_count: number;
   timeline?: Array<Record<string, unknown>>;
   subscription?: {

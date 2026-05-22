@@ -62,6 +62,56 @@ function formatProvider(provider: string): string {
   return provider.replace(/_/g, " ");
 }
 
+function formatDateTime(value: string, locale: string): string {
+  return new Date(value).toLocaleString(locale === "fr" ? "fr-FR" : "en-US");
+}
+
+function formatRefundState(
+  record: PaymentManualRecord,
+  locale: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  if (record.refund_required && !record.refund_done_at) {
+    return t("refund_pending");
+  }
+
+  if (record.refund_done_at) {
+    return t("refund_done_on", {
+      date: formatDateTime(record.refund_done_at, locale),
+    });
+  }
+
+  return t("refund_none");
+}
+
+function isCooldownActive(record: PaymentManualRecord): boolean {
+  if (!record.cooldown_until) {
+    return false;
+  }
+
+  return new Date(record.cooldown_until).getTime() > Date.now();
+}
+
+function formatCooldownState(
+  record: PaymentManualRecord,
+  locale: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  if (!record.cooldown_until) {
+    return t("cooldown_none");
+  }
+
+  if (isCooldownActive(record)) {
+    return t("cooldown_active_until", {
+      date: formatDateTime(record.cooldown_until, locale),
+    });
+  }
+
+  return t("cooldown_elapsed_on", {
+    date: formatDateTime(record.cooldown_until, locale),
+  });
+}
+
 function parseImageRef(
   ref?: string,
 ): { bucket: string; objectKey: string } | null {
@@ -217,6 +267,14 @@ export default function PaymentManualPage() {
       return <Badge variant="destructive">{t("status_refund_required")}</Badge>;
     }
 
+    if (record.status === "REJECTED" && isCooldownActive(record)) {
+      return (
+        <Badge className="bg-orange-100 text-orange-900">
+          {t("cooldown_active")}
+        </Badge>
+      );
+    }
+
     if (record.status === "COMPLETED") {
       return (
         <Badge className="bg-green-100 text-green-900">
@@ -315,7 +373,9 @@ export default function PaymentManualPage() {
                       <TableHead>{t("client")}</TableHead>
                       <TableHead>{t("amount")}</TableHead>
                       <TableHead>{t("provider")}</TableHead>
+                      <TableHead>{t("request_number")}</TableHead>
                       <TableHead>{t("sender_number")}</TableHead>
+                      <TableHead>{t("refund")}</TableHead>
                       <TableHead>{t("submitted_at")}</TableHead>
                       <TableHead>{t("status")}</TableHead>
                       <TableHead className="text-right">
@@ -340,11 +400,13 @@ export default function PaymentManualPage() {
                           FCFA
                         </TableCell>
                         <TableCell>{formatProvider(item.provider)}</TableCell>
+                        <TableCell>{item.request_number || "—"}</TableCell>
                         <TableCell>{item.sender_number || "—"}</TableCell>
                         <TableCell>
-                          {new Date(item.created_at).toLocaleString(
-                            locale === "fr" ? "fr-FR" : "en-US",
-                          )}
+                          {formatRefundState(item, locale, t)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDateTime(item.created_at, locale)}
                         </TableCell>
                         <TableCell>{statusBadge(item)}</TableCell>
                         <TableCell className="text-right">
@@ -453,8 +515,20 @@ export default function PaymentManualPage() {
                   {formatProvider(selected.provider)}
                 </p>
                 <p>
+                  <strong>{t("request_number")}:</strong>{" "}
+                  {selected.request_number || "—"}
+                </p>
+                <p>
                   <strong>{t("sender_number")}:</strong>{" "}
                   {selected.sender_number || "—"}
+                </p>
+                <p>
+                  <strong>{t("refund")}:</strong>{" "}
+                  {formatRefundState(selected, locale, t)}
+                </p>
+                <p>
+                  <strong>{t("cooldown")}:</strong>{" "}
+                  {formatCooldownState(selected, locale, t)}
                 </p>
                 <p>
                   <strong>{t("proofs")}:</strong> {selected.proofs?.length || 0}

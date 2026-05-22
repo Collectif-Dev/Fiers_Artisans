@@ -1,10 +1,16 @@
+import 'dart:async';
+
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../config/app_config.dart';
 import '../../config/theme.dart';
+import '../../data/models/manual_payment_model.dart';
 import '../../providers/payment_manual_provider.dart';
 import '../common/app_snackbar.dart';
 import 'payment_status_widget.dart';
@@ -22,7 +28,6 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     'ORANGE_MONEY': ['07'],
     'MTN_MOMO': ['05'],
     'WAVE': ['07', '05', '01'],
-    // Reserved for future activation.
     'MOOV_MONEY': ['01'],
   };
   static const Map<String, String?> _recipientByProvider = {
@@ -36,6 +41,8 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
   XFile? _proofImage;
   Uint8List? _proofBytes;
   String _provider = 'ORANGE_MONEY';
+  Timer? _clockTimer;
+  DateTime _now = DateTime.now();
 
   @override
   void initState() {
@@ -48,11 +55,28 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       if (tx == null) {
         return;
       }
+
       if (tx.provider != _provider && mounted) {
         setState(() {
           _provider = tx.provider;
         });
       }
+
+      if (!(tx.isPending || tx.isRejected) && mounted) {
+        setState(() {
+          _proofImage = null;
+          _proofBytes = null;
+        });
+      }
+    });
+
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _now = DateTime.now();
+      });
     });
 
     Future.microtask(
@@ -64,25 +88,107 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
   @override
   void dispose() {
+    _clockTimer?.cancel();
     _senderController.dispose();
     super.dispose();
   }
 
+  String _digitsOnly(String value) {
+    return value.replaceAll(RegExp(r'\D'), '');
+  }
+
+  String _normalizePhoneWithPrefix(String phone) {
+    final prefixDigits = _digitsOnly(AppConfig.phonePrefix);
+    final rawDigits = _digitsOnly(phone);
+
+    if (rawDigits.isEmpty) {
+      return '';
+    }
+    if (rawDigits.startsWith(prefixDigits)) {
+      return rawDigits;
+    }
+    return '$prefixDigits$rawDigits';
+  }
+
   String _formatPhoneSpaced(String raw) {
     final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.length != 10) return raw;
+    if (digits.length != 10) {
+      return raw;
+    }
     return '${digits.substring(0, 2)} ${digits.substring(2, 4)} ${digits.substring(4, 6)} ${digits.substring(6, 8)} ${digits.substring(8, 10)}';
   }
 
+  String _formatDate(DateTime value, {bool withTime = false}) {
+    final pattern = withTime ? 'dd/MM/yyyy HH:mm' : 'dd/MM/yyyy';
+    return DateFormat(pattern).format(value.toLocal());
+  }
+
+  String _formatRemainingDuration(DateTime target) {
+    final remaining = target.difference(_now);
+    if (remaining.isNegative) {
+      return '0h 00min 00s';
+    }
+
+    final totalSeconds = remaining.inSeconds;
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = remaining.inSeconds % 60;
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}min ${seconds.toString().padLeft(2, '0')}s';
+  }
+
+  String _providerLabel(String provider) {
+    return switch (provider) {
+      'ORANGE_MONEY' => 'manual_payment.provider.orange'.tr(),
+      'MTN_MOMO' => 'manual_payment.provider.mtn'.tr(),
+      'MOOV_MONEY' => 'manual_payment.provider.moov_unavailable'.tr(),
+      'WAVE' => 'manual_payment.provider.wave_manual'.tr(),
+      _ => provider,
+    };
+  }
+
+  String _prefixesLabel(List<String> prefixes) {
+    if (prefixes.length == 1) {
+      return prefixes.first;
+    }
+    if (prefixes.length == 2) {
+      return '${prefixes[0]} ou ${prefixes[1]}';
+    }
+    final head = prefixes.sublist(0, prefixes.length - 1).join(', ');
+    return '$head ou ${prefixes.last}';
+  }
+
+  bool _isValidSenderNumberForProvider(
+    String sender, {
+    required String provider,
+  }) {
+    if (!_digits10Pattern.hasMatch(sender)) {
+      return false;
+    }
+    final allowedPrefixes = _allowedPrefixesByProvider[provider];
+    if (allowedPrefixes == null || allowedPrefixes.isEmpty) {
+      return false;
+    }
+    for (final prefix in allowedPrefixes) {
+      if (sender.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _pickImage({required bool disabled}) async {
-    if (disabled) return;
+    if (disabled) {
+      return;
+    }
 
     final picker = ImagePicker();
     final image = await picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 90,
     );
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _proofImage = image;
       _proofBytes = null;
@@ -90,7 +196,9 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
     if (image != null) {
       final bytes = await image.readAsBytes();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _proofBytes = bytes;
       });
@@ -99,8 +207,55 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
   Future<void> _copyRecipient(String number) async {
     await Clipboard.setData(ClipboardData(text: number));
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     AppSnackBar.show(context, message: 'manual_payment.copy_success'.tr());
+  }
+
+  Future<void> _launchSupportWhatsApp(ManualPaymentModel tx) async {
+    final supportNumber =
+        tx.recipientNumber ?? _recipientByProvider[tx.provider] ?? '';
+    final normalized = _normalizePhoneWithPrefix(supportNumber);
+    if (normalized.isEmpty) {
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.support_unavailable'.tr(),
+      );
+      return;
+    }
+
+    final expirationDate = tx.expiresAtAdmin != null
+        ? _formatDate(tx.expiresAtAdmin!)
+        : '—';
+    final message = 'manual_payment.support_whatsapp_message'.tr(
+      namedArgs: {
+        'transactionId': tx.transactionId,
+        'amount': '${tx.amountFcfa}',
+        'date': expirationDate,
+      },
+    );
+    final encodedMessage = Uri.encodeComponent(message);
+    final appUri = Uri.parse(
+      'whatsapp://send?phone=$normalized&text=$encodedMessage',
+    );
+    final webUri = Uri.parse('https://wa.me/$normalized?text=$encodedMessage');
+
+    var launched = false;
+    if (!kIsWeb) {
+      launched = await launchUrl(appUri, mode: LaunchMode.externalApplication);
+    }
+
+    if (!launched) {
+      launched = await launchUrl(webUri, mode: LaunchMode.externalApplication);
+    }
+
+    if (!launched && mounted) {
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.support_unavailable'.tr(),
+      );
+    }
   }
 
   Future<void> _initiate() async {
@@ -115,15 +270,12 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       return;
     }
 
-    if (tx != null && (tx.isPending || tx.isPendingAdmin)) {
-      AppSnackBar.show(context, message: 'manual_payment.request_pending'.tr());
-      return;
-    }
-
-    if (tx != null && !tx.canInitiateNewTransaction) {
+    if (tx != null && !tx.canInitiateNewRequest) {
       AppSnackBar.show(
         context,
-        message: 'manual_payment.new_transaction_not_allowed'.tr(),
+        message: tx.isRefundPending
+            ? 'manual_payment.refund_pending_error'.tr()
+            : 'manual_payment.new_transaction_not_allowed'.tr(),
       );
       return;
     }
@@ -132,7 +284,9 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
         .read(paymentManualProvider.notifier)
         .initiatePayment(provider: _provider);
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final latest = ref.read(paymentManualProvider).currentTransaction;
     if (latest != null &&
         latest.provider == _provider &&
@@ -155,6 +309,17 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
     if (tx == null) {
       AppSnackBar.show(context, message: 'manual_payment.generate_first'.tr());
+      return;
+    }
+
+    final isCooldownLocked = tx.hasActiveCooldownAt(_now);
+    if (isCooldownLocked) {
+      AppSnackBar.show(
+        context,
+        message: 'manual_payment.cooldown_notice'.tr(
+          namedArgs: {'remaining': _formatRemainingDuration(tx.cooldownUntil!)},
+        ),
+      );
       return;
     }
 
@@ -211,7 +376,9 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
         .read(paymentManualProvider.notifier)
         .submitProof(filePath: image.path, senderNumber: sender);
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     final error = ref.read(paymentManualProvider).error;
     if (error == null) {
       AppSnackBar.show(context, message: 'manual_payment.proof_sent'.tr());
@@ -260,46 +427,6 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     );
   }
 
-  bool _isValidSenderNumberForProvider(
-    String sender, {
-    required String provider,
-  }) {
-    if (!_digits10Pattern.hasMatch(sender)) {
-      return false;
-    }
-    final allowedPrefixes = _allowedPrefixesByProvider[provider];
-    if (allowedPrefixes == null || allowedPrefixes.isEmpty) {
-      return false;
-    }
-    for (final prefix in allowedPrefixes) {
-      if (sender.startsWith(prefix)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  String _providerLabel(String provider) {
-    return switch (provider) {
-      'ORANGE_MONEY' => 'manual_payment.provider.orange'.tr(),
-      'MTN_MOMO' => 'manual_payment.provider.mtn'.tr(),
-      'MOOV_MONEY' => 'manual_payment.provider.moov_unavailable'.tr(),
-      'WAVE' => 'manual_payment.provider.wave_manual'.tr(),
-      _ => provider,
-    };
-  }
-
-  String _prefixesLabel(List<String> prefixes) {
-    if (prefixes.length == 1) {
-      return prefixes.first;
-    }
-    if (prefixes.length == 2) {
-      return '${prefixes[0]} ou ${prefixes[1]}';
-    }
-    final head = prefixes.sublist(0, prefixes.length - 1).join(', ');
-    return '$head ou ${prefixes.last}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -309,22 +436,30 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
     final providerUnavailable = _recipientByProvider[_provider] == null;
     final isPendingAdminLocked = tx != null && tx.isPendingAdmin;
-
+    final isCooldownLocked = tx?.hasActiveCooldownAt(_now) == true;
+    final canChangeProvider =
+        !state.isLoading && (tx == null || tx.canInitiateNewRequest);
     final canInitiate =
         !state.isLoading &&
         !providerUnavailable &&
-        (tx == null || tx.canInitiateNewTransaction);
+        (tx == null || tx.canInitiateNewRequest);
     final canSubmit =
         !state.isLoading &&
         tx != null &&
         (tx.isPending || tx.isRejected) &&
+        !isCooldownLocked &&
         !(state.hasSubmittedProof && tx.isPendingAdmin);
+
+    final buttonLabel = tx != null && tx.isExpired
+        ? 'manual_payment.new_request'.tr()
+        : 'manual_payment.generate_transaction'.tr();
 
     final recipientFromBackend =
         tx != null && tx.provider == _provider && tx.recipientNumber != null;
     final selectedRecipient = recipientFromBackend
         ? tx.recipientNumber
-        : _recipientByProvider[_provider];
+        : _recipientByProvider[tx?.provider ?? _provider] ??
+            _recipientByProvider[_provider];
     final formattedRecipient = selectedRecipient == null
         ? null
         : _formatPhoneSpaced(selectedRecipient);
@@ -479,10 +614,12 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                   child: Text('manual_payment.provider.wave_manual'.tr()),
                 ),
               ],
-              onChanged: isPendingAdminLocked
+              onChanged: !canChangeProvider || isCooldownLocked
                   ? null
                   : (value) {
-                      if (value == null) return;
+                      if (value == null) {
+                        return;
+                      }
                       setState(() {
                         _provider = value;
                       });
@@ -574,25 +711,60 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                 'manual_payment.transaction_initiated_notice'.tr(),
                 style: TextStyle(color: noticeColor),
               ),
+            ] else if (tx != null && isCooldownLocked) ...[
+              const SizedBox(height: 8),
+              Text(
+                'manual_payment.cooldown_notice'.tr(
+                  namedArgs: {
+                    'remaining': _formatRemainingDuration(tx.cooldownUntil!),
+                  },
+                ),
+                style: TextStyle(color: noticeColor, fontWeight: FontWeight.w700),
+              ),
             ],
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: canInitiate ? _initiate : null,
-              child: Text('manual_payment.generate_transaction'.tr()),
+              child: Text(buttonLabel),
             ),
             const SizedBox(height: 16),
             PaymentStatusWidget(transaction: tx),
+            if (tx != null && tx.isRefundPending) ...[
+              const SizedBox(height: 12),
+              _RefundPendingWidget(
+                transaction: tx,
+                onContactSupport: () => _launchSupportWhatsApp(tx),
+              ),
+            ],
+            if (tx != null && tx.isExpired && tx.isRefundDone) ...[
+              const SizedBox(height: 12),
+              _RefundDoneWidget(
+                transaction: tx,
+                refundDate: tx.refundDoneAt != null
+                    ? _formatDate(tx.refundDoneAt!, withTime: true)
+                    : null,
+              ),
+            ],
             const SizedBox(height: 12),
-            if (tx != null) ...[
+            if (tx != null && (tx.isPending || tx.isRejected)) ...[
               Text(
                 'manual_payment.amount_label'.tr(
                   namedArgs: {'amount': '${tx.amountFcfa}'},
                 ),
               ),
+              if (tx.isRejected && tx.currentAttemptNumber > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'manual_payment.attempt_count'.tr(
+                    namedArgs: {'attempt': '${tx.currentAttemptNumber}'},
+                  ),
+                  style: TextStyle(color: noticeColor, fontWeight: FontWeight.w600),
+                ),
+              ],
               const SizedBox(height: 12),
               TextField(
                 controller: _senderController,
-                enabled: !isPendingAdminLocked,
+                enabled: !isPendingAdminLocked && !isCooldownLocked,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
@@ -607,14 +779,18 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
-                onPressed: isPendingAdminLocked
+                onPressed: isPendingAdminLocked || isCooldownLocked
                     ? null
-                    : () => _pickImage(disabled: isPendingAdminLocked),
+                    : () => _pickImage(
+                          disabled: isPendingAdminLocked || isCooldownLocked,
+                        ),
                 icon: const Icon(Icons.image_outlined),
                 label: Text(
                   isPendingAdminLocked
                       ? 'manual_payment.proof_already_submitted'.tr()
-                      : 'manual_payment.select_proof'.tr(),
+                      : isCooldownLocked
+                          ? 'manual_payment.cooldown_locked_cta'.tr()
+                          : 'manual_payment.select_proof'.tr(),
                 ),
               ),
               const SizedBox(height: 8),
@@ -675,6 +851,142 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RefundPendingWidget extends StatelessWidget {
+  const _RefundPendingWidget({
+    required this.transaction,
+    required this.onContactSupport,
+  });
+
+  final ManualPaymentModel transaction;
+  final VoidCallback onContactSupport;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final expirationDate = transaction.expiresAtAdmin != null
+        ? DateFormat('dd/MM/yyyy').format(transaction.expiresAtAdmin!.toLocal())
+        : '—';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4E5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFC857)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'manual_payment.refund_pending_title'.tr(),
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'manual_payment.transaction_id'.tr(
+              namedArgs: {'id': transaction.transactionId},
+            ),
+          ),
+          Text(
+            'manual_payment.amount_label'.tr(
+              namedArgs: {'amount': '${transaction.amountFcfa}'},
+            ),
+          ),
+          Text(
+            'manual_payment.expiration_date'.tr(
+              namedArgs: {'date': expirationDate},
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'manual_payment.refund_pending_body'.tr(
+              namedArgs: {'amount': '${transaction.amountFcfa}'},
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'manual_payment.refund_pending_support_eta'.tr(),
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onContactSupport,
+              icon: const Icon(Icons.chat_bubble_outline),
+              label: Text('manual_payment.contact_support_whatsapp'.tr()),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.lock_outline),
+              label: Text(
+                'manual_payment.new_request_locked_until_refund'.tr(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RefundDoneWidget extends StatelessWidget {
+  const _RefundDoneWidget({
+    required this.transaction,
+    required this.refundDate,
+  });
+
+  final ManualPaymentModel transaction;
+  final String? refundDate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE9F8EE),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF67C587)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'manual_payment.refund_done_title'.tr(),
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF146C2E),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'manual_payment.transaction_id'.tr(
+              namedArgs: {'id': transaction.transactionId},
+            ),
+          ),
+          if (refundDate != null)
+            Text(
+              'manual_payment.refund_done_label'.tr(
+                namedArgs: {'date': refundDate!},
+              ),
+            ),
+          const SizedBox(height: 8),
+          Text('manual_payment.refund_done_body'.tr()),
+        ],
       ),
     );
   }

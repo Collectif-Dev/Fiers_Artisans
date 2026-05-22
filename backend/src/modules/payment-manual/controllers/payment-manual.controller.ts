@@ -43,6 +43,13 @@ export class PaymentManualController {
       provider: payment.provider,
       amount_fcfa: payment.amount_fcfa,
       status: payment.status,
+      request_number: payment.request_number,
+      refund_required: payment.refund_required,
+      refund_done_at: payment.refund_done_at,
+      rejection_reason: payment.rejection_reason,
+      cooldown_until: payment.cooldown_until,
+      cooldown_cycle: payment.cooldown_cycle,
+      proof_count: payment.proofs?.length || 0,
       expires_at_admin: payment.expires_at_admin,
       recipient_number: recipientNumber,
       provider_available: this.paymentManualService.isProviderAvailable(

@@ -41,6 +41,9 @@ interface AdminListFilters {
   sort?: 'asc' | 'desc' | string;
 }
 
+const MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE = 3;
+const MANUAL_PAYMENT_COOLDOWN_BASE_HOURS = 5;
+
 const MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER: Record<
   PaymentProviderManual,
   string | null
@@ -230,7 +233,10 @@ export class PaymentManualService implements OnModuleDestroy {
       select: ['id', 'status', 'artisan_profile_id', 'amount_fcfa'],
     });
 
-    if (subscription?.status === SubscriptionStatus.ACTIVE) {
+    if (
+      artisanProfile.is_subscription_active &&
+      subscription?.status === SubscriptionStatus.ACTIVE
+    ) {
       throw new BusinessException(
         'PAYMENT_MANUAL_ALREADY_ACTIVE',
         'Votre abonnement est deja actif.',
@@ -247,39 +253,46 @@ export class PaymentManualService implements OnModuleDestroy {
       );
     }
 
-    const openPayment = await this.paymentManualRepository.findOne({
+    const latestPayment = await this.paymentManualRepository.findOne({
       where: {
         subscription_id: subscription.id,
-        status: In([
-          PaymentManualStatus.PENDING,
-          PaymentManualStatus.PENDING_ADMIN,
-          PaymentManualStatus.REJECTED,
-        ]),
         deleted_at: IsNull(),
       },
-      order: { created_at: 'DESC' },
+      order: {
+        created_at: 'DESC',
+        request_number: 'DESC',
+      },
       relations: ['proofs'],
     });
 
-    if (openPayment) {
-      if (openPayment.status === PaymentManualStatus.REJECTED) {
-        const attempts = openPayment.proofs?.length || 0;
-        if (attempts < 3) {
-          return openPayment;
-        }
-      }
-
-      if (
-        openPayment.status === PaymentManualStatus.PENDING ||
-        openPayment.status === PaymentManualStatus.PENDING_ADMIN
-      ) {
-        return openPayment;
-      }
-
-      throw new ConflictException(
-        'Aucune tentative supplementaire autorisee pour ce paiement.',
+    if (
+      latestPayment?.status === PaymentManualStatus.EXPIRED &&
+      latestPayment.refund_required &&
+      !latestPayment.refund_done_at
+    ) {
+      throw new BusinessException(
+        'PAYMENT_MANUAL_REFUND_PENDING',
+        'Un remboursement est en cours. Vous ne pouvez pas creer une nouvelle demande.',
+        HttpStatus.CONFLICT,
       );
     }
+
+    if (
+      latestPayment &&
+      [
+        PaymentManualStatus.PENDING,
+        PaymentManualStatus.PENDING_ADMIN,
+        PaymentManualStatus.REJECTED,
+      ].includes(latestPayment.status)
+    ) {
+      return latestPayment;
+    }
+
+    const requestNumber =
+      (await this.paymentManualRepository.count({
+        where: { subscription_id: subscription.id },
+        withDeleted: true,
+      })) + 1;
 
     const now = new Date();
     const expiresAtAdmin = new Date(
@@ -293,6 +306,7 @@ export class PaymentManualService implements OnModuleDestroy {
         amount_fcfa: subscription.amount_fcfa || this.amountFcfa,
         provider,
         status: PaymentManualStatus.PENDING,
+        request_number: requestNumber,
         expires_at_admin: expiresAtAdmin,
         timeline: [
           this.timelineEvent('PAYMENT_MANUAL_INITIATED', {
@@ -346,18 +360,26 @@ export class PaymentManualService implements OnModuleDestroy {
       where: { payment_manual_id: payment.id, deleted_at: IsNull() },
     });
 
-    if (attempts >= 3) {
+    if (
+      payment.status === PaymentManualStatus.REJECTED &&
+      this.hasActiveCooldown(payment)
+    ) {
+      const cooldownUntil = payment.cooldown_until!;
       throw new BusinessException(
-        'PAYMENT_MANUAL_MAX_ATTEMPTS',
-        'Limite de 3 tentatives atteinte pour cette transaction.',
+        'PAYMENT_MANUAL_COOLDOWN_ACTIVE',
+        `Nouvelle soumission possible dans ${this.formatRemainingDuration(cooldownUntil)}.`,
         HttpStatus.TOO_MANY_REQUESTS,
       );
     }
+
     await this.enforceProofSubmissionRateLimit(params.userId);
 
     this.logger.log(
       `[SUBMIT] Proof submission allowed for user=${params.userId} transactionId=${params.transactionId}`,
     );
+
+    const uploadAttemptNumber =
+      (attempts % MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE) + 1;
 
     const validation = await this.proofValidationService.validateImage(
       params.file,
@@ -396,7 +418,7 @@ export class PaymentManualService implements OnModuleDestroy {
       image_url: `${uploaded.bucket}/${uploaded.objectKey}`,
       image_hash_sha256: imageHash,
       declared_payment_time: params.declaredTime ?? null,
-      upload_attempt_number: attempts + 1,
+      upload_attempt_number: uploadAttemptNumber,
       file_type: validation.mimeType,
       file_size_kb: Math.max(1, Math.round(validation.sizeBytes / 1024)),
       file_resolution: `${validation.width}x${validation.height}`,
@@ -431,12 +453,13 @@ export class PaymentManualService implements OnModuleDestroy {
     payment.sender_number = params.senderNumber;
     payment.rejected_at = null;
     payment.rejection_reason = null;
+    payment.cooldown_until = null;
     payment.timeline = [
       ...(payment.timeline || []),
       this.timelineEvent('PROOF_SUBMITTED', {
         byUserId: params.userId,
         proofId: savedProof.id,
-        attempt: attempts + 1,
+        attempt: uploadAttemptNumber,
       }),
     ];
     await this.paymentManualRepository.save(payment);
@@ -571,29 +594,59 @@ export class PaymentManualService implements OnModuleDestroy {
       throw new BadRequestException('Le paiement doit etre en attente admin.');
     }
 
+    const proofCount = await this.paymentProofRepository.count({
+      where: { payment_manual_id: payment.id, deleted_at: IsNull() },
+    });
+    const shouldStartCooldown =
+      proofCount > 0 &&
+      proofCount % MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE === 0;
+
     payment.status = PaymentManualStatus.REJECTED;
     payment.rejected_at = new Date();
     payment.rejection_reason = reason;
+    if (shouldStartCooldown) {
+      const nextCooldownCycle = Math.max(1, (payment.cooldown_cycle || 0) + 1);
+      const cooldownUntil = new Date(
+        Date.now() + this.cooldownDurationMs(nextCooldownCycle),
+      );
+      payment.cooldown_cycle = nextCooldownCycle;
+      payment.cooldown_until = cooldownUntil;
+    } else {
+      payment.cooldown_until = null;
+    }
     payment.timeline = [
       ...(payment.timeline || []),
       this.timelineEvent('PAYMENT_MANUAL_REJECTED', {
         byAdminId: adminId,
         reason,
+        cooldownCycle: payment.cooldown_cycle || 0,
+        cooldownUntil: payment.cooldown_until?.toISOString?.() || null,
       }),
     ];
     await this.paymentManualRepository.save(payment);
 
     const artisanUserId = payment.subscription?.artisan_profile?.user_id;
     if (artisanUserId) {
+      const rejectionType = payment.cooldown_until
+        ? 'PAYMENT_MANUAL_COOLDOWN'
+        : 'PAYMENT_MANUAL_REJECTED';
+      const rejectionTitle = payment.cooldown_until
+        ? 'Blocage temporaire actif'
+        : 'Preuve rejetee';
+      const rejectionBody = payment.cooldown_until
+        ? `Blocage temporaire actif. Nouvelle soumission possible dans ${this.formatRemainingDuration(payment.cooldown_until)}.`
+        : `Preuve rejetee : ${reason}`;
       await this.notificationsService.create({
         userId: artisanUserId,
-        type: 'PAYMENT_MANUAL_REJECTED',
-        title: 'Preuve rejetee',
-        body: `Preuve rejetee : ${reason}`,
+        type: rejectionType,
+        title: rejectionTitle,
+        body: rejectionBody,
         data: {
           paymentId: payment.id,
           transactionId: payment.transaction_id,
           reason,
+          cooldownUntil: payment.cooldown_until?.toISOString?.() || null,
+          cooldownCycle: payment.cooldown_cycle || 0,
         },
       });
     }
@@ -664,6 +717,7 @@ export class PaymentManualService implements OnModuleDestroy {
     payment.rejection_reason = null;
     payment.refund_required = false;
     payment.refund_done_at = null;
+    payment.cooldown_until = null;
     payment.expires_at_admin = expiresAtAdmin;
     payment.timeline = [
       ...(payment.timeline || []),
@@ -871,7 +925,7 @@ export class PaymentManualService implements OnModuleDestroy {
         userId: artisanUserId,
         type: 'REFUND_PROCESSED',
         title: 'Remboursement effectue',
-        body: 'Le remboursement de votre paiement manuel a ete confirme.',
+        body: `Votre remboursement de ${payment.amount_fcfa} FCFA a ete confirme. Vous pouvez maintenant creer une nouvelle demande.`,
         data: {
           paymentId: payment.id,
           transactionId: payment.transaction_id,
@@ -956,25 +1010,44 @@ export class PaymentManualService implements OnModuleDestroy {
   }
 
   async getCurrentTransaction(userId: string): Promise<PaymentManual | null> {
-    const activeStatuses = [
-      PaymentManualStatus.PENDING,
-      PaymentManualStatus.PENDING_ADMIN,
-      PaymentManualStatus.REJECTED,
-    ];
+    const artisanProfile =
+      await this.resolvePreferredArtisanProfileForUser(userId);
+    const subscriptions = await this.subscriptionRepository.find({
+      where: { artisan_profile_id: artisanProfile.id },
+      select: ['id', 'artisan_profile_id', 'created_at'],
+      order: { created_at: 'DESC' },
+    });
 
-    const payment = await this.paymentManualRepository
-      .createQueryBuilder('pm')
-      .leftJoinAndSelect('pm.proofs', 'proof', 'proof.deleted_at IS NULL')
-      .leftJoinAndSelect('pm.subscription', 'subscription')
-      .leftJoinAndSelect('subscription.artisan_profile', 'artisan')
-      .where('artisan.user_id = :userId', { userId })
-      .andWhere('pm.deleted_at IS NULL')
-      .andWhere('pm.status IN (:...statuses)', { statuses: activeStatuses })
-      .orderBy('pm.created_at', 'DESC')
-      .addOrderBy('proof.submitted_at', 'DESC')
-      .getOne();
+    if (!subscriptions.length) {
+      return null;
+    }
 
-    return payment ?? null;
+    const [latestPayment] = await this.paymentManualRepository.find({
+      where: {
+        subscription_id: In(subscriptions.map((subscription) => subscription.id)),
+        deleted_at: IsNull(),
+      },
+      relations: ['proofs', 'subscription', 'subscription.artisan_profile'],
+      order: {
+        created_at: 'DESC',
+        request_number: 'DESC',
+        proofs: { submitted_at: 'DESC' },
+      },
+      take: 1,
+    });
+
+    if (!latestPayment) {
+      return null;
+    }
+
+    if (
+      latestPayment.status === PaymentManualStatus.COMPLETED &&
+      !latestPayment.subscription?.artisan_profile?.is_subscription_active
+    ) {
+      return null;
+    }
+
+    return latestPayment;
   }
 
   async getStatus(
@@ -1230,6 +1303,41 @@ export class PaymentManualService implements OnModuleDestroy {
     }
 
     return payment;
+  }
+
+  private cooldownDurationMs(cycle: number): number {
+    return (
+      MANUAL_PAYMENT_COOLDOWN_BASE_HOURS *
+      60 *
+      60 *
+      1000 *
+      Math.pow(2, Math.max(0, cycle - 1))
+    );
+  }
+
+  private hasActiveCooldown(payment: Pick<PaymentManual, 'cooldown_until'>): boolean {
+    if (!payment.cooldown_until) {
+      return false;
+    }
+
+    return payment.cooldown_until.getTime() > Date.now();
+  }
+
+  private formatRemainingDuration(target: Date): string {
+    const remainingMs = Math.max(0, target.getTime() - Date.now());
+    const totalMinutes = Math.ceil(remainingMs / (60 * 1000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    if (hours <= 0) {
+      return `${minutes} min`;
+    }
+
+    if (minutes === 0) {
+      return `${hours} h`;
+    }
+
+    return `${hours} h ${minutes} min`;
   }
 
   private generateTransactionId(): string {

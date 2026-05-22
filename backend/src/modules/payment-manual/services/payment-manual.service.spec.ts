@@ -63,7 +63,7 @@ describe('PaymentManualService', () => {
         create: jest.fn(),
       } as any,
       {
-        logActivity: jest.fn(),
+        logActivity: jest.fn().mockResolvedValue(undefined),
       } as any,
       {
         validateImage: jest.fn(),
@@ -117,12 +117,14 @@ describe('PaymentManualService', () => {
       amount_fcfa: 5000,
     });
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
-    paymentManualRepository.findOne = jest.fn().mockResolvedValue({
-      id: 'pm-1',
-      transaction_id: 'TX-1',
-      status: PaymentManualStatus.PENDING,
-      proofs: [],
-    });
+    paymentManualRepository.findOne = jest
+      .fn()
+      .mockResolvedValue({
+        id: 'pm-1',
+        transaction_id: 'TX-1',
+        status: PaymentManualStatus.PENDING,
+        proofs: [],
+      });
 
     const result = await service.initiatePayment(
       'user-1',
@@ -131,6 +133,74 @@ describe('PaymentManualService', () => {
 
     expect(result.id).toBe('pm-1');
     expect(paymentManualRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('blocks initiation when an expired payment is waiting for refund', async () => {
+    artisanProfileRepository.find = jest.fn().mockResolvedValue([
+      {
+        id: 'artisan-1',
+        user_id: 'user-1',
+        is_subscription_active: false,
+      },
+    ]);
+    subscriptionRepository.findOne = jest.fn().mockResolvedValue({
+      id: 'sub-1',
+      status: 'PENDING',
+      artisan_profile_id: 'artisan-1',
+      amount_fcfa: 5000,
+    });
+    subscriptionRepository.find = jest.fn().mockResolvedValue([]);
+    paymentManualRepository.findOne = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'pm-exp-1',
+        transaction_id: 'TX-EXP-1',
+        status: PaymentManualStatus.EXPIRED,
+        refund_required: true,
+        refund_done_at: null,
+        proofs: [],
+      });
+
+    await expect(
+      service.initiatePayment('user-1', PaymentProviderManual.ORANGE_MONEY),
+    ).rejects.toMatchObject({
+      code: 'PAYMENT_MANUAL_REFUND_PENDING',
+    });
+  });
+
+  it('assigns a request number when creating a new manual payment', async () => {
+    artisanProfileRepository.find = jest.fn().mockResolvedValue([
+      {
+        id: 'artisan-1',
+        user_id: 'user-1',
+        is_subscription_active: false,
+      },
+    ]);
+    subscriptionRepository.findOne = jest.fn().mockResolvedValue({
+      id: 'sub-1',
+      status: 'PENDING',
+      artisan_profile_id: 'artisan-1',
+      amount_fcfa: 5000,
+    });
+    subscriptionRepository.find = jest.fn().mockResolvedValue([]);
+    paymentManualRepository.findOne = jest.fn().mockResolvedValue(null);
+    paymentManualRepository.count = jest.fn().mockResolvedValue(1);
+    paymentManualRepository.save = jest.fn().mockImplementation(async (payload) => ({
+      id: 'pm-new-1',
+      ...payload,
+    }));
+
+    const payment = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.ORANGE_MONEY,
+    );
+
+    expect(payment.request_number).toBe(2);
+    expect(paymentManualRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request_number: 2,
+      }),
+    );
   });
 
   it('returns operator-specific recipient numbers', () => {

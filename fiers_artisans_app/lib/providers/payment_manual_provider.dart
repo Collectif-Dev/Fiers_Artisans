@@ -101,7 +101,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
         hasSubmittedProof: tx?.isPendingAdmin == true,
       );
 
-      if (tx != null && (tx.isPending || tx.isPendingAdmin)) {
+      if (tx != null && _shouldPoll(tx)) {
         _startPolling();
       } else {
         _pollingTimer?.cancel();
@@ -120,7 +120,11 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
         isLoading: false,
         hasSubmittedProof: false,
       );
-      _startPolling();
+      if (_shouldPoll(tx)) {
+        _startPolling();
+      } else {
+        _pollingTimer?.cancel();
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
@@ -138,7 +142,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
             ? false
             : state.hasSubmittedProof,
       );
-      if (tx.isCompleted) {
+      if (!_shouldPoll(tx)) {
         _pollingTimer?.cancel();
       }
     } catch (e) {
@@ -168,11 +172,19 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
               ? _statusMessage(
                   latest.status,
                   rejectionReason: latest.rejectionReason ?? payloadReason,
-                  refundDone: payloadRefundDone,
+                  refundDone: latest.refundDoneAt != null || payloadRefundDone,
                   refundRequired: latest.refundRequired,
+                  amountFcfa: latest.amountFcfa,
+                  cooldownActive: latest.isCooldownActive,
+                  cooldownRemainingSeconds: latest.cooldownRemainingSeconds,
                 )
               : null,
         );
+        if (_shouldPoll(latest)) {
+          _startPolling();
+        } else {
+          _pollingTimer?.cancel();
+        }
         return;
       } catch (_) {
         // Fallback to payload-only status message when API refresh fails.
@@ -186,6 +198,8 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
           rejectionReason: payloadReason,
           refundDone: payloadRefundDone,
           refundRequired: payloadRefundRequired,
+          cooldownActive: false,
+          cooldownRemainingSeconds: 0,
         ),
       );
     }
@@ -238,6 +252,8 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     });
   }
 
+  bool _shouldPoll(ManualPaymentModel tx) => tx.isPending || tx.isPendingAdmin;
+
   String _toUserFacingError(Object error) {
     if (error is DioException) {
       final status = error.response?.statusCode;
@@ -285,12 +301,22 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
           signature.contains('too many requests') ||
           signature.contains('rate_limit') ||
           backendCode == 'PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT' ||
-          backendCode == 'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT') {
+          backendCode == 'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT' ||
+          backendCode == 'PAYMENT_MANUAL_REJECTED_COOLDOWN' ||
+          backendCode == 'PAYMENT_MANUAL_COOLDOWN_ACTIVE') {
         if (backendCode == 'PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT' &&
             backendMessage.trim().isNotEmpty) {
           return backendMessage;
         }
         if (backendCode == 'PAYMENT_MANUAL_SUBMIT_RATE_LIMIT' &&
+            backendMessage.trim().isNotEmpty) {
+          return backendMessage;
+        }
+        if (backendCode == 'PAYMENT_MANUAL_REJECTED_COOLDOWN' &&
+            backendMessage.trim().isNotEmpty) {
+          return backendMessage;
+        }
+        if (backendCode == 'PAYMENT_MANUAL_COOLDOWN_ACTIVE' &&
             backendMessage.trim().isNotEmpty) {
           return backendMessage;
         }
@@ -308,6 +334,12 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
       if (backendCode == 'PAYMENT_MANUAL_MAX_ATTEMPTS') {
         return 'Vous avez atteint la limite de tentatives pour cette transaction.';
+      }
+
+      if (backendCode == 'PAYMENT_MANUAL_REFUND_PENDING') {
+        return backendMessage.trim().isNotEmpty
+            ? backendMessage
+            : 'Un remboursement est en cours. Vous ne pouvez pas creer une nouvelle demande.';
       }
 
       if (signature.contains('type de fichier invalide') ||
@@ -358,15 +390,25 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     String? rejectionReason,
     required bool refundDone,
     required bool refundRequired,
+    int? amountFcfa,
+    required bool cooldownActive,
+    required int cooldownRemainingSeconds,
   }) {
     if (refundDone) {
-      return 'Un remboursement a ete effectue.';
+      final amount = amountFcfa ?? 5000;
+      return 'Votre remboursement de $amount FCFA a ete confirme. Vous pouvez maintenant creer une nouvelle demande.';
     }
 
     switch (status) {
       case 'COMPLETED':
         return 'Votre paiement a ete valide. Abonnement actif.';
       case 'REJECTED':
+        if (cooldownActive) {
+          final hours = cooldownRemainingSeconds ~/ 3600;
+          final minutes = (cooldownRemainingSeconds % 3600) ~/ 60;
+          final seconds = cooldownRemainingSeconds % 60;
+          return 'Blocage temporaire actif. Nouvelle soumission possible dans ${hours}h ${minutes.toString().padLeft(2, '0')}min ${seconds.toString().padLeft(2, '0')}s.';
+        }
         if (rejectionReason != null && rejectionReason.trim().isNotEmpty) {
           return 'Preuve rejetee : ${rejectionReason.trim()}';
         }

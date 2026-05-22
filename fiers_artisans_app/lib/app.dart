@@ -103,6 +103,7 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp>
     const paymentSnackTypes = {
       'PAYMENT_MANUAL_VALIDATED',
       'PAYMENT_MANUAL_REJECTED',
+      'PAYMENT_MANUAL_COOLDOWN',
       'PAYMENT_MANUAL_REOPENED',
       'PAYMENT_MANUAL_EXPIRED',
       'REFUND_PROCESSED',

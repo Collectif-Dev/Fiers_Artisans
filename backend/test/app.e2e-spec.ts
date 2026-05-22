@@ -1,36 +1,59 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import { HealthController } from '../src/modules/health/health.controller';
+import { PaymentMinioIndicator } from '../src/modules/health/indicators/payment-minio.indicator';
+import { AnalyticsService } from '../src/modules/analytics/analytics.service';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+describe('HealthController (e2e)', () => {
+  let app: INestApplication;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
+      controllers: [HealthController],
+      providers: [
+        {
+          provide: PaymentMinioIndicator,
+          useValue: {
+            check: jest
+              .fn()
+              .mockResolvedValue({ bucket: 'payment-proofs', exists: true }),
+          },
+        },
+        {
+          provide: AnalyticsService,
+          useValue: {
+            getLogRetentionStatus: jest
+              .fn()
+              .mockResolvedValue({ ttlSeconds: 2_592_000 }),
+          },
+        },
+      ],
     }).compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await app.close();
   });
 
-  it('/health (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/health')
-      .expect(200)
-      .expect(({ body }) => {
-        expect(body).toMatchObject({
-          status: 'ok',
-          service: 'Fiers Artisans API',
-        });
-        expect(typeof body.timestamp).toBe('string');
-        expect(typeof body.uptime).toBe('number');
-      });
+  it('/health (GET)', async () => {
+    const controller = app.get(HealthController);
+    const body = await controller.check();
+
+    expect(body).toMatchObject({
+      status: 'ok',
+      service: 'Fiers Artisans API',
+    });
+    expect(typeof body.timestamp).toBe('string');
+    expect(typeof body.uptime).toBe('number');
+    expect(body.storage?.paymentProofsBucket).toEqual({
+      bucket: 'payment-proofs',
+      exists: true,
+    });
+    expect(body.analytics?.activityLogsTtl).toEqual({
+      ttlSeconds: 2_592_000,
+    });
   });
 });

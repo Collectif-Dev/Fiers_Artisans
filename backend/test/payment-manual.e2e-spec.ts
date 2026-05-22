@@ -33,11 +33,22 @@ function createHarness() {
     return [String(statusFilter)];
   };
 
+  const resolveListFilter = (value: unknown): string[] => {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(String);
+    const maybeOp = value as { value?: unknown; _value?: unknown };
+    if (Array.isArray(maybeOp?.value)) return maybeOp.value.map(String);
+    if (Array.isArray(maybeOp?._value)) return maybeOp._value.map(String);
+    return [String(value)];
+  };
+
   const paymentManualRepository = {
     findOne: jest.fn(async ({ where, relations }: AnyRecord) => {
       if (where?.transaction_id) {
         const payment = state.payments.find(
-          (p) => p.transaction_id === where.transaction_id && !p.deleted_at,
+          (p) =>
+            p.transaction_id === where.transaction_id &&
+            (!where.deleted_at || !p.deleted_at),
         );
         if (!payment) return null;
         if (relations?.includes('subscription')) {
@@ -84,8 +95,17 @@ function createHarness() {
           .filter(
             (p) =>
               p.subscription_id === where.subscription_id &&
-              !p.deleted_at &&
+              (!where.deleted_at || !p.deleted_at) &&
               (allowed.length === 0 || allowed.includes(p.status)),
+          )
+          .filter(
+            (p) =>
+              where.refund_required === undefined ||
+              p.refund_required === where.refund_required,
+          )
+          .filter(
+            (p) =>
+              where.refund_done_at === undefined || p.refund_done_at == null,
           )
           .sort(
             (a, b) =>
@@ -119,7 +139,11 @@ function createHarness() {
           created_at: new Date(),
           updated_at: new Date(),
           timeline: [],
+          request_number: 1,
           refund_required: false,
+          refund_done_at: null,
+          cooldown_until: null,
+          cooldown_cycle: 0,
           attempted_refund_count: 0,
           ...payload,
         };
@@ -140,8 +164,62 @@ function createHarness() {
       return payload;
     }),
     create: jest.fn((payload: AnyRecord) => payload),
-    count: jest.fn(),
-    find: jest.fn(async ({ where, take }: AnyRecord) => {
+    count: jest.fn(async ({ where, withDeleted }: AnyRecord) => {
+      if (where?.subscription_id) {
+        return state.payments.filter(
+          (p) =>
+            p.subscription_id === where.subscription_id &&
+            (withDeleted || !p.deleted_at),
+        ).length;
+      }
+      return 0;
+    }),
+    find: jest.fn(async ({ where, take, relations }: AnyRecord) => {
+      if (where?.subscription_id) {
+        const subscriptionIds = resolveListFilter(where.subscription_id);
+        const list = state.payments
+          .filter(
+            (p) =>
+              subscriptionIds.includes(p.subscription_id) &&
+              (!where.deleted_at || !p.deleted_at),
+          )
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime(),
+          );
+        return list.slice(0, take || list.length).map((payment) => {
+          const enriched = { ...payment };
+          if (relations?.includes('proofs')) {
+            enriched.proofs = state.proofs
+              .filter(
+                (proof) =>
+                  proof.payment_manual_id === payment.id && !proof.deleted_at,
+              )
+              .sort(
+                (a, b) =>
+                  new Date(b.submitted_at).getTime() -
+                  new Date(a.submitted_at).getTime(),
+              );
+          }
+          if (relations?.includes('subscription')) {
+            enriched.subscription = state.subscriptions.find(
+              (subscription) => subscription.id === payment.subscription_id,
+            );
+            if (
+              enriched.subscription &&
+              relations?.includes('subscription.artisan_profile')
+            ) {
+              enriched.subscription.artisan_profile = state.artisanProfiles.find(
+                (artisan) =>
+                  artisan.id === enriched.subscription.artisan_profile_id,
+              );
+            }
+          }
+          return enriched;
+        });
+      }
+
       const now = new Date();
       const list = state.payments.filter((p) => {
         const expired =
@@ -232,7 +310,7 @@ function createHarness() {
     }),
     save: jest.fn(async (payload: AnyRecord) => {
       if (!payload.id) {
-        const created = { id: randomUUID(), ...payload };
+        const created = { id: randomUUID(), created_at: new Date(), ...payload };
         state.subscriptions.push(created);
         return created;
       }
@@ -245,6 +323,21 @@ function createHarness() {
       return payload;
     }),
     create: jest.fn((payload: AnyRecord) => payload),
+    find: jest.fn(async ({ where }: AnyRecord) => {
+      if (where?.artisan_profile_id) {
+        const artisanIds = resolveListFilter(where.artisan_profile_id);
+        return state.subscriptions
+          .filter((subscription) =>
+            artisanIds.includes(subscription.artisan_profile_id),
+          )
+          .sort(
+            (a, b) =>
+              new Date(b.created_at || 0).getTime() -
+              new Date(a.created_at || 0).getTime(),
+          );
+      }
+      return [];
+    }),
   } as any;
 
   const artisanProfileRepository = {
@@ -252,6 +345,15 @@ function createHarness() {
       return (
         state.artisanProfiles.find((a) => a.user_id === where.user_id) || null
       );
+    }),
+    find: jest.fn(async ({ where }: AnyRecord) => {
+      return state.artisanProfiles
+        .filter((artisan) => artisan.user_id === where.user_id)
+        .sort(
+          (a, b) =>
+            new Date(b.updated_at || 0).getTime() -
+            new Date(a.updated_at || 0).getTime(),
+        );
     }),
   } as any;
 
@@ -445,10 +547,22 @@ describe('Payment Manual (e2e scenarios)', () => {
     expect(expired?.status).toBe(PaymentManualStatus.EXPIRED);
     expect(expired?.refund_required).toBe(true);
 
-    await service.reopenProof('pm-exp-1', 'admin-1', 'manual review override');
-    const reopened = state.payments.find((p) => p.id === 'pm-exp-1');
-    expect(reopened?.status).toBe(PaymentManualStatus.PENDING);
-    expect(reopened?.refund_required).toBe(false);
+    await expect(
+      service.initiatePayment('user-1', PaymentProviderManual.WAVE),
+    ).rejects.toMatchObject({
+      code: 'PAYMENT_MANUAL_REFUND_PENDING',
+    });
+
+    await service.markRefundDone('pm-exp-1', 'admin-1');
+    const refunded = state.payments.find((p) => p.id === 'pm-exp-1');
+    expect(refunded?.refund_required).toBe(false);
+    expect(refunded?.refund_done_at).toBeInstanceOf(Date);
+
+    const newRequest = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.WAVE,
+    );
+    expect(newRequest.request_number).toBe(2);
   });
 
   it('Scenario 4: duplicate proof hash returns 409 conflict', async () => {
@@ -536,19 +650,46 @@ describe('Payment Manual (e2e scenarios)', () => {
     ).rejects.toBeInstanceOf(BusinessException);
   });
 
-  it('Scenario 6: upload attempts over limit return 429', async () => {
-    const { service, state } = createHarness();
+  it('Scenario 6: rejected proof enters cooldown after third failed cycle and reopens on the same transaction', async () => {
+    const { service, state, notificationsService, mockFile } = createHarness();
     const initiated = await service.initiatePayment(
       'user-1',
       PaymentProviderManual.ORANGE_MONEY,
     );
-    const payment = state.payments.find((p) => p.id === initiated.id)!;
-    payment.status = PaymentManualStatus.REJECTED;
 
-    state.proofs.push(
-      { id: 'proof-1', payment_manual_id: initiated.id, deleted_at: null },
-      { id: 'proof-2', payment_manual_id: initiated.id, deleted_at: null },
-      { id: 'proof-3', payment_manual_id: initiated.id, deleted_at: null },
+    const proofBuffers = [
+      mockFile,
+      Buffer.concat([mockFile, Buffer.from('aa', 'hex')]),
+      Buffer.concat([mockFile, Buffer.from('bb', 'hex')]),
+      Buffer.concat([mockFile, Buffer.from('cc', 'hex')]),
+    ];
+
+    for (let index = 0; index < 3; index += 1) {
+      await service.submitProof({
+        transactionId: initiated.transaction_id,
+        userId: 'user-1',
+        file: {
+          buffer: proofBuffers[index],
+          mimetype: 'image/jpeg',
+          size: proofBuffers[index].length,
+          originalname: `proof-${index + 1}.jpg`,
+        } as Express.Multer.File,
+        senderNumber: '0700000000',
+      });
+      await service.rejectProof(initiated.id, 'admin-1', `reject-${index + 1}`);
+    }
+
+    const payment = state.payments.find((p) => p.id === initiated.id)!;
+    expect(payment.cooldown_cycle).toBe(1);
+    expect(payment.cooldown_until).toBeInstanceOf(Date);
+    expect(notificationsService.create).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'PAYMENT_MANUAL_COOLDOWN',
+        data: expect.objectContaining({
+          cooldownCycle: 1,
+        }),
+      }),
     );
 
     try {
@@ -556,17 +697,136 @@ describe('Payment Manual (e2e scenarios)', () => {
         transactionId: initiated.transaction_id,
         userId: 'user-1',
         file: {
-          buffer: Buffer.from('ffd8ffe1', 'hex'),
+          buffer: proofBuffers[3],
           mimetype: 'image/jpeg',
-          size: 4,
+          size: proofBuffers[3].length,
           originalname: 'proof-over-limit.jpg',
         } as Express.Multer.File,
         senderNumber: '0700000000',
       });
-      throw new Error('Expected submitProof to throw 429');
+      throw new Error('Expected submitProof to throw cooldown 429');
     } catch (error) {
       expect(error).toBeInstanceOf(HttpException);
       expect((error as HttpException).getStatus()).toBe(429);
     }
+
+    payment.cooldown_until = new Date(Date.now() - 1000);
+
+    await service.submitProof({
+      transactionId: initiated.transaction_id,
+      userId: 'user-1',
+      file: {
+        buffer: proofBuffers[3],
+        mimetype: 'image/jpeg',
+        size: proofBuffers[3].length,
+        originalname: 'proof-after-cooldown.jpg',
+      } as Express.Multer.File,
+      senderNumber: '0700000000',
+    });
+
+    const refreshed = state.payments.find((p) => p.id === initiated.id)!;
+    const latestProof = state.proofs[state.proofs.length - 1];
+    expect(refreshed.status).toBe(PaymentManualStatus.PENDING_ADMIN);
+    expect(refreshed.cooldown_until).toBeNull();
+    expect(latestProof.upload_attempt_number).toBe(1);
+  });
+
+  it('Scenario 7: getCurrentTransaction always returns the latest payment, not an older rejected one', async () => {
+    const { service, state } = createHarness();
+    const subscription = {
+      id: 'sub-latest-1',
+      artisan_profile_id: 'artisan-1',
+      amount_fcfa: 5000,
+      status: SubscriptionStatus.PENDING,
+      created_at: new Date('2026-05-01T08:00:00.000Z'),
+    };
+    state.subscriptions.push(subscription);
+    state.payments.push(
+      {
+        id: 'pm-old-rejected',
+        subscription_id: subscription.id,
+        transaction_id: 'TX-OLD-REJ',
+        amount_fcfa: 5000,
+        provider: PaymentProviderManual.ORANGE_MONEY,
+        status: PaymentManualStatus.REJECTED,
+        request_number: 1,
+        refund_required: false,
+        refund_done_at: null,
+        created_at: new Date('2026-05-01T09:00:00.000Z'),
+        expires_at_admin: null,
+        timeline: [],
+      },
+      {
+        id: 'pm-latest-expired',
+        subscription_id: subscription.id,
+        transaction_id: 'TX-LATEST-EXP',
+        amount_fcfa: 5000,
+        provider: PaymentProviderManual.WAVE,
+        status: PaymentManualStatus.EXPIRED,
+        request_number: 2,
+        refund_required: true,
+        refund_done_at: null,
+        created_at: new Date('2026-05-10T09:00:00.000Z'),
+        expires_at_admin: new Date('2026-05-13T09:00:00.000Z'),
+        timeline: [],
+      },
+    );
+
+    const current = await service.getCurrentTransaction('user-1');
+
+    expect(current?.transaction_id).toBe('TX-LATEST-EXP');
+    expect(current?.status).toBe(PaymentManualStatus.EXPIRED);
+    expect(current?.refund_required).toBe(true);
+  });
+
+  it('Scenario 8: a refunded expired payment does not get overridden by an older rejected request during re-initiation', async () => {
+    const { service, state } = createHarness();
+    const subscription = {
+      id: 'sub-reinit-1',
+      artisan_profile_id: 'artisan-1',
+      amount_fcfa: 5000,
+      status: SubscriptionStatus.PENDING,
+      created_at: new Date('2026-05-01T08:00:00.000Z'),
+    };
+    state.subscriptions.push(subscription);
+    state.payments.push(
+      {
+        id: 'pm-rejected-1',
+        subscription_id: subscription.id,
+        transaction_id: 'TX-OLD-001',
+        amount_fcfa: 5000,
+        provider: PaymentProviderManual.ORANGE_MONEY,
+        status: PaymentManualStatus.REJECTED,
+        request_number: 1,
+        refund_required: false,
+        refund_done_at: null,
+        created_at: new Date('2026-05-01T09:00:00.000Z'),
+        expires_at_admin: null,
+        timeline: [],
+      },
+      {
+        id: 'pm-expired-refunded',
+        subscription_id: subscription.id,
+        transaction_id: 'TX-EXP-002',
+        amount_fcfa: 5000,
+        provider: PaymentProviderManual.WAVE,
+        status: PaymentManualStatus.EXPIRED,
+        request_number: 2,
+        refund_required: false,
+        refund_done_at: new Date('2026-05-12T10:00:00.000Z'),
+        created_at: new Date('2026-05-10T09:00:00.000Z'),
+        expires_at_admin: new Date('2026-05-13T09:00:00.000Z'),
+        timeline: [],
+      },
+    );
+
+    const newRequest = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.WAVE,
+    );
+
+    expect(newRequest.transaction_id).not.toBe('TX-OLD-001');
+    expect(newRequest.request_number).toBe(3);
+    expect(newRequest.status).toBe(PaymentManualStatus.PENDING);
   });
 });
