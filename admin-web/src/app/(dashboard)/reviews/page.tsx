@@ -85,7 +85,10 @@ export default function ReviewsPage() {
   }, [page, limit, tApp]);
 
   useEffect(() => {
-    loadReviews();
+    const timeoutId = window.setTimeout(() => {
+      void loadReviews();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [loadReviews]);
 
   const silentRefresh = useCallback(async () => {

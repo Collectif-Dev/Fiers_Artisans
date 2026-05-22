@@ -3,7 +3,7 @@
 # ══════════════════════════════════════════════════════════════════════
 
 # ── Stage 1 : Development ────────────────────────────────────────────
-FROM node:20-alpine AS development
+FROM node:24-alpine AS development
 
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -16,7 +16,7 @@ FROM development AS build
 RUN npm run build
 
 # ── Stage 3 : Production ─────────────────────────────────────────────
-FROM node:20-alpine AS production
+FROM node:24-alpine AS production
 
 WORKDIR /app
 ENV NODE_ENV=production

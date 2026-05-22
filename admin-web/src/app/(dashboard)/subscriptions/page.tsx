@@ -68,7 +68,10 @@ export default function SubscriptionsPage() {
   }, [page, limit]);
 
   useEffect(() => {
-    loadSubscriptions();
+    const timeoutId = window.setTimeout(() => {
+      void loadSubscriptions();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [loadSubscriptions]);
 
   useAdminSSE(silentRefresh, {

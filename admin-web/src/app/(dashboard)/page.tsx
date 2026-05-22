@@ -49,7 +49,10 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    loadStats();
+    const timeoutId = window.setTimeout(() => {
+      void loadStats();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [loadStats]);
 
   // Real-time: refresh KPIs for business-changing events.

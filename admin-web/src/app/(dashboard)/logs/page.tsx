@@ -78,7 +78,10 @@ export default function LogsPage() {
   }, [page, limit, actionFilter, tApp]);
 
   useEffect(() => {
-    loadLogs();
+    const timeoutId = window.setTimeout(() => {
+      void loadLogs();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [loadLogs]);
 
   const silentRefresh = useCallback(async () => {

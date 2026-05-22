@@ -62,7 +62,10 @@ export default function ClientsPage() {
   }, [page, limit]);
 
   useEffect(() => {
-    loadClients();
+    const timeoutId = window.setTimeout(() => {
+      void loadClients();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [loadClients]);
 
   useAdminSSE(silentRefresh, {

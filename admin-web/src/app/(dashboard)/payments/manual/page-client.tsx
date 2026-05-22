@@ -79,7 +79,16 @@ export default function PaymentManualPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState("PENDING_ADMIN");
+  const [status, setStatus] = useState(() => {
+    if (typeof window === "undefined") {
+      return "PENDING_ADMIN";
+    }
+
+    return (
+      new URLSearchParams(window.location.search).get("status") ??
+      "PENDING_ADMIN"
+    );
+  });
 
   const [selected, setSelected] = useState<PaymentManualRecord | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -108,18 +117,11 @@ export default function PaymentManualPage() {
   );
 
   useEffect(() => {
-    void load(true);
+    const timeoutId = window.setTimeout(() => {
+      void load(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [load]);
-
-  useEffect(() => {
-    const queryStatus = new URLSearchParams(window.location.search).get(
-      "status",
-    );
-    if (queryStatus) {
-      setStatus(queryStatus);
-      setPage(1);
-    }
-  }, []);
 
   useAdminSSE(
     () => {

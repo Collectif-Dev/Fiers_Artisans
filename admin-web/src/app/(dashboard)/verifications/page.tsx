@@ -214,7 +214,10 @@ export default function VerificationsPage() {
   }, [limit, page]);
 
   useEffect(() => {
-    loadDocs();
+    const timeoutId = window.setTimeout(() => {
+      void loadDocs();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [loadDocs]);
 
   // Real-time: refresh docs on verification events only.

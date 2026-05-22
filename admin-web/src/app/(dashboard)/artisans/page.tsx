@@ -70,7 +70,10 @@ export default function ArtisansPage() {
   }, [page, limit]);
 
   useEffect(() => {
-    loadArtisans();
+    const timeoutId = window.setTimeout(() => {
+      void loadArtisans();
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
   }, [loadArtisans]);
 
   useAdminSSE(silentRefresh, {
