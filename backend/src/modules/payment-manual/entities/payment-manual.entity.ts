@@ -31,6 +31,7 @@ export enum PaymentManualStatus {
 @Index('IDX_PAYMENT_MANUAL_SUB_CREATED', ['subscription_id', 'created_at'])
 @Index('IDX_PAYMENT_MANUAL_SUB_REQUEST', ['subscription_id', 'request_number'])
 @Index('IDX_PAYMENT_MANUAL_STATUS_EXPIRES', ['status', 'expires_at_admin'])
+@Index('IDX_PAYMENT_MANUAL_REPLACED_BY', ['replaced_by_transaction_id'])
 @Entity('payment_manual')
 export class PaymentManual {
   @PrimaryGeneratedColumn('uuid')
@@ -87,6 +88,9 @@ export class PaymentManual {
 
   @Column({ type: 'int', default: 1 })
   request_number: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  replaced_by_transaction_id: string | null;
 
   @Column({ default: false })
   refund_required: boolean;

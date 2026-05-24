@@ -214,6 +214,7 @@ export interface PaymentManualRecord {
   rejected_at?: string | null;
   rejection_reason?: string | null;
   request_number: number;
+  replaced_by_transaction_id?: string | null;
   refund_required: boolean;
   refund_done_at?: string | null;
   cooldown_until?: string | null;

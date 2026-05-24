@@ -94,18 +94,12 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final tx = await _repository.fetchCurrentTransaction();
-      state = state.copyWith(
-        currentTransaction: tx,
-        clearCurrentTransaction: tx == null,
-        isLoading: false,
-        hasSubmittedProof: tx?.isPendingAdmin == true,
-      );
-
-      if (tx != null && _shouldPoll(tx)) {
-        _startPolling();
-      } else {
-        _pollingTimer?.cancel();
+      final resolved = await _replaceIfEligible(tx);
+      if (resolved != null) {
+        return;
       }
+
+      _setCurrentTransaction(tx, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
@@ -136,15 +130,17 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
     try {
       final tx = await _repository.fetchStatus(transactionId: txId);
-      state = state.copyWith(
-        currentTransaction: tx,
+      final resolved = await _replaceIfEligible(tx);
+      if (resolved != null) {
+        return;
+      }
+      _setCurrentTransaction(
+        tx,
+        isLoading: false,
         hasSubmittedProof: tx.status == 'REJECTED'
             ? false
             : state.hasSubmittedProof,
       );
-      if (!_shouldPoll(tx)) {
-        _pollingTimer?.cancel();
-      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
@@ -161,10 +157,15 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     if (txId != null && txId.isNotEmpty) {
       try {
         final latest = await _repository.fetchStatus(transactionId: txId);
+        final replacement = await _replaceIfEligible(latest);
+        if (replacement != null) {
+          return;
+        }
         final statusChanged =
             previousStatus == null || previousStatus != latest.status;
-        state = state.copyWith(
-          currentTransaction: latest,
+        _setCurrentTransaction(
+          latest,
+          isLoading: false,
           hasSubmittedProof: latest.status == 'REJECTED'
               ? false
               : state.hasSubmittedProof,
@@ -180,11 +181,6 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
                 )
               : null,
         );
-        if (_shouldPoll(latest)) {
-          _startPolling();
-        } else {
-          _pollingTimer?.cancel();
-        }
         return;
       } catch (_) {
         // Fallback to payload-only status message when API refresh fails.
@@ -243,6 +239,53 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
   void clearTransientMessage() {
     state = state.copyWith(clearTransientMessage: true);
+  }
+
+  void _setCurrentTransaction(
+    ManualPaymentModel? tx, {
+    required bool isLoading,
+    bool? hasSubmittedProof,
+    String? transientMessage,
+  }) {
+    state = state.copyWith(
+      currentTransaction: tx,
+      clearCurrentTransaction: tx == null,
+      isLoading: isLoading,
+      hasSubmittedProof: hasSubmittedProof ?? (tx?.isPendingAdmin == true),
+      transientMessage: transientMessage,
+      clearTransientMessage: transientMessage == null,
+    );
+    if (tx != null && _shouldPoll(tx)) {
+      _startPolling();
+    } else {
+      _pollingTimer?.cancel();
+    }
+  }
+
+  Future<ManualPaymentModel?> _replaceIfEligible(ManualPaymentModel? tx) async {
+    if (tx == null || !tx.isAutoReplaceCandidate) {
+      return null;
+    }
+
+    try {
+      final replacement = await _repository.initiatePayment(provider: tx.provider);
+      _setCurrentTransaction(
+        replacement,
+        isLoading: false,
+        hasSubmittedProof: false,
+        transientMessage:
+            'Votre transaction ${tx.transactionId} a ete remplacee automatiquement par ${replacement.transactionId}.',
+      );
+      return replacement;
+    } catch (error) {
+      state = state.copyWith(
+        currentTransaction: tx,
+        isLoading: false,
+        hasSubmittedProof: tx.isPendingAdmin,
+        error: _toUserFacingError(error),
+      );
+      return tx;
+    }
   }
 
   void _startPolling() {

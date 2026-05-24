@@ -12,7 +12,9 @@ void main() {
       'rejection_reason': 'Informations incoherentes',
       'refund_required': true,
       'refund_done_at': '2026-05-21T09:30:00.000Z',
+      'validated_at': '2026-05-19T09:30:00.000Z',
       'request_number': 3,
+      'replaced_by_transaction_id': 'TX-NEW-222',
       'cooldown_until': '2026-05-21T12:30:00.000Z',
       'cooldown_cycle': 2,
       'proof_count': 4,
@@ -29,9 +31,14 @@ void main() {
     expect(model.isRefundDone, true);
     expect(model.providerAvailable, true);
     expect(model.requestNumber, 3);
+    expect(model.validatedAt, isNotNull);
+    expect(model.isRejectedAfterValidation, true);
+    expect(model.replacedByTransactionId, 'TX-NEW-222');
+    expect(model.hasReplacement, true);
     expect(model.cooldownUntil, isNotNull);
     expect(model.cooldownCycle, 2);
     expect(model.submittedProofCount, 4);
     expect(model.currentAttemptNumber, 1);
+    expect(model.isAutoReplaceCandidate, false);
   });
 }

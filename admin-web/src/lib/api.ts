@@ -331,10 +331,14 @@ export async function getManualPayments(
   page = 1,
   limit = 20,
   status?: string,
+  scope?: "ACTIVE" | "HISTORY" | "ALL",
 ): Promise<PaginatedResult<PaymentManualRecord>> {
   const params: Record<string, string | number> = { page, limit };
   if (status && status !== "all") {
     params.status = status;
+  }
+  if (scope && scope !== "ALL") {
+    params.scope = scope;
   }
   const { data } = await api.get("/admin/payment-proofs", { params });
   return toPaginatedResult<PaymentManualRecord>(data, page, limit);

@@ -121,6 +121,14 @@ function parseImageRef(
   return { bucket: parts[0], objectKey: parts.slice(1).join("/") };
 }
 
+function isArchivedRecord(record: PaymentManualRecord): boolean {
+  return (
+    record.status === "EXPIRED" ||
+    (record.status === "REJECTED" && Boolean(record.validated_at)) ||
+    Boolean(record.replaced_by_transaction_id)
+  );
+}
+
 export default function PaymentManualPage() {
   const { t, locale } = useTranslations("payment_manual");
   const { t: tApp } = useTranslations("app");
@@ -129,16 +137,8 @@ export default function PaymentManualPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState(() => {
-    if (typeof window === "undefined") {
-      return "PENDING_ADMIN";
-    }
-
-    return (
-      new URLSearchParams(window.location.search).get("status") ??
-      "PENDING_ADMIN"
-    );
-  });
+  const [status, setStatus] = useState("all");
+  const [scope, setScope] = useState<"ACTIVE" | "HISTORY">("ACTIVE");
 
   const [selected, setSelected] = useState<PaymentManualRecord | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -154,7 +154,7 @@ export default function PaymentManualPage() {
     async (showLoading = true) => {
       if (showLoading) setLoading(true);
       try {
-        const result = await getManualPayments(page, PAGE_SIZE, status);
+        const result = await getManualPayments(page, PAGE_SIZE, status, scope);
         setItems(result.data);
         setTotal(result.total);
       } catch {
@@ -163,7 +163,7 @@ export default function PaymentManualPage() {
         if (showLoading) setLoading(false);
       }
     },
-    [page, status, tApp],
+    [page, scope, status, tApp],
   );
 
   useEffect(() => {
@@ -178,7 +178,11 @@ export default function PaymentManualPage() {
       void load(false);
     },
     {
-      eventTypes: ["PAYMENT_MANUAL_NEW_PROOF", "PAYMENT_MANUAL_UPDATED"],
+      eventTypes: [
+        "PAYMENT_MANUAL_NEW_PROOF",
+        "PAYMENT_MANUAL_UPDATED",
+        "PAYMENT_MANUAL_TIMELINE_UPDATED",
+      ],
     },
   );
 
@@ -311,6 +315,8 @@ export default function PaymentManualPage() {
     [t],
   );
 
+  const selectedIsArchived = selected ? isArchivedRecord(selected) : false;
+
   return (
     <div className="space-y-6">
       <div>
@@ -319,6 +325,26 @@ export default function PaymentManualPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-2">
+          <Button
+            variant={scope === "ACTIVE" ? "default" : "outline"}
+            onClick={() => {
+              setScope("ACTIVE");
+              setPage(1);
+            }}
+          >
+            {t("active_tab")}
+          </Button>
+          <Button
+            variant={scope === "HISTORY" ? "default" : "outline"}
+            onClick={() => {
+              setScope("HISTORY");
+              setPage(1);
+            }}
+          >
+            {t("history_tab")}
+          </Button>
+        </div>
         <Select
           value={status}
           onValueChange={(value) => {
@@ -387,7 +413,17 @@ export default function PaymentManualPage() {
                     {items.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">
-                          {item.transaction_id}
+                          <div className="space-y-1">
+                            <div>{item.transaction_id}</div>
+                            {item.replaced_by_transaction_id && (
+                              <Badge variant="outline">
+                                {t("replaced_by").replace(
+                                  "{id}",
+                                  item.replaced_by_transaction_id,
+                                )}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {item.subscription?.artisan_profile?.user
@@ -507,6 +543,11 @@ export default function PaymentManualPage() {
                 <p>
                   <strong>{t("status")}:</strong> {selected.status}
                 </p>
+                {selectedIsArchived && (
+                  <div className="rounded border border-orange-400/40 bg-orange-500/10 p-2 text-orange-700 text-xs">
+                    {t("archived_notice")}
+                  </div>
+                )}
                 <p>
                   <strong>{t("amount")}:</strong> {selected.amount_fcfa} FCFA
                 </p>
@@ -517,6 +558,22 @@ export default function PaymentManualPage() {
                 <p>
                   <strong>{t("request_number")}:</strong>{" "}
                   {selected.request_number || "—"}
+                </p>
+                <p>
+                  <strong>{t("validated_at")}:</strong>{" "}
+                  {selected.validated_at
+                    ? formatDateTime(selected.validated_at, locale)
+                    : "—"}
+                </p>
+                <p>
+                  <strong>{t("rejected_at")}:</strong>{" "}
+                  {selected.rejected_at
+                    ? formatDateTime(selected.rejected_at, locale)
+                    : "—"}
+                </p>
+                <p>
+                  <strong>{t("replaced_by_label")}:</strong>{" "}
+                  {selected.replaced_by_transaction_id || "—"}
                 </p>
                 <p>
                   <strong>{t("sender_number")}:</strong>{" "}
@@ -560,6 +617,7 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
+                selectedIsArchived ||
                 selected.status !== "PENDING_ADMIN" ||
                 (selected.proofs?.length ?? 0) === 0
               }
@@ -572,6 +630,7 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
+                selectedIsArchived ||
                 selected.status !== "PENDING_ADMIN" ||
                 (selected.proofs?.length ?? 0) === 0
               }
@@ -591,10 +650,10 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
+                selectedIsArchived ||
                 !(
-                  ["REJECTED", "EXPIRED", "COMPLETED"].includes(
-                    selected.status,
-                  ) || Boolean(selected.refund_done_at)
+                  ["REJECTED", "COMPLETED"].includes(selected.status) ||
+                  Boolean(selected.refund_done_at)
                 )
               }
             >

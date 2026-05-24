@@ -35,11 +35,16 @@ import { PaymentRealtimeService } from '../events/payment-realtime.service';
 import { BusinessException } from '../../../common/exceptions/business.exception';
 
 interface AdminListFilters {
+  scope?: 'ACTIVE' | 'HISTORY' | 'ALL';
   status?: PaymentManualStatus | 'REFUND_REQUIRED';
   page?: number;
   limit?: number;
   sort?: 'asc' | 'desc' | string;
 }
+
+type AutoReplacementReason =
+  | 'REJECTED_AFTER_VALIDATION'
+  | 'EXPIRED_REFUND_CLEARED';
 
 const MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE = 3;
 const MANUAL_PAYMENT_COOLDOWN_BASE_HOURS = 5;
@@ -265,11 +270,7 @@ export class PaymentManualService implements OnModuleDestroy {
       relations: ['proofs'],
     });
 
-    if (
-      latestPayment?.status === PaymentManualStatus.EXPIRED &&
-      latestPayment.refund_required &&
-      !latestPayment.refund_done_at
-    ) {
+    if (latestPayment && this.hasPendingRefund(latestPayment)) {
       throw new BusinessException(
         'PAYMENT_MANUAL_REFUND_PENDING',
         'Un remboursement est en cours. Vous ne pouvez pas creer une nouvelle demande.',
@@ -282,41 +283,31 @@ export class PaymentManualService implements OnModuleDestroy {
       [
         PaymentManualStatus.PENDING,
         PaymentManualStatus.PENDING_ADMIN,
-        PaymentManualStatus.REJECTED,
       ].includes(latestPayment.status)
     ) {
       return latestPayment;
     }
 
-    const requestNumber =
-      (await this.paymentManualRepository.count({
-        where: { subscription_id: subscription.id },
-        withDeleted: true,
-      })) + 1;
+    if (
+      latestPayment?.status === PaymentManualStatus.REJECTED &&
+      !this.isRejectedAfterValidation(latestPayment)
+    ) {
+      return latestPayment;
+    }
 
-    const now = new Date();
-    const expiresAtAdmin = new Date(
-      now.getTime() + this.expiryHours * 60 * 60 * 1000,
-    );
+    if (latestPayment && this.isAutoReplacementCandidate(latestPayment)) {
+      return this.createReplacementPayment({
+        previousPayment: latestPayment,
+        subscription,
+        userId,
+      });
+    }
 
-    const payment = await this.paymentManualRepository.save(
-      this.paymentManualRepository.create({
-        subscription_id: subscription.id,
-        transaction_id: this.generateTransactionId(),
-        amount_fcfa: subscription.amount_fcfa || this.amountFcfa,
-        provider,
-        status: PaymentManualStatus.PENDING,
-        request_number: requestNumber,
-        expires_at_admin: expiresAtAdmin,
-        timeline: [
-          this.timelineEvent('PAYMENT_MANUAL_INITIATED', {
-            byUserId: userId,
-            provider,
-            amountFcfa: subscription.amount_fcfa || this.amountFcfa,
-          }),
-        ],
-      }),
-    );
+    const payment = await this.createPendingPayment({
+      subscription,
+      provider,
+      userId,
+    });
 
     this.analyticsService
       .logActivity({
@@ -597,9 +588,12 @@ export class PaymentManualService implements OnModuleDestroy {
     const proofCount = await this.paymentProofRepository.count({
       where: { payment_manual_id: payment.id, deleted_at: IsNull() },
     });
+    const rejectedAfterValidation = payment.validated_at != null;
     const shouldStartCooldown =
+      !rejectedAfterValidation &&
       proofCount > 0 &&
       proofCount % MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE === 0;
+    const correlationId = randomUUID();
 
     payment.status = PaymentManualStatus.REJECTED;
     payment.rejected_at = new Date();
@@ -612,6 +606,9 @@ export class PaymentManualService implements OnModuleDestroy {
       payment.cooldown_cycle = nextCooldownCycle;
       payment.cooldown_until = cooldownUntil;
     } else {
+      if (rejectedAfterValidation) {
+        payment.cooldown_cycle = 0;
+      }
       payment.cooldown_until = null;
     }
     payment.timeline = [
@@ -619,11 +616,46 @@ export class PaymentManualService implements OnModuleDestroy {
       this.timelineEvent('PAYMENT_MANUAL_REJECTED', {
         byAdminId: adminId,
         reason,
+        rejectedAfterValidation,
         cooldownCycle: payment.cooldown_cycle || 0,
         cooldownUntil: payment.cooldown_until?.toISOString?.() || null,
       }),
     ];
+
+    if (
+      rejectedAfterValidation &&
+      !this.hasPendingRefund(payment) &&
+      payment.subscription?.status === SubscriptionStatus.ACTIVE
+    ) {
+      payment.timeline.push(
+        this.timelineEvent('SUBSCRIPTION_DEACTIVATION_REQUESTED', {
+          byAdminId: adminId,
+          correlationId,
+          reason: 'TRANSACTION_REJECTED',
+        }),
+      );
+    }
     await this.paymentManualRepository.save(payment);
+
+    if (
+      rejectedAfterValidation &&
+      !this.hasPendingRefund(payment) &&
+      payment.subscription?.status === SubscriptionStatus.ACTIVE
+    ) {
+      await this.subscriptionService.deactivateSubscriptionFromManualPayment({
+        subscriptionId: payment.subscription_id,
+        paymentManualId: payment.id,
+        reason: 'TRANSACTION_REJECTED',
+        actorId: adminId,
+        correlationId,
+      });
+      await this.paymentRealtimeService.emitTimelineUpdated({
+        paymentId: payment.id,
+        transactionId: payment.transaction_id,
+        correlationId,
+        reason: 'TRANSACTION_REJECTED',
+      });
+    }
 
     const artisanUserId = payment.subscription?.artisan_profile?.user_id;
     if (artisanUserId) {
@@ -684,6 +716,12 @@ export class PaymentManualService implements OnModuleDestroy {
 
     if (!payment) {
       throw new NotFoundException('Paiement manuel introuvable.');
+    }
+
+    if (this.isHistoricalPayment(payment)) {
+      throw new BadRequestException(
+        'Les paiements historiques remplaces ou expires ne peuvent plus etre rouverts.',
+      );
     }
 
     const canReopenByStatus = [
@@ -842,17 +880,49 @@ export class PaymentManualService implements OnModuleDestroy {
       }
 
       for (const payment of stale) {
+        const correlationId = randomUUID();
+        const shouldDeactivateSubscription =
+          !this.hasPendingRefund(payment) &&
+          payment.subscription?.status === SubscriptionStatus.ACTIVE;
+        if (
+          shouldDeactivateSubscription
+        ) {
+          await this.subscriptionService.deactivateSubscriptionFromManualPayment(
+            {
+              subscriptionId: payment.subscription_id,
+              paymentManualId: payment.id,
+              reason: 'TRANSACTION_EXPIRED',
+              correlationId,
+            },
+          );
+        }
+
         payment.status = PaymentManualStatus.EXPIRED;
         payment.refund_required = true;
         payment.attempted_refund_count =
           (payment.attempted_refund_count || 0) + 1;
         payment.timeline = [
           ...(payment.timeline || []),
+          ...(shouldDeactivateSubscription
+            ? [
+                this.timelineEvent('SUBSCRIPTION_DEACTIVATION_REQUESTED', {
+                  correlationId,
+                  reason: 'TRANSACTION_EXPIRED',
+                }),
+              ]
+            : []),
           this.timelineEvent('PAYMENT_MANUAL_EXPIRED', {
             reason: 'PENDING_ADMIN_TIMEOUT',
+            correlationId,
           }),
         ];
         await this.paymentManualRepository.save(payment);
+        await this.paymentRealtimeService.emitTimelineUpdated({
+          paymentId: payment.id,
+          transactionId: payment.transaction_id,
+          correlationId,
+          reason: 'TRANSACTION_EXPIRED',
+        });
 
         const artisanUserId = payment.subscription?.artisan_profile?.user_id;
         if (artisanUserId) {
@@ -967,6 +1037,20 @@ export class PaymentManualService implements OnModuleDestroy {
       .leftJoinAndSelect('s.artisan_profile', 'artisan')
       .leftJoinAndSelect('artisan.user', 'user')
       .where('pm.deleted_at IS NULL');
+
+    const archivedPredicate = `(pm.status = :expiredStatus OR (pm.status = :rejectedStatus AND pm.validated_at IS NOT NULL) OR pm.replaced_by_transaction_id IS NOT NULL)`;
+
+    if (filters.scope === 'ACTIVE') {
+      qb.andWhere(`NOT ${archivedPredicate}`, {
+        expiredStatus: PaymentManualStatus.EXPIRED,
+        rejectedStatus: PaymentManualStatus.REJECTED,
+      });
+    } else if (filters.scope === 'HISTORY') {
+      qb.andWhere(archivedPredicate, {
+        expiredStatus: PaymentManualStatus.EXPIRED,
+        rejectedStatus: PaymentManualStatus.REJECTED,
+      });
+    }
 
     if (filters.status) {
       if (filters.status === 'REFUND_REQUIRED') {
@@ -1321,6 +1405,223 @@ export class PaymentManualService implements OnModuleDestroy {
     }
 
     return payment.cooldown_until.getTime() > Date.now();
+  }
+
+  private hasPendingRefund(
+    payment: Pick<PaymentManual, 'refund_required' | 'refund_done_at'>,
+  ): boolean {
+    return payment.refund_required && !payment.refund_done_at;
+  }
+
+  private isRejectedAfterValidation(
+    payment: Pick<PaymentManual, 'status' | 'validated_at'>,
+  ): boolean {
+    return (
+      payment.status === PaymentManualStatus.REJECTED &&
+      payment.validated_at != null
+    );
+  }
+
+  private isHistoricalPayment(
+    payment: Pick<
+      PaymentManual,
+      'status' | 'validated_at' | 'replaced_by_transaction_id'
+    >,
+  ): boolean {
+    return (
+      payment.status === PaymentManualStatus.EXPIRED ||
+      this.isRejectedAfterValidation(payment) ||
+      Boolean(payment.replaced_by_transaction_id)
+    );
+  }
+
+  private isAutoReplacementCandidate(
+    payment: Pick<
+      PaymentManual,
+      'status' | 'validated_at' | 'refund_required' | 'refund_done_at'
+    >,
+  ): boolean {
+    if (this.hasPendingRefund(payment)) {
+      return false;
+    }
+
+    if (payment.status === PaymentManualStatus.EXPIRED) {
+      return true;
+    }
+
+    return this.isRejectedAfterValidation(payment);
+  }
+
+  private autoReplacementReason(
+    payment: Pick<PaymentManual, 'status' | 'validated_at'>,
+  ): AutoReplacementReason {
+    return this.isRejectedAfterValidation(payment)
+      ? 'REJECTED_AFTER_VALIDATION'
+      : 'EXPIRED_REFUND_CLEARED';
+  }
+
+  private async createPendingPayment(params: {
+    subscription: Pick<Subscription, 'id' | 'amount_fcfa'>;
+    provider: PaymentProviderManual;
+    userId: string;
+    reason?: AutoReplacementReason;
+    previousTransactionId?: string;
+    correlationId?: string;
+  }): Promise<PaymentManual> {
+    const requestNumber =
+      (await this.paymentManualRepository.count({
+        where: { subscription_id: params.subscription.id },
+        withDeleted: true,
+      })) + 1;
+
+    const now = new Date();
+    const expiresAtAdmin = new Date(
+      now.getTime() + this.expiryHours * 60 * 60 * 1000,
+    );
+    const timelineType = params.reason
+      ? 'PAYMENT_MANUAL_AUTO_REPLACEMENT_CREATED'
+      : 'PAYMENT_MANUAL_INITIATED';
+
+    const payload = this.paymentManualRepository.create({
+      subscription_id: params.subscription.id,
+      transaction_id: this.generateTransactionId(),
+      amount_fcfa: params.subscription.amount_fcfa || this.amountFcfa,
+      provider: params.provider,
+      status: PaymentManualStatus.PENDING,
+      request_number: requestNumber,
+      expires_at_admin: expiresAtAdmin,
+      timeline: [
+        this.timelineEvent(timelineType, {
+          byUserId: params.userId,
+          provider: params.provider,
+          amountFcfa: params.subscription.amount_fcfa || this.amountFcfa,
+          previousTransactionId: params.previousTransactionId || null,
+          reason: params.reason || null,
+          correlationId: params.correlationId || null,
+        }),
+      ],
+    });
+
+    try {
+      return await this.paymentManualRepository.save(payload);
+    } catch (error) {
+      const isUniqueViolation =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === '23505';
+      if (!isUniqueViolation) {
+        throw error;
+      }
+
+      const existingPending = await this.paymentManualRepository.findOne({
+        where: {
+          subscription_id: params.subscription.id,
+          status: PaymentManualStatus.PENDING,
+          deleted_at: IsNull(),
+        },
+        relations: ['proofs'],
+        order: {
+          created_at: 'DESC',
+        },
+      });
+      if (existingPending) {
+        return existingPending;
+      }
+
+      throw error;
+    }
+  }
+
+  private async createReplacementPayment(params: {
+    previousPayment: PaymentManual;
+    subscription: Pick<Subscription, 'id' | 'amount_fcfa'>;
+    userId: string;
+  }): Promise<PaymentManual> {
+    const reason = this.autoReplacementReason(params.previousPayment);
+    const correlationId = randomUUID();
+    const payment = await this.createPendingPayment({
+      subscription: params.subscription,
+      provider: params.previousPayment.provider,
+      userId: params.userId,
+      reason,
+      previousTransactionId: params.previousPayment.transaction_id,
+      correlationId,
+    });
+
+    params.previousPayment.replaced_by_transaction_id = payment.transaction_id;
+    params.previousPayment.timeline = [
+      ...(params.previousPayment.timeline || []),
+      this.timelineEvent('PAYMENT_MANUAL_AUTO_REPLACED', {
+        byUserId: params.userId,
+        previousTransactionId: params.previousPayment.transaction_id,
+        replacedByTransactionId: payment.transaction_id,
+        reason,
+        correlationId,
+      }),
+    ];
+    await this.paymentManualRepository.save(params.previousPayment);
+
+    const artisanProfile =
+      await this.resolvePreferredArtisanProfileForUser(params.userId);
+    const artisanUserId = artisanProfile.user_id;
+
+    if (artisanUserId) {
+      try {
+        await this.notificationsService.create({
+          userId: artisanUserId,
+          type: 'PAYMENT_MANUAL_AUTO_REPLACED',
+          title: 'Nouvelle demande creee automatiquement',
+          body: `Votre transaction ${params.previousPayment.transaction_id} a ete remplacee par ${payment.transaction_id}.`,
+          data: {
+            previousTransactionId: params.previousPayment.transaction_id,
+            transactionId: payment.transaction_id,
+            paymentId: payment.id,
+            reason,
+            correlationId,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Notification non bloquante ignoree pour transaction=${payment.transaction_id} type=PAYMENT_MANUAL_AUTO_REPLACED: ${error}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'manual_payment_auto_replaced',
+        correlation_id: correlationId,
+        previousTransactionId: params.previousPayment.transaction_id,
+        replacementTransactionId: payment.transaction_id,
+        reason,
+      }),
+    );
+
+    await this.paymentRealtimeService.emitTimelineUpdated({
+      paymentId: params.previousPayment.id,
+      transactionId: params.previousPayment.transaction_id,
+      replacedByTransactionId: payment.transaction_id,
+      reason,
+      correlationId,
+    });
+
+    this.analyticsService
+      .logActivity({
+        actorId: params.userId,
+        action: 'PAYMENT_MANUAL_INITIATED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+          provider: payment.provider,
+          source: 'AUTO_REPLACEMENT',
+          previousTransactionId: params.previousPayment.transaction_id,
+          correlationId,
+        },
+      })
+      .catch(() => {});
+
+    return payment;
   }
 
   private formatRemainingDuration(target: Date): string {

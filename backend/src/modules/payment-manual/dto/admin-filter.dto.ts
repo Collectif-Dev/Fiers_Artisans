@@ -4,6 +4,10 @@ import { PaymentManualStatus } from '../entities/payment-manual.entity';
 
 export class AdminFilterDto {
   @IsOptional()
+  @IsIn(['ACTIVE', 'HISTORY', 'ALL'])
+  scope?: 'ACTIVE' | 'HISTORY' | 'ALL';
+
+  @IsOptional()
   @IsIn([
     PaymentManualStatus.PENDING,
     PaymentManualStatus.PENDING_ADMIN,

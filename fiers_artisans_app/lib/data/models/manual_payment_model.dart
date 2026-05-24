@@ -9,8 +9,10 @@ class ManualPaymentModel {
   final DateTime? refundDoneAt;
   final bool providerAvailable;
   final DateTime? expiresAtAdmin;
+  final DateTime? validatedAt;
   final int submittedProofCount;
   final int requestNumber;
+  final String? replacedByTransactionId;
   final DateTime? cooldownUntil;
   final int cooldownCycle;
 
@@ -25,8 +27,10 @@ class ManualPaymentModel {
     this.refundDoneAt,
     this.providerAvailable = true,
     this.expiresAtAdmin,
+    this.validatedAt,
     this.submittedProofCount = 0,
     this.requestNumber = 0,
+    this.replacedByTransactionId,
     this.cooldownUntil,
     this.cooldownCycle = 0,
   });
@@ -36,9 +40,16 @@ class ManualPaymentModel {
   bool get isPendingAdmin => status == 'PENDING_ADMIN';
   bool get isPending => status == 'PENDING';
   bool get isExpired => status == 'EXPIRED';
-  bool get isRefundPending => isExpired && refundRequired && refundDoneAt == null;
+  bool get isRejectedAfterValidation => isRejected && validatedAt != null;
+  bool get isRefundPending => refundRequired && refundDoneAt == null;
   bool get isRefundDone => refundDoneAt != null;
-  bool get canInitiateNewRequest => isExpired && isRefundDone;
+  bool get hasReplacement =>
+      replacedByTransactionId != null && replacedByTransactionId!.trim().isNotEmpty;
+  bool get isAutoReplaceCandidate =>
+      !hasReplacement &&
+      !isRefundPending &&
+      (isRejectedAfterValidation || isExpired);
+  bool get canInitiateNewRequest => isAutoReplaceCandidate;
   bool get canInitiateNewTransaction => canInitiateNewRequest;
   bool get isCooldownActive =>
       cooldownUntil != null && cooldownUntil!.isAfter(DateTime.now());
@@ -88,12 +99,18 @@ class ManualPaymentModel {
       expiresAtAdmin: json['expires_at_admin'] != null
           ? DateTime.tryParse(json['expires_at_admin'].toString())
           : null,
+      validatedAt: json['validated_at'] != null
+          ? DateTime.tryParse(json['validated_at'].toString())
+          : null,
       submittedProofCount: proofCountFromPayload ?? derivedProofCount,
       requestNumber:
           int.tryParse(
             (json['request_number'] ?? json['requestNumber'] ?? 0).toString(),
           ) ??
           0,
+      replacedByTransactionId:
+          json['replaced_by_transaction_id']?.toString() ??
+          json['replacedByTransactionId']?.toString(),
       cooldownUntil: json['cooldown_until'] != null
           ? DateTime.tryParse(json['cooldown_until'].toString())
           : null,

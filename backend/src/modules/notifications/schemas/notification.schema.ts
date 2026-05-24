@@ -22,6 +22,7 @@ export class Notification extends Document {
       'PAYMENT_MANUAL_COOLDOWN',
       'PAYMENT_MANUAL_REOPENED',
       'PAYMENT_MANUAL_EXPIRED',
+      'PAYMENT_MANUAL_AUTO_REPLACED',
       'PAYMENT_MANUAL_INTEGRITY_ALERT',
       'REFUND_PROCESSED',
     ],

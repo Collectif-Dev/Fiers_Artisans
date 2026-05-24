@@ -482,6 +482,147 @@ export class SubscriptionService {
       .catch(() => {});
   }
 
+  async deactivateSubscriptionFromManualPayment(params: {
+    subscriptionId: string;
+    paymentManualId: string;
+    reason: 'TRANSACTION_REJECTED' | 'TRANSACTION_EXPIRED';
+    actorId?: string;
+    correlationId: string;
+  }): Promise<void> {
+    const nextStatus =
+      params.reason === 'TRANSACTION_EXPIRED'
+        ? SubscriptionStatus.EXPIRED
+        : SubscriptionStatus.CANCELLED;
+
+    const payload = await this.dataSource.transaction(async (manager) => {
+      const subscriptionRepository = manager.getRepository(Subscription);
+      const artisanProfileRepository = manager.getRepository(ArtisanProfile);
+
+      const subscription = await subscriptionRepository.findOne({
+        where: { id: params.subscriptionId },
+      });
+      if (!subscription) {
+        throw new NotFoundException('Abonnement introuvable.');
+      }
+
+      const artisanProfile = await artisanProfileRepository.findOne({
+        where: { id: subscription.artisan_profile_id },
+        select: ['id', 'user_id', 'is_subscription_active'],
+      });
+
+      if (
+        subscription.status !== SubscriptionStatus.ACTIVE &&
+        !artisanProfile?.is_subscription_active
+      ) {
+        this.logger.log(
+          JSON.stringify({
+            event: 'manual_payment_subscription_deactivation_noop',
+            correlation_id: params.correlationId,
+            subscriptionId: subscription.id,
+            paymentManualId: params.paymentManualId,
+            reason: params.reason,
+          }),
+        );
+
+        return {
+          subscriptionId: subscription.id,
+          artisanProfileId: subscription.artisan_profile_id,
+          artisanUserId: artisanProfile?.user_id || null,
+          wasChanged: false,
+          nextStatus: subscription.status,
+        };
+      }
+
+      await subscriptionRepository.update(subscription.id, {
+        status: nextStatus,
+      });
+      await artisanProfileRepository.update(subscription.artisan_profile_id, {
+        is_subscription_active: false,
+      });
+
+      return {
+        subscriptionId: subscription.id,
+        artisanProfileId: subscription.artisan_profile_id,
+        artisanUserId: artisanProfile?.user_id || null,
+        wasChanged: true,
+        nextStatus,
+      };
+    });
+
+    if (!payload.wasChanged) {
+      return;
+    }
+
+    this.adminRealtimeService.emit('SUBSCRIPTION_UPDATED', {
+      subscriptionId: payload.subscriptionId,
+      artisanProfileId: payload.artisanProfileId,
+      status: payload.nextStatus,
+      source: params.reason,
+      paymentManualId: params.paymentManualId,
+      correlationId: params.correlationId,
+    });
+
+    if (payload.artisanUserId) {
+      try {
+        await this.notificationsService.create({
+          userId: payload.artisanUserId,
+          type: 'SUBSCRIPTION_UPDATED',
+          title:
+            params.reason === 'TRANSACTION_EXPIRED'
+              ? 'Abonnement desactive'
+              : 'Abonnement annule',
+          body:
+            params.reason === 'TRANSACTION_EXPIRED'
+              ? 'Votre abonnement a ete desactive car la transaction manuelle a expire.'
+              : 'Votre abonnement a ete annule apres rejet de la transaction manuelle.',
+          data: {
+            subscriptionId: payload.subscriptionId,
+            status: payload.nextStatus,
+            source: params.reason,
+            paymentManualId: params.paymentManualId,
+            correlationId: params.correlationId,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Notification non bloquante ignoree pour user=${payload.artisanUserId} type=SUBSCRIPTION_UPDATED: ${error}`,
+        );
+      }
+
+      this.emitSubscriptionRealtimeEvent({
+        artisanUserId: payload.artisanUserId,
+        artisanProfileId: payload.artisanProfileId,
+        subscriptionId: payload.subscriptionId,
+        subscriptionStatus: payload.nextStatus,
+        isSubscriptionActive: false,
+      }).catch(() => {});
+    }
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'manual_payment_subscription_deactivated',
+        correlation_id: params.correlationId,
+        subscriptionId: payload.subscriptionId,
+        paymentManualId: params.paymentManualId,
+        reason: params.reason,
+        status: payload.nextStatus,
+      }),
+    );
+
+    this.analyticsService
+      .logActivity({
+        actorId: params.actorId || 'system',
+        action: 'SUBSCRIPTION_UPDATED',
+        targetId: payload.subscriptionId,
+        metadata: {
+          source: params.reason,
+          paymentManualId: params.paymentManualId,
+          correlationId: params.correlationId,
+        },
+      })
+      .catch(() => {});
+  }
+
   /**
    * Cron: every day at 2 AM — deactivate expired subscriptions.
    */

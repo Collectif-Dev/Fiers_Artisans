@@ -3,6 +3,7 @@ import { AdminRealtimeService } from '../../../common/realtime/admin-realtime.se
 import { ChatGateway } from '../../chat/chat.gateway';
 import {
   PAYMENT_MANUAL_NEW_PROOF,
+  PAYMENT_MANUAL_TIMELINE_UPDATED,
   PAYMENT_MANUAL_UPDATED,
 } from './payment.events';
 
@@ -40,5 +41,9 @@ export class PaymentRealtimeService {
         updatedAt: payload.updatedAt,
       });
     }
+  }
+
+  async emitTimelineUpdated(payload: Record<string, unknown>): Promise<void> {
+    this.adminRealtimeService.emit(PAYMENT_MANUAL_TIMELINE_UPDATED, payload);
   }
 }

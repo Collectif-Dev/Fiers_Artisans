@@ -23,6 +23,8 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
   Object? submitProofError;
   int fetchStatusCalls = 0;
   int submitProofCalls = 0;
+  int initiateCalls = 0;
+  final List<String> initiateProviders = [];
 
   @override
   Future<ManualPaymentModel?> fetchCurrentTransaction() async {
@@ -31,6 +33,8 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
 
   @override
   Future<ManualPaymentModel> initiatePayment({required String provider}) async {
+    initiateCalls += 1;
+    initiateProviders.add(provider);
     if (initiateError != null) {
       throw initiateError!;
     }
@@ -221,6 +225,48 @@ void main() {
 
     expect(notifier.state.currentTransaction?.status, 'REJECTED');
     expect(notifier.state.transientMessage, 'Preuve rejetee : Capture floue');
+
+    notifier.dispose();
+    await events.close();
+  });
+
+  test('auto-replaces a terminal rejected transaction on load using its provider', () async {
+    final repo = FakePaymentManualRepository(
+      initiateResult: const ManualPaymentModel(
+        transactionId: 'TX-NEW-1',
+        provider: 'MTN_MOMO',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      statusResult: const ManualPaymentModel(
+        transactionId: 'TX-NEW-1',
+        provider: 'MTN_MOMO',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      currentResult: ManualPaymentModel(
+        transactionId: 'TX-OLD-1',
+        provider: 'MTN_MOMO',
+        amountFcfa: 5000,
+        status: 'REJECTED',
+        validatedAt: DateTime.parse('2026-05-20T10:00:00.000Z'),
+      ),
+    );
+    final events = StreamController<ChatRealtimeEvent>.broadcast();
+    final notifier = PaymentManualNotifier(
+      repository: repo,
+      domainEvents: events.stream,
+    );
+
+    await notifier.loadCurrentTransaction(refresh: true);
+
+    expect(repo.initiateCalls, 1);
+    expect(repo.initiateProviders, ['MTN_MOMO']);
+    expect(notifier.state.currentTransaction?.transactionId, 'TX-NEW-1');
+    expect(
+      notifier.state.transientMessage,
+      'Votre transaction TX-OLD-1 a ete remplacee automatiquement par TX-NEW-1.',
+    );
 
     notifier.dispose();
     await events.close();

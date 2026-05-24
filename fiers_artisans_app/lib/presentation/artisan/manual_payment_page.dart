@@ -51,6 +51,21 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       previous,
       next,
     ) {
+      final nextMessage = next.transientMessage;
+      final previousMessage = previous?.transientMessage;
+      if (nextMessage != null &&
+          nextMessage.isNotEmpty &&
+          nextMessage != previousMessage &&
+          mounted) {
+        AppSnackBar.show(context, message: nextMessage);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          ref.read(paymentManualProvider.notifier).clearTransientMessage();
+        });
+      }
+
       final tx = next.currentTransaction;
       if (tx == null) {
         return;
@@ -450,7 +465,8 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
         !isCooldownLocked &&
         !(state.hasSubmittedProof && tx.isPendingAdmin);
 
-    final buttonLabel = tx != null && tx.isExpired
+    final buttonLabel =
+        tx != null && (tx.isExpired || tx.canInitiateNewRequest)
         ? 'manual_payment.new_request'.tr()
         : 'manual_payment.generate_transaction'.tr();
 
@@ -909,7 +925,10 @@ class _RefundPendingWidget extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'manual_payment.refund_pending_body'.tr(
-              namedArgs: {'amount': '${transaction.amountFcfa}'},
+              namedArgs: {
+                'amount': '${transaction.amountFcfa}',
+                'transactionId': transaction.transactionId,
+              },
             ),
           ),
           const SizedBox(height: 6),

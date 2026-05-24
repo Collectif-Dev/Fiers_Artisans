@@ -12,7 +12,8 @@ export type AdminRealtimeEventType =
   | 'PAYMENT_UPDATED'
   | 'ACTIVITY_LOGGED'
   | 'PAYMENT_MANUAL_NEW_PROOF'
-  | 'PAYMENT_MANUAL_UPDATED';
+  | 'PAYMENT_MANUAL_UPDATED'
+  | 'PAYMENT_MANUAL_TIMELINE_UPDATED';
 
 export interface AdminRealtimeEvent<
   TPayload extends Record<string, unknown> = Record<string, unknown>,

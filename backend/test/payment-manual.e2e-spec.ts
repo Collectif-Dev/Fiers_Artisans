@@ -366,6 +366,46 @@ function createHarness() {
   const paymentRealtimeService = {
     emitNewProof: jest.fn(async () => ({})),
     emitPaymentUpdated: jest.fn(async () => ({})),
+    emitTimelineUpdated: jest.fn(async () => ({})),
+  } as any;
+  const subscriptionService = {
+    activateSubscriptionFromManualPayment: jest.fn(
+      async (subscriptionId: string) => {
+        const sub = state.subscriptions.find((s) => s.id === subscriptionId);
+        if (sub) {
+          sub.status = SubscriptionStatus.ACTIVE;
+          const artisan = state.artisanProfiles.find(
+            (profile) => profile.id === sub.artisan_profile_id,
+          );
+          if (artisan) {
+            artisan.is_subscription_active = true;
+          }
+        }
+      },
+    ),
+    deactivateSubscriptionFromManualPayment: jest.fn(
+      async ({
+        subscriptionId,
+        reason,
+      }: {
+        subscriptionId: string;
+        reason: 'TRANSACTION_REJECTED' | 'TRANSACTION_EXPIRED';
+      }) => {
+        const sub = state.subscriptions.find((s) => s.id === subscriptionId);
+        if (sub) {
+          sub.status =
+            reason === 'TRANSACTION_EXPIRED'
+              ? SubscriptionStatus.EXPIRED
+              : SubscriptionStatus.CANCELLED;
+          const artisan = state.artisanProfiles.find(
+            (profile) => profile.id === sub.artisan_profile_id,
+          );
+          if (artisan) {
+            artisan.is_subscription_active = false;
+          }
+        }
+      },
+    ),
   } as any;
 
   const service = new PaymentManualService(
@@ -382,16 +422,7 @@ function createHarness() {
       getSignedUrl: jest.fn(async () => 'https://signed-url'),
       streamFile: jest.fn(),
     } as any,
-    {
-      activateSubscriptionFromManualPayment: jest.fn(
-        async (subscriptionId: string) => {
-          const sub = state.subscriptions.find((s) => s.id === subscriptionId);
-          if (sub) {
-            sub.status = SubscriptionStatus.ACTIVE;
-          }
-        },
-      ),
-    } as any,
+    subscriptionService,
     notificationsService,
     analyticsService,
     {
@@ -443,6 +474,7 @@ function createHarness() {
     state,
     paymentProofRepository,
     notificationsService,
+    subscriptionService,
     mockFile,
   };
 }
@@ -828,5 +860,108 @@ describe('Payment Manual (e2e scenarios)', () => {
     expect(newRequest.transaction_id).not.toBe('TX-OLD-001');
     expect(newRequest.request_number).toBe(3);
     expect(newRequest.status).toBe(PaymentManualStatus.PENDING);
+  });
+
+  it('Scenario 9: a rejected payment after prior validation deactivates the subscription and auto-replaces with a new transaction', async () => {
+    const { service, state, notificationsService, mockFile, subscriptionService } =
+      createHarness();
+    const initiated = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.ORANGE_MONEY,
+    );
+
+    await service.submitProof({
+      transactionId: initiated.transaction_id,
+      userId: 'user-1',
+      file: {
+        buffer: mockFile,
+        mimetype: 'image/jpeg',
+        size: mockFile.length,
+        originalname: 'proof-initial.jpg',
+      } as Express.Multer.File,
+      senderNumber: '0700000000',
+    });
+    await service.validateProof(initiated.id, 'admin-1');
+    await service.reopenProof(initiated.id, 'admin-1', 're-review');
+    await service.rejectProof(initiated.id, 'admin-2', 'proof invalidated');
+
+    const rejected = state.payments.find((payment) => payment.id === initiated.id)!;
+    const subscription = state.subscriptions.find(
+      (row) => row.id === initiated.subscription_id,
+    );
+
+    expect(rejected.status).toBe(PaymentManualStatus.REJECTED);
+    expect(subscription?.status).toBe(SubscriptionStatus.CANCELLED);
+    expect(state.artisanProfiles[0].is_subscription_active).toBe(false);
+    expect(
+      subscriptionService.deactivateSubscriptionFromManualPayment,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: initiated.subscription_id,
+        reason: 'TRANSACTION_REJECTED',
+      }),
+    );
+
+    const replacement = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.WAVE,
+    );
+
+    expect(replacement.status).toBe(PaymentManualStatus.PENDING);
+    expect(replacement.provider).toBe(PaymentProviderManual.ORANGE_MONEY);
+    expect(replacement.request_number).toBe(2);
+    expect(rejected.replaced_by_transaction_id).toBe(
+      replacement.transaction_id,
+    );
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'PAYMENT_MANUAL_AUTO_REPLACED',
+        data: expect.objectContaining({
+          previousTransactionId: initiated.transaction_id,
+          transactionId: replacement.transaction_id,
+        }),
+      }),
+    );
+  });
+
+  it('Scenario 10: expiration deactivates an active subscription before archiving the transaction', async () => {
+    const { service, state, subscriptionService } = createHarness();
+    state.artisanProfiles[0].is_subscription_active = true;
+    const subscription = {
+      id: 'sub-exp-active-1',
+      artisan_profile_id: 'artisan-1',
+      amount_fcfa: 5000,
+      status: SubscriptionStatus.ACTIVE,
+      created_at: new Date('2026-05-01T08:00:00.000Z'),
+    };
+    state.subscriptions.push(subscription);
+    state.payments.push({
+      id: 'pm-exp-active-1',
+      subscription_id: subscription.id,
+      transaction_id: 'TX-EXP-ACTIVE',
+      amount_fcfa: 5000,
+      provider: PaymentProviderManual.WAVE,
+      status: PaymentManualStatus.PENDING_ADMIN,
+      refund_required: false,
+      attempted_refund_count: 0,
+      created_at: new Date(),
+      expires_at_admin: new Date(Date.now() - 60_000),
+      timeline: [],
+      subscription,
+    });
+
+    await service.expirePayments();
+
+    expect(subscription.status).toBe(SubscriptionStatus.EXPIRED);
+    expect(state.artisanProfiles[0].is_subscription_active).toBe(false);
+    expect(
+      subscriptionService.deactivateSubscriptionFromManualPayment,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: subscription.id,
+        reason: 'TRANSACTION_EXPIRED',
+      }),
+    );
   });
 });
