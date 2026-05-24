@@ -437,9 +437,7 @@ Ces volumes ne doivent jamais etre supprimes dans un nettoyage normal :
 Script principal :
 
 ```bash
-./infrastructure/scripts/clean-docker.sh --dry-run
 ./infrastructure/scripts/clean-docker.sh
-./infrastructure/scripts/clean-docker.sh --dry-run --all
 ./infrastructure/scripts/clean-docker.sh --all
 ```
 
@@ -447,7 +445,7 @@ Ce script :
 
 - supprime les conteneurs arretes
 - supprime les images dangling et, en `--all`, les images inutilisees
-- nettoie le build cache
+- purge completement le build cache inutilise
 - supprime les reseaux orphelins
 - supprime les volumes anonymes orphelins
 - preserve les volumes nommes critiques

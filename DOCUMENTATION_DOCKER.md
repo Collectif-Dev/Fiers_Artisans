@@ -3,7 +3,7 @@
 Cette documentation est le runbook Docker de reference du projet.
 
 Regles de securite a retenir avant toute commande de nettoyage :
-- Toujours lancer un `--dry-run` avant un nettoyage destructeur.
+- Toujours auditer l'etat Docker avant un nettoyage destructeur.
 - Ne jamais supprimer les volumes de donnees critiques.
 - Ne jamais lancer `docker system prune -a --volumes`.
 - Considerer qu'un volume "dangling" n'est pas forcement obsolete.
@@ -33,9 +33,10 @@ Important :
 2. En mode `--all`, le script supprime aussi les images `<none>`, mais plus largement toutes les images inutilisees par un container.
    Commande utilisee : `docker image prune -a -f`
 
-3. Le build cache est nettoye dans les deux cas :
-   - mode standard : `docker builder prune -f`
-   - mode `--all` : `docker builder prune -a -f`
+3. Le build cache est purge completement dans les deux cas.
+   Le script utilise une purge agressive du cache BuildKit :
+   - priorite a `docker buildx prune --all --force`
+   - fallback sur `docker builder prune -a -f`
 
 4. Le script ne touche jamais aux volumes nommes critiques listes plus haut.
    En revanche, il peut supprimer les volumes anonymes orphelins, c'est-a-dire les volumes sans nom stable, typiquement representes par des IDs hexadecimaux de 64 caracteres.
@@ -86,25 +87,28 @@ docker system prune -a --volumes
 
 Ces deux commandes peuvent supprimer des volumes de donnees que tu veux conserver.
 
-### Sequence de test demandee
+### Sequence de verification recommandee
 
 Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
 
 ```bash
-# 1. Simulation aggressive
-./infrastructure/scripts/clean-docker.sh --dry-run --all
+# 1. Nettoyage standard
+./infrastructure/scripts/clean-docker.sh
 
-# 2. Nettoyage agressif reel
+# 2. Nettoyage agressif si tu veux aussi retirer toutes les images inutilisees
 ./infrastructure/scripts/clean-docker.sh --all
 
 # 3. Verifier les images <none>
 docker image ls --filter dangling=true
 
-# 4. Verifier l'etat des volumes
+# 4. Verifier le cache build
+docker builder du
+
+# 5. Verifier l'etat des volumes
 docker volume ls
 docker volume ls --filter dangling=true
 
-# 5. Voir uniquement les volumes anonymes orphelins
+# 6. Voir uniquement les volumes anonymes orphelins
 docker volume ls -q --filter dangling=true | grep -E '^[a-f0-9]{64}$'
 ```
 
@@ -261,9 +265,7 @@ Volumes non critiques mais frequents en dev :
 | Rebuild complet sans cache d'un service | `docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml -f infrastructure/docker-compose.portainer.yml build --no-cache api` |
 | Voir les logs d'un service | `docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.dev.yml -f infrastructure/docker-compose.portainer.yml logs -f api` |
 | Nettoyage standard | `./infrastructure/scripts/clean-docker.sh` |
-| Simulation standard | `./infrastructure/scripts/clean-docker.sh --dry-run` |
 | Nettoyage agressif | `./infrastructure/scripts/clean-docker.sh --all` |
-| Simulation agressive | `./infrastructure/scripts/clean-docker.sh --dry-run --all` |
 
 ### Depuis le dossier `~/mes_projets_dev/Fiers_Artisants/infrastructure/`
 
@@ -279,9 +281,7 @@ Volumes non critiques mais frequents en dev :
 | Rebuild complet sans cache d'un service | `docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.portainer.yml build --no-cache api` |
 | Voir les logs d'un service | `docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.portainer.yml logs -f api` |
 | Nettoyage standard | `./scripts/clean-docker.sh` |
-| Simulation standard | `./scripts/clean-docker.sh --dry-run` |
 | Nettoyage agressif | `./scripts/clean-docker.sh --all` |
-| Simulation agressive | `./scripts/clean-docker.sh --dry-run --all` |
 
 ## 4. Gestion du cycle de vie complet
 
@@ -355,23 +355,19 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml -f infrastru
 
 ## 5. Nettoyage et maintenance Docker
 
-### Les 4 modes du script `clean-docker.sh`
+### Les 2 modes du script `clean-docker.sh`
 
 | Mode | Effet |
 |---|---|
-| `./infrastructure/scripts/clean-docker.sh --dry-run` | Simulation du nettoyage standard |
 | `./infrastructure/scripts/clean-docker.sh` | Nettoyage standard reel |
-| `./infrastructure/scripts/clean-docker.sh --dry-run --all` | Simulation du nettoyage agressif |
 | `./infrastructure/scripts/clean-docker.sh --all` | Nettoyage agressif reel |
 
 ### Ce que chaque mode supprime reellement
 
-| Mode | Conteneurs arretes | Images dangling | Toutes les images inutilisees | Build cache partiel | Build cache complet | Reseaux orphelins | Volumes anonymes orphelins | Volumes nommes critiques |
-|---|---|---|---|---|---|---|---|---|
-| `--dry-run` | simulation | simulation | non | simulation | non | simulation | simulation | preserves |
-| standard | oui | oui | non | oui | non | oui | oui | preserves |
-| `--dry-run --all` | simulation | simulation indirecte | simulation | non | simulation | simulation | simulation | preserves |
-| `--all` | oui | oui | oui | non | oui | oui | oui | preserves |
+| Mode | Conteneurs arretes | Images dangling | Toutes les images inutilisees | Build cache complet | Reseaux orphelins | Volumes anonymes orphelins | Volumes nommes critiques |
+|---|---|---|---|---|---|---|---|
+| standard | oui | oui | non | oui | oui | oui | preserves |
+| `--all` | oui | oui | oui | oui | oui | oui | preserves |
 
 ### Commandes exactes utilisees par le script
 
@@ -380,7 +376,9 @@ Mode standard :
 ```bash
 docker container prune -f
 docker image prune -f
-docker builder prune -f
+docker buildx prune --all --force
+# fallback si buildx indisponible :
+# docker builder prune -a -f
 docker network prune -f
 docker volume rm <volume_id_hexadecimal_uniquement>
 ```
@@ -390,7 +388,9 @@ Mode `--all` :
 ```bash
 docker container prune -f
 docker image prune -a -f
-docker builder prune -a -f
+docker buildx prune --all --force
+# fallback si buildx indisponible :
+# docker builder prune -a -f
 docker network prune -f
 docker volume rm <volume_id_hexadecimal_uniquement>
 ```
@@ -458,7 +458,7 @@ docker volume ls | grep -E '(^|_)(postgres|mongo|redis|minio|grafana|prometheus|
 | `network already exists` | ancien reseau non supprime ou projet Compose concurrent | `docker network ls`, puis `docker network prune -f` si le reseau est vraiment orphelin |
 | `Cannot connect to service` | service down, port non expose, mauvais host interne/externe | verifier `docker compose ps`, `docker compose logs`, et le mapping de ports |
 | Grafana ou Prometheus inaccessibles | port non expose dans la variante Compose utilisee | en dev utiliser `docker-compose.dev.yml`; en prod-like, noter que Prometheus et Grafana ne sont pas exposes dans le Compose de base actuel |
-| Portainer montre encore des volumes "dangling" | stack arretee ou volumes anonymes non nettoyes | distinguer volumes nommes critiques et volumes anonymes; lancer `clean-docker.sh --dry-run` puis `--all` si besoin |
+| Portainer montre encore des volumes "dangling" | stack arretee ou volumes anonymes non nettoyes | distinguer volumes nommes critiques et volumes anonymes; lancer `clean-docker.sh`, puis `--all` si besoin |
 
 ## 8. Prompt reutilisable pour l'IA
 
@@ -476,7 +476,7 @@ Contexte :
 Contraintes absolues :
 - Ne jamais supprimer les volumes de donnees suivants :
   postgres_data, mongo_data, redis_data, minio_data, grafana_data, prometheus_data, portainer_data
-- Toujours commencer par un dry-run
+- Toujours commencer par un audit CLI de l'etat Docker
 - Toujours preciser si la commande doit etre lancee depuis la racine ou depuis infrastructure/
 
 Ta mission :
@@ -488,7 +488,7 @@ Ta mission :
    - docker volume ls --filter dangling=true
    - docker network ls --filter dangling=true
 2. Expliquer ce qui est sur de nettoyer et ce qui doit etre preserve
-3. Proposer d'abord les commandes de simulation
+3. Proposer d'abord les commandes d'audit et de verification
 4. Proposer ensuite les commandes reelles
 5. Si Portainer affiche encore des ressources obsoletes, expliquer precisement pourquoi
 6. Ne jamais recommander docker volume prune ni docker system prune -a --volumes
@@ -534,13 +534,13 @@ docker network ls --filter dangling=true
 
 ### Nettoyer sans risque
 
-Toujours commencer par :
+Commencer par le nettoyage standard :
 
 ```bash
-./infrastructure/scripts/clean-docker.sh --dry-run --all
+./infrastructure/scripts/clean-docker.sh
 ```
 
-Puis si le resultat est conforme :
+Puis utiliser le mode agressif si tu veux aussi supprimer toutes les images inutilisees :
 
 ```bash
 ./infrastructure/scripts/clean-docker.sh --all

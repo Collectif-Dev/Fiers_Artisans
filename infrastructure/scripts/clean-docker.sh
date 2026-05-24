@@ -13,7 +13,6 @@ BASE_COMPOSE="$INFRA_DIR/docker-compose.yml"
 DEV_COMPOSE="$INFRA_DIR/docker-compose.dev.yml"
 PORTAINER_COMPOSE="$INFRA_DIR/docker-compose.portainer.yml"
 
-DRY_RUN=false
 PRUNE_ALL=false
 
 COMPOSE_FILES=()
@@ -73,12 +72,9 @@ usage() {
   cat <<'EOF'
 Usage:
   infrastructure/scripts/clean-docker.sh
-  infrastructure/scripts/clean-docker.sh --dry-run
   infrastructure/scripts/clean-docker.sh --all
-  infrastructure/scripts/clean-docker.sh --dry-run --all
 
 Options:
-  --dry-run   Simule le nettoyage sans rien supprimer.
   --all       Nettoyage agressif des images inutilisees et du build cache.
               Les volumes ne sont jamais supprimes.
   -h, --help  Affiche cette aide.
@@ -196,8 +192,6 @@ list_dangling_images() {
 }
 
 list_unused_images_after_container_prune() {
-  # docker image prune -a has no native dry-run mode. We approximate the candidate
-  # set by excluding images referenced by any container, including stopped ones.
   local -a active_containers=()
   mapfile -t active_containers < <(
     docker ps -aq
@@ -238,6 +232,26 @@ get_build_cache_reclaimable() {
   fi
 }
 
+extract_prune_total() {
+  local prune_output="${1:-}"
+
+  awk -F'Total:[[:space:]]*' '/Total:/ { print $2 }' <<<"$prune_output" \
+    | tail -n 1 \
+    | tr -d '\r'
+}
+
+prune_build_cache() {
+  if docker buildx version >/dev/null 2>&1; then
+    if docker buildx prune --all --force 2>&1; then
+      return 0
+    fi
+
+    log_warn "docker buildx prune a echoue. Bascule sur docker builder prune."
+  fi
+
+  docker builder prune -a -f 2>&1
+}
+
 maybe_stop_stack() {
   local running_containers
   local running_count
@@ -252,11 +266,6 @@ maybe_stop_stack() {
   fi
 
   log_warn "Conteneurs Fiers Artisans en cours : $(join_by ', ' ${running_containers//$'\n'/ })"
-
-  if [[ "$DRY_RUN" == true ]]; then
-    log_info "[dry-run] docker compose down --remove-orphans serait propose avant le nettoyage."
-    return
-  fi
 
   if [[ ! -t 0 ]]; then
     log_warn "Session non interactive detectee. La stack reste active ; le nettoyage continue."
@@ -292,12 +301,10 @@ print_header() {
   log_info "Fichiers Compose detectes : $(join_by ', ' "${display_files[@]}")"
   log_info "Services couverts : $(join_by ', ' "${MANAGED_SERVICES[@]}")"
 
-  if [[ "$DRY_RUN" == true ]]; then
-    log_warn "Mode : dry-run. Aucune ressource ne sera supprimee."
-  elif [[ "$PRUNE_ALL" == true ]]; then
+  if [[ "$PRUNE_ALL" == true ]]; then
     log_warn "Mode : --all. Nettoyage agressif des images inutilisees et du build cache."
   else
-    log_info "Mode : nettoyage standard securise."
+    log_info "Mode : nettoyage standard securise avec purge complete du build cache."
   fi
 }
 
@@ -310,7 +317,9 @@ run_cleanup() {
   local image_count=0
   local network_count=0
   local anonymous_volume_count=0
-  local build_cache_value="n/a"
+  local build_cache_value="0B"
+  local build_cache_before="n/a"
+  local build_cache_after="n/a"
   local builder_output=""
 
   if [[ "$PRUNE_ALL" == true ]]; then
@@ -322,30 +331,12 @@ run_cleanup() {
   stopped_container_ids="$(list_stopped_containers)"
   orphan_network_ids="$(list_orphan_networks)"
   dangling_anonymous_volume_ids="$(list_dangling_anonymous_volumes)"
-  build_cache_value="$(get_build_cache_reclaimable)"
+  build_cache_before="$(get_build_cache_reclaimable)"
 
   container_count="$(count_lines "$stopped_container_ids")"
   image_count="$(count_lines "$candidate_image_ids")"
   network_count="$(count_lines "$orphan_network_ids")"
   anonymous_volume_count="$(count_lines "$dangling_anonymous_volume_ids")"
-
-  if [[ "$DRY_RUN" == true ]]; then
-    printf '%s\n' '------------------------------------------------------------'
-    printf '[DRY-RUN] Rien n a ete supprime. Apercu du nettoyage :\n'
-    printf '  - Conteneurs arretes : %s\n' "$container_count"
-    if [[ "$PRUNE_ALL" == true ]]; then
-      printf '  - Images inutilisees (--all) : %s\n' "$image_count"
-    else
-      printf '  - Images dangling : %s\n' "$image_count"
-    fi
-    printf '  - Build cache recuperable (estimation) : %s\n' "$build_cache_value"
-    printf '  - Reseaux orphelins : %s\n' "$network_count"
-    printf '  - Volumes anonymes orphelins : %s\n' "$anonymous_volume_count"
-    printf '  - Volumes preserves : %s\n' "$(join_by ', ' "${PRESERVED_VOLUMES[@]}")"
-    printf '============================================================\n'
-    printf '[DRY-RUN] Simulation terminee.\n'
-    return
-  fi
 
   log_info "Suppression des conteneurs arretes..."
   docker container prune -f >/dev/null
@@ -358,17 +349,18 @@ run_cleanup() {
     docker image prune -f >/dev/null
   fi
 
-  if [[ "$PRUNE_ALL" == true ]]; then
-    log_info "Suppression complete du build cache inutilise..."
-    builder_output="$(docker builder prune -a -f 2>&1)"
-  else
-    log_info "Suppression du build cache obsolete..."
-    builder_output="$(docker builder prune -f 2>&1)"
-  fi
-
-  build_cache_value="$(awk -F'Total:[[:space:]]*' '/Total:/ { print $2 }' <<<"$builder_output" | tail -n 1 | tr -d '\r')"
+  log_info "Purge complete du build cache inutilise..."
+  builder_output="$(prune_build_cache)"
+  build_cache_after="$(get_build_cache_reclaimable)"
+  build_cache_value="$(extract_prune_total "$builder_output")"
   if [[ -z "$build_cache_value" ]]; then
-    build_cache_value="0B"
+    if [[ "$build_cache_before" != "n/a" && "$build_cache_after" == "0B" ]]; then
+      build_cache_value="$build_cache_before"
+    elif [[ "$build_cache_before" == "$build_cache_after" ]]; then
+      build_cache_value="0B"
+    else
+      build_cache_value="$build_cache_before"
+    fi
   fi
 
   log_info "Suppression des reseaux orphelins..."
@@ -386,6 +378,10 @@ run_cleanup() {
     log_info "Aucun volume anonyme orphelin a supprimer."
   fi
 
+  if [[ "$build_cache_after" != "n/a" && "$build_cache_after" != "0B" ]]; then
+    log_warn "Du build cache subsiste apres nettoyage : $build_cache_after"
+  fi
+
   printf '%s\n' '------------------------------------------------------------'
   printf 'Nettoyage Docker - Fiers Artisans\n'
   printf '============================================================\n'
@@ -398,6 +394,7 @@ run_cleanup() {
   fi
 
   printf 'Build cache libere : %s\n' "$build_cache_value"
+  printf 'Build cache restant : %s\n' "$build_cache_after"
   printf 'Reseaux orphelins supprimes : %s\n' "$network_count"
   printf 'Volumes anonymes orphelins supprimes : %s\n' "$anonymous_volume_count"
   printf 'Volumes preserves : %s\n' "$(join_by ', ' "${PRESERVED_VOLUMES[@]}")"
@@ -408,9 +405,6 @@ run_cleanup() {
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --dry-run)
-        DRY_RUN=true
-        ;;
       --all)
         PRUNE_ALL=true
         ;;
