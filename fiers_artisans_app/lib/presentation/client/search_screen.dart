@@ -29,7 +29,9 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
-  static const double _nearbyRadiusKm = 20;
+  static const double _nearbyRadiusKm = 10;
+  static const double _urgentRadiusKm = 20;
+  static const double _topRatedRadiusKm = 20;
   static const double _topRatedMinRating = 3;
 
   final _searchCtrl = TextEditingController();
@@ -85,11 +87,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         final subcat = params['subcategoryId'] as String?;
         if (subcat != null) _selectedSubcategoryId = subcat;
 
-        if (params['topRated'] == true) {
+        final preset = params['preset']?.toString();
+
+        if (preset == 'urgent') {
+          _radius = _urgentRadiusKm;
+        } else if (preset == 'nearby') {
+          _isNearbyPreset = true;
+          _radius = _nearbyRadiusKm;
+        } else if (preset == 'topRated') {
           _sortBy = 'rating';
           _minRating = _topRatedMinRating;
+          _radius = _topRatedRadiusKm;
         }
-        if (params['nearby'] == true) {
+
+        if (preset == null && params['topRated'] == true) {
+          _sortBy = 'rating';
+          _minRating = _topRatedMinRating;
+          _radius = _topRatedRadiusKm;
+        }
+        if (preset == null && params['nearby'] == true) {
           _isNearbyPreset = true;
           _radius = _nearbyRadiusKm;
         }

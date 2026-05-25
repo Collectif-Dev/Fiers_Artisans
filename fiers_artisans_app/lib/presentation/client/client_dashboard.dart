@@ -176,7 +176,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                     child: GestureDetector(
                       onTap: () => context.push(
                         '/client/search',
-                        extra: {'nearby': true},
+                        extra: {'nearby': true, 'preset': 'urgent'},
                       ),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -304,7 +304,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                             label: 'home.nearby'.tr(),
                             onTap: () => context.push(
                               '/client/search',
-                              extra: {'nearby': true},
+                              extra: {'nearby': true, 'preset': 'nearby'},
                             ),
                           ),
                         ),
@@ -315,7 +315,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                             label: 'home.top_rated'.tr(),
                             onTap: () => context.push(
                               '/client/search',
-                              extra: {'topRated': true},
+                              extra: {'topRated': true, 'preset': 'topRated'},
                             ),
                           ),
                         ),
