@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from './entities/user.entity';
@@ -12,6 +12,13 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { MapVisibilityGateway } from './map-visibility.gateway';
 import { AdminRealtimeService } from '../../common/realtime/admin-realtime.service';
+import { BusinessException } from '../../common/exceptions/business.exception';
+
+type UserLocationSnapshot = {
+  latitude: number | null;
+  longitude: number | null;
+  locationUpdatedAt: Date | null;
+};
 
 @Injectable()
 export class UsersService {
@@ -31,6 +38,67 @@ export class UsersService {
     private readonly mapVisibilityGateway: MapVisibilityGateway,
     private readonly adminRealtimeService: AdminRealtimeService,
   ) {}
+
+  private async getUserLocationSnapshot(
+    userId: string,
+  ): Promise<UserLocationSnapshot> {
+    const rawLocation = await this.userRepository
+      .createQueryBuilder('u')
+      .select('u.location_updated_at', 'location_updated_at')
+      .addSelect('ST_Y(u.location::geometry)', 'latitude')
+      .addSelect('ST_X(u.location::geometry)', 'longitude')
+      .where('u.id = :id', { id: userId })
+      .getRawOne<{
+        location_updated_at: string | Date | null;
+        latitude: string | null;
+        longitude: string | null;
+      }>();
+
+    return {
+      latitude:
+        rawLocation?.latitude != null ? Number(rawLocation.latitude) : null,
+      longitude:
+        rawLocation?.longitude != null ? Number(rawLocation.longitude) : null,
+      locationUpdatedAt: rawLocation?.location_updated_at
+        ? new Date(rawLocation.location_updated_at)
+        : null,
+    };
+  }
+
+  private async attachLocationSnapshot<
+    T extends { user_id?: string; user?: { id?: string | null } | null },
+  >(entity: T): Promise<T> {
+    const userId = entity.user_id ?? entity.user?.id ?? null;
+    if (!userId) {
+      return entity;
+    }
+
+    const snapshot = await this.getUserLocationSnapshot(userId);
+    Object.assign(entity as Record<string, unknown>, {
+      latitude: snapshot.latitude,
+      longitude: snapshot.longitude,
+      location_updated_at: snapshot.locationUpdatedAt,
+      locationUpdatedAt: snapshot.locationUpdatedAt,
+    });
+    return entity;
+  }
+
+  private async userHasStoredLocation(userId: string): Promise<boolean> {
+    const snapshot = await this.getUserLocationSnapshot(userId);
+    return snapshot.latitude != null && snapshot.longitude != null;
+  }
+
+  private async ensureArtisanLocationForVisibility(userId: string): Promise<void> {
+    if (await this.userHasStoredLocation(userId)) {
+      return;
+    }
+
+    throw new BusinessException(
+      'PROFILE_LOCATION_REQUIRED_FOR_AVAILABILITY',
+      'Impossible de rendre votre profil visible sans position GPS valide. Mettez d abord votre localisation a jour.',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
 
   private async emitMapVisibilityUpdate(
     artisanUserId: string,
@@ -60,30 +128,16 @@ export class UsersService {
       return;
     }
 
-    const rawLocation = await this.userRepository
-      .createQueryBuilder('u')
-      .select('u.location_updated_at', 'location_updated_at')
-      .addSelect('ST_Y(u.location::geometry)', 'latitude')
-      .addSelect('ST_X(u.location::geometry)', 'longitude')
-      .where('u.id = :id', { id: artisanUserId })
-      .getRawOne<{
-        location_updated_at: string | Date | null;
-        latitude: string | null;
-        longitude: string | null;
-      }>();
+    const rawLocation = await this.getUserLocationSnapshot(artisanUserId);
 
     await this.mapVisibilityGateway.emitArtisanVisibilityUpdated({
       artisanUserId,
       isAvailable: isAvailable && profile.is_subscription_active,
       categoryId: profile.category_id,
       subcategoryId: profile.subcategory_id,
-      latitude:
-        rawLocation?.latitude != null ? Number(rawLocation.latitude) : null,
-      longitude:
-        rawLocation?.longitude != null ? Number(rawLocation.longitude) : null,
-      locationUpdatedAt: rawLocation?.location_updated_at
-        ? new Date(rawLocation.location_updated_at)
-        : null,
+      latitude: rawLocation.latitude,
+      longitude: rawLocation.longitude,
+      locationUpdatedAt: rawLocation.locationUpdatedAt,
     });
   }
 
@@ -113,7 +167,7 @@ export class UsersService {
     if (!profile) {
       throw new NotFoundException('Profil artisan non trouvé.');
     }
-    return profile;
+    return this.attachLocationSnapshot(profile);
   }
 
   async getArtisanPublicProfile(artisanId: string): Promise<ArtisanProfile> {
@@ -138,15 +192,25 @@ export class UsersService {
       targetId: profile.id,
     }).catch(() => {});
 
-    return profile;
+    return this.attachLocationSnapshot(profile);
   }
 
   async updateArtisanProfile(
     userId: string,
     dto: UpdateArtisanProfileDto,
   ): Promise<ArtisanProfile> {
-    const profile = await this.getArtisanProfile(userId);
+    const profile = await this.artisanProfileRepository.findOne({
+      where: { user_id: userId },
+      relations: ['subcategory'],
+    });
+    if (!profile) {
+      throw new NotFoundException('Profil artisan non trouvé.');
+    }
     const previousAvailability = profile.is_available;
+
+    if (dto.is_available === true) {
+      await this.ensureArtisanLocationForVisibility(userId);
+    }
 
     if (dto.subcategory_id) {
       const subcategory = await this.subcategoryRepository.findOne({
@@ -225,7 +289,7 @@ export class UsersService {
       })
       .catch(() => {});
 
-    return savedProfile;
+    return this.attachLocationSnapshot(savedProfile);
   }
 
   async getArtisanStats(userId: string): Promise<{
@@ -251,14 +315,19 @@ export class UsersService {
     if (!profile) {
       throw new NotFoundException('Profil client non trouvé.');
     }
-    return profile;
+    return this.attachLocationSnapshot(profile);
   }
 
   async updateClientProfile(
     userId: string,
     dto: UpdateClientProfileDto,
   ): Promise<ClientProfile> {
-    const profile = await this.getClientProfile(userId);
+    const profile = await this.clientProfileRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!profile) {
+      throw new NotFoundException('Profil client non trouvé.');
+    }
     Object.assign(profile, dto);
     const saved = await this.clientProfileRepository.save(profile);
     this.adminRealtimeService.emit('CLIENT_UPDATED', {
@@ -273,7 +342,7 @@ export class UsersService {
         updatedAt: new Date().toISOString(),
       })
       .catch(() => {});
-    return saved;
+    return this.attachLocationSnapshot(saved);
   }
 
   async listFavoriteArtisans(clientUserId: string): Promise<Record<string, any>[]> {
@@ -423,17 +492,59 @@ export class UsersService {
     userId: string,
     lat: number,
     lng: number,
+    city?: string,
+    commune?: string,
   ): Promise<void> {
-    await this.userRepository
-      .createQueryBuilder()
-      .update(User)
-      .set({
-        location: () => 'ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)',
-        location_updated_at: () => 'CURRENT_TIMESTAMP',
-      })
-      .where('id = :id', { id: userId })
-      .setParameters({ lat, lng })
-      .execute();
+    const normalizedCity = city?.trim();
+    const normalizedCommune = commune?.trim();
+
+    await this.userRepository.manager.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder()
+        .update(User)
+        .set({
+          location: () => 'ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)',
+          location_updated_at: () => 'CURRENT_TIMESTAMP',
+        })
+        .where('id = :id', { id: userId })
+        .setParameters({ lat, lng })
+        .execute();
+
+      const user = await manager.getRepository(User).findOne({
+        where: { id: userId },
+        select: ['id', 'role'],
+      });
+
+      if (
+        user?.role === UserRole.ARTISAN &&
+        (normalizedCity || normalizedCommune)
+      ) {
+        await manager.getRepository(ArtisanProfile).update(
+          { user_id: userId },
+          {
+            ...(normalizedCity ? { city: normalizedCity } : {}),
+            ...(normalizedCommune ? { commune: normalizedCommune } : {}),
+          },
+        );
+      }
+
+      if (
+        user?.role === UserRole.CLIENT &&
+        (normalizedCity || normalizedCommune)
+      ) {
+        await manager.getRepository(ClientProfile).update(
+          { user_id: userId },
+          {
+            ...(normalizedCity ? { city: normalizedCity } : {}),
+            ...(normalizedCommune ? { commune: normalizedCommune } : {}),
+          },
+        );
+      }
+    });
+
+    const snapshot = await this.getUserLocationSnapshot(userId);
+    const updatedAtIso =
+      snapshot.locationUpdatedAt?.toISOString() ?? new Date().toISOString();
 
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -460,7 +571,67 @@ export class UsersService {
           subcategory_id: artisanProfile.subcategory_id,
           is_subscription_active: artisanProfile.is_subscription_active,
         }).catch(() => {});
+
+        this.adminRealtimeService.emit('ARTISAN_UPDATED', {
+          userId,
+          artisanProfileId: artisanProfile.id,
+          categoryId: artisanProfile.category_id,
+          subcategoryId: artisanProfile.subcategory_id,
+          isAvailable: artisanProfile.is_available,
+          isSubscriptionActive: artisanProfile.is_subscription_active,
+          latitude: snapshot.latitude,
+          longitude: snapshot.longitude,
+          locationUpdatedAt: updatedAtIso,
+        });
+        this.chatGateway
+          .emitUserSyncEvent(userId, 'userProfileUpdated', {
+            role: 'ARTISAN',
+            updatedAt: updatedAtIso,
+            locationUpdatedAt: updatedAtIso,
+          })
+          .catch(() => {});
+        this.chatGateway
+          .emitGlobalSyncEvent('artisanProfileUpdated', {
+            artisanUserId: userId,
+            artisanProfileId: artisanProfile.id,
+            isAvailable: artisanProfile.is_available,
+            categoryId: artisanProfile.category_id,
+            subcategoryId: artisanProfile.subcategory_id,
+            isSubscriptionActive: artisanProfile.is_subscription_active,
+            latitude: snapshot.latitude,
+            longitude: snapshot.longitude,
+            locationUpdatedAt: updatedAtIso,
+            updatedAt: updatedAtIso,
+          })
+          .catch(() => {});
       }
+
+      return;
+    }
+
+    if (user?.role === UserRole.CLIENT) {
+      const clientProfile = await this.clientProfileRepository.findOne({
+        where: { user_id: userId },
+        loadEagerRelations: false,
+        select: ['id', 'user_id', 'city', 'commune'],
+      });
+
+      this.adminRealtimeService.emit('CLIENT_UPDATED', {
+        userId,
+        clientProfileId: clientProfile?.id ?? null,
+        city: clientProfile?.city ?? null,
+        commune: clientProfile?.commune ?? null,
+        latitude: snapshot.latitude,
+        longitude: snapshot.longitude,
+        locationUpdatedAt: updatedAtIso,
+      });
+      this.chatGateway
+        .emitUserSyncEvent(userId, 'userProfileUpdated', {
+          role: 'CLIENT',
+          updatedAt: updatedAtIso,
+          locationUpdatedAt: updatedAtIso,
+        })
+        .catch(() => {});
     }
   }
 

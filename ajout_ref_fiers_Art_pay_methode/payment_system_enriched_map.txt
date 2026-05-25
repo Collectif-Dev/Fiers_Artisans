@@ -1,282 +1,277 @@
-Système de paiement manuel — Wave / Mobile Money (Côte d’Ivoire)
-Map technique complète · Architecture produit + backend + UX + anti-fraude
+Systeme de paiement manuel - Wave / Mobile Money (Cote d'Ivoire)
+Map technique enrichie synchronisee avec le code actuel
 
-1. Vue d’ensemble
-Architecture
-    • Wave API (optionnel / futur) : désactivé temporairement 
-    • Paiement manuel (actif) : principal système 
-    • Les deux coexistent sur la page paiement 
-Objectif
-Valider des paiements mobiles (Wave / Orange Money / MTN / Moov) via :
-    • preuve utilisateur (capture écran) 
-    • validation admin 
-    • contrôle anti-fraude automatisé 
+Document de reference detaille :
+- DOCUMENTATION_PAIEMENT_MANUEL.md
 
-2. Paramètres système
-Élément
-Valeur
-Abonnement
-5 000 FCFA / mois
-Délai admin
-48 à 72 heures
-Upload max preuve
-3 tentatives
-Hash image
-SHA-256 (déduplication globale)
+1. Vue systeme
+- Flux principal : paiement manuel Mobile Money
+- Operateurs : Wave manuel, Orange Money, MTN, Moov
+- Montant : 5 000 FCFA
+- Validation : admin
+- Stockage : PostgreSQL + MinIO + notifications Mongo/temps reel
 
-3. Flow complet A → Z
-1. Création transaction
-POST /api/transactions
-{
-  "transaction_id": "TX-A4F2C9B1",
-  "status": "PENDING",
-  "created_at": "2025-07-01T10:00:00Z",
-  "expires_at_admin": "2025-07-03T10:00:00Z"
-}
+2. Couches impliquees
+Backend
+- payment-manual.entity.ts
+- payment-proof.entity.ts
+- payment-manual.service.ts
+- payment-manual.controller.ts
+- payment-manual-admin.controller.ts
+- payment-realtime.service.ts
+- subscription.service.ts
 
-2. Paiement hors système
-L’utilisateur :
-    • ouvre Wave / Orange Money / MTN / Moov 
-    • envoie 5 000 FCFA + frais opérateur 
-    • conserve la capture écran 
+Mobile Flutter
+- manual_payment_model.dart
+- payment_manual_provider.dart
+- manual_payment_page.dart
+- payment_status_widget.dart
 
-3. Soumission preuve
-POST /api/transactions/:id/proof
-Content-Type: multipart/form-data
-{
-  "image": "[file]",
-  "sender_number": "0701234567",
-  "declared_time": "10h15"
-}
-Retour :
-{
-  "proof_id": "PRF-XXX",
-  "submitted_at": "2025-07-01T10:35:00Z",
-  "image_hash": "a3f9..."
-}
+Admin Web
+- payments/manual/page-client.tsx
+- src/lib/api.ts
+- src/types/index.ts
 
-4. Validations backend (bloquantes)
-    1. Transaction existe 
-    2. Status = PENDING 
-    3. Non expirée 
-    4. Hash image unique 
-    5. sender_number valide (CI) 
-Si OK → stockage preuve
+3. Etats persistants
+- PENDING
+- PENDING_ADMIN
+- COMPLETED
+- REJECTED
+- EXPIRED
 
-5. Traitement admin
-L’admin voit :
-    • image 
-    • sender_number 
-    • timestamp 
-    • métadonnées EXIF 
-Actions :
-    • Valider 
-    • Rejeter (avec motif) 
+4. Etats derives
+- REJECTED simple
+  - status = REJECTED
+  - validated_at = null
+- REJECTED apres validation
+  - status = REJECTED
+  - validated_at != null
+- EXPIRED remboursement en attente
+  - status = EXPIRED
+  - refund_required = true
+  - refund_done_at = null
+- EXPIRED remboursement traite
+  - status = EXPIRED
+  - refund_done_at != null
+- Historique archive
+  - EXPIRED
+  - REJECTED apres validation
+  - replaced_by_transaction_id != null
 
-6A. Validation
-PATCH /api/transactions/:id/validate
-{
-  "status": "COMPLETED",
-  "validated_at": "2025-07-01T14:20:00Z"
-}
-→ abonnement activé
+5. Initiation
+Entree :
+- POST /api/v1/payments/manual/initiate
 
-6B. Rejet
-PATCH /api/transactions/:id/reject
-{
-  "reason": "Montant insuffisant"
-}
-→ status = REJECTED
+Resolution :
+1. verifier provider disponible
+2. resoudre l'artisan et l'abonnement
+3. bloquer si abonnement deja actif
+4. charger la derniere transaction reelle
+5. appliquer la matrice suivante
 
-6C. Expiration automatique
-Cron (chaque heure) :
-UPDATE transactions
-SET status = 'EXPIRED',
-    refund_required = true
-WHERE status = 'PENDING'
-AND expires_at_admin < NOW()
-AND proof EXISTS;
+Matrice :
+- PENDING
+  - retourner la meme transaction
+- PENDING_ADMIN
+  - retourner la meme transaction
+- REJECTED simple
+  - retourner la meme transaction
+- remboursement en attente
+  - erreur PAYMENT_MANUAL_REFUND_PENDING
+- REJECTED apres validation
+  - creer un nouvel ID automatiquement
+- EXPIRED remboursement traite
+  - creer un nouvel ID automatiquement
+- aucun historique coherent
+  - creation normale
 
-4. Scénarios métiers
-✔ Cas normal
-    • paiement correct 
-    • validation admin 
-    • statut COMPLETED 
+6. Auto-remplacement
+Declencheurs :
+- REJECTED apres validation
+- EXPIRED avec remboursement deja traite
 
-⚠ Frais opérateur oubliés
-    • montant reçu < 5000 FCFA 
-    • rejet admin 
-    • nouvelle tentative client 
+Effets backend :
+- nouvelle transaction PENDING
+- previous_provider reutilise
+- request_number = precedent + 1
+- ancienne transaction.replaced_by_transaction_id = nouvel ID
+- timeline : PAYMENT_MANUAL_AUTO_REPLACED
+- notification : PAYMENT_MANUAL_AUTO_REPLACED
+- SSE admin : PAYMENT_MANUAL_TIMELINE_UPDATED
 
-⚠ Admin absent
-    • dépasse 72h 
-    • passage EXPIRED 
-    • remboursement manuel 
+7. Soumission de preuve
+Entree :
+- POST /api/v1/payments/manual/:transactionId/submit-proof
 
-🚨 Réutilisation image
-    • hash déjà existant 
-    • rejet automatique immédiat 
+Controles :
+- ownership
+- status autorise : PENDING ou REJECTED simple
+- cooldown_until absent ou depasse
+- hash image non duplique
+- fichier image valide
+- sender_number valide
 
-🚨 Image modifiée / suspecte
-    • EXIF Photoshop / Canva 
-    • score IA élevé 
-    • rejet ou flag admin 
+Effets :
+- creation payment_proof
+- status -> PENDING_ADMIN
+- reset cooldown actif
 
-⚠ 3 tentatives upload dépassées
-    • blocage 429 
-    • support requis 
+8. Validation admin
+Entree :
+- PATCH /api/v1/admin/payment-proofs/:id/validate
 
-5. Frontend (structure logique)
-États paiement
-    • PENDING → en attente validation 
-    • COMPLETED → abonnement actif 
-    • REJECTED → paiement refusé 
-    • EXPIRED → délai dépassé 
+Effets :
+- status -> COMPLETED
+- validated_at renseigne
+- activation abonnement
+- notification PAYMENT_MANUAL_VALIDATED
+- push / temps reel
 
-Champs formulaire preuve
-    • image (jpg/png/webp) 
-    • sender_number (obligatoire) 
-    • declared_time (optionnel) 
-    • compteur tentative (max 3) 
+9. Rejet admin
+Entree :
+- PATCH /api/v1/admin/payment-proofs/:id/reject
 
-Règles UI
-    • Wave API visible mais désactivé 
-    • paiement manuel actif 
-    • confirmation obligatoire avant envoi 
+Branche A - rejet simple
+- transaction en cycle normal
+- validated_at = null
+- status -> REJECTED
+- motif enregistre
+- cooldown progressif tous les 3 rejets du cycle
+- notification :
+  - PAYMENT_MANUAL_REJECTED
+  - ou PAYMENT_MANUAL_COOLDOWN
 
-6. Backend API
-Endpoint
-Rôle
-POST /transactions
-créer transaction
-GET /transactions/:id
-statut client
-POST /transactions/:id/proof
-upload preuve
-PATCH /validate
-validation admin
-PATCH /reject
-rejet admin
-GET /admin/transactions
-dashboard
-PATCH /refund-done
-remboursement
+Branche B - rejet apres validation
+- validated_at != null
+- status -> REJECTED
+- abonnement desactive si actif
+- raison : TRANSACTION_REJECTED
+- aucun cooldown pour reutiliser la meme transaction
+- transaction archivee
+- prochain chargement / initiate = auto-remplacement
 
-7. Modèle de données
-transactions
-    • id (TX-XXXX) 
-    • user_id 
-    • amount = 5000 
-    • status (PENDING / COMPLETED / REJECTED / EXPIRED) 
-    • created_at 
-    • expires_at_admin 
-    • validated_at 
-    • rejected_at 
-    • rejection_reason 
-    • refund_required 
-    • refund_done 
+10. Cooldown
+Champs :
+- cooldown_until
+- cooldown_cycle
 
-payment_proofs
-    • id 
-    • transaction_id 
-    • image_url 
-    • image_hash (UNIQUE) 
-    • sender_number 
-    • submitted_at 
-    • declared_payment_time 
-    • upload_attempt 
-    • file_type 
-    • file_size 
-    • exif_data 
-    • ai_suspicion_score 
-    • is_suspicious 
+Formule :
+- 5h * 2^(cycle - 1)
 
-8. Sécurité
-Bloquants
-    • hash image doublon → rejet immédiat 
-    • sender_number invalide → 400 
-    • fichier > 5MB → 413 
-    • format interdit → 415 
-    • 3 uploads max → 429 
+Exemples :
+- cycle 1 = 5h
+- cycle 2 = 10h
+- cycle 3 = 20h
 
-Anti-fraude
-    • détection EXIF Photoshop 
-    • score IA suspicion 
-    • comparaison dates EXIF vs transaction 
-    • tracking global hash image 
+Effets UX :
+- sender bloque
+- upload bloque
+- bouton de soumission bloque
+- temps restant affiche en temps reel
 
-Accès
-    • client → uniquement ses transactions 
-    • admin → endpoints protégés 
-    • images → URL signée (expiration 1h) 
+11. Expiration
+Traitement cron :
+- selection des PENDING_ADMIN hors delai
 
-9. Gestion des erreurs
-Code
-Cas
-Message
-400
-numéro invalide
-numéro CI requis
-403
-accès interdit
-non autorisé
-404
-transaction inconnue
-introuvable
-409
-déjà traité
-transaction déjà validée
-413
-fichier trop lourd
-max 5MB
-415
-format invalide
-JPG/PNG/WEBP uniquement
-429
-trop de tentatives
-support requis
-500
-erreur serveur
-retry sécurisé
+Effets :
+1. si abonnement encore actif :
+   - deactivateSubscription(reason = TRANSACTION_EXPIRED)
+2. status -> EXPIRED
+3. refund_required = true
+4. attempted_refund_count + 1
+5. timeline PAYMENT_MANUAL_EXPIRED
+6. notification PAYMENT_MANUAL_EXPIRED
+7. SSE admin timeline updated
 
-10. Cron système
--- toutes les heures
-SELECT * FROM transactions
-WHERE status = 'PENDING'
-AND expires_at_admin < NOW();
-Actions :
-    • EXPIRED 
-    • refund_required = true 
-    • notification admin 
+12. Remboursement
+Entree :
+- PATCH /api/v1/admin/payment-proofs/:id/mark-refunded
 
-11. Dashboard admin
-Colonnes
-    • TX ID 
-    • Client 
-    • Montant 
-    • Proof 
-    • sender_number 
-    • Status 
-    • délai restant 
-    • actions 
+Effets :
+- refund_done_at renseigne
+- refund_required = false
+- timeline REFUND_PROCESSED
+- notification REFUND_PROCESSED
+- transaction reste historique
+- prochain initiate peut auto-remplacer si EXPIRED
 
-Onglets transaction
-    • résumé 
-    • preuve 
-    • métadonnées EXIF 
-    • remboursement 
+13. Reouverture admin
+Autorisee uniquement pour les transactions encore coherentes avec un cycle actif.
 
-12. Règles critiques
-    • image_hash = UNIQUE global 
-    • une seule preuve active par transaction 
-    • aucune modification après statut final 
-    • remboursement obligatoire si EXPIRED + preuve 
-    • logs admin obligatoires 
+Interdit sur :
+- EXPIRED
+- REJECTED apres validation
+- transaction deja remplacee
 
-13. Points techniques importants
-    • EXIF peut être absent (iOS) 
-    • hash calculé AVANT stockage S3 
-    • polling recommandé (30s) ou SSE 
-    • sender_number doit rester brut (format exact) 
-    • Wave API conservée mais inactive
+14. Filtres admin
+GET /api/v1/admin/payment-proofs
 
+Scopes :
+- ACTIVE
+- HISTORY
+- ALL
+
+ACTIVE :
+- PENDING
+- PENDING_ADMIN
+- COMPLETED
+- REJECTED simples non archives
+
+HISTORY :
+- EXPIRED
+- REJECTED apres validation
+- transactions remplacees
+
+15. Traçabilite
+Champs :
+- request_number
+- replaced_by_transaction_id
+- validated_at
+- rejected_at
+- refund_required
+- refund_done_at
+- cooldown_until
+- cooldown_cycle
+
+Evenements :
+- PAYMENT_MANUAL_NEW_PROOF
+- PAYMENT_MANUAL_UPDATED
+- PAYMENT_MANUAL_TIMELINE_UPDATED
+- PAYMENT_MANUAL_AUTO_REPLACED
+- REFUND_PROCESSED
+
+16. Scenarios de reference
+Scenario A - nominal
+- PENDING -> PENDING_ADMIN -> COMPLETED
+
+Scenario B - rejet simple
+- PENDING -> PENDING_ADMIN -> REJECTED
+- meme transaction reutilisee
+
+Scenario C - cooldown
+- 3 rejets du cycle
+- cooldown_until renseigne
+- attente avant nouvel upload
+
+Scenario D - expiration
+- PENDING_ADMIN -> EXPIRED
+- abonnement desactive
+- remboursement requis
+
+Scenario E - expiration remboursee
+- EXPIRED + refund_done_at
+- nouvelle transaction auto-creee
+
+Scenario F - rejet apres validation
+- transaction deja validee par le passe
+- nouvelle preuve rejetee
+- abonnement desactive
+- transaction archivee
+- nouveau TX ID cree au prochain chargement/initiate
+
+17. Garde-fous de coherence
+- ne jamais raisonner sur une vieille transaction au lieu de la derniere
+- ne jamais creer de doublon PENDING pour un meme abonnement
+- ne jamais ouvrir une nouvelle demande pendant un remboursement en attente
+- ne jamais modifier une transaction historique archivee
+- toujours reutiliser previous_provider lors d'un auto-remplacement

@@ -62,6 +62,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
   Timer? _pollingTimer;
   StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
+  Future<void>? _inFlightCurrentLoad;
 
   PaymentManualNotifier({
     PaymentManualRepositoryContract? repository,
@@ -86,11 +87,22 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     super.dispose();
   }
 
-  Future<void> loadCurrentTransaction({bool refresh = false}) async {
+  Future<void> loadCurrentTransaction({bool refresh = false}) {
     if (!refresh && state.currentTransaction != null) {
-      return;
+      return Future.value();
+    }
+    if (_inFlightCurrentLoad != null) {
+      return _inFlightCurrentLoad!;
     }
 
+    final future = _loadCurrentTransactionInternal();
+    _inFlightCurrentLoad = future;
+    return future.whenComplete(() {
+      _inFlightCurrentLoad = null;
+    });
+  }
+
+  Future<void> _loadCurrentTransactionInternal() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final tx = await _repository.fetchCurrentTransaction();

@@ -36,7 +36,13 @@ export class UsersController {
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateLocationDto,
   ) {
-    return this.usersService.updateUserLocation(userId, dto.lat, dto.lng);
+    return this.usersService.updateUserLocation(
+      userId,
+      dto.lat,
+      dto.lng,
+      dto.city,
+      dto.commune,
+    );
   }
 
   // ── Artisan Profile ─────────────────────────────────────────────

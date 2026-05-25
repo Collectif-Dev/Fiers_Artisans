@@ -2,195 +2,161 @@
 
 ## Objectif
 
-Ce document decrit le systeme de paiement manuel Mobile Money de **Fiers Artisans** de bout en bout :
+Ce document decrit l'etat reel du systeme de paiement manuel Mobile Money de **Fiers Artisans** apres le durcissement recent du cycle de vie des transactions :
 
-- son role metier
-- son architecture technique
-- ses entites et ses statuts
-- ses endpoints backend
-- ses comportements mobile et admin
-- ses scenarios normaux et degrades
-- ses invariants de securite et d'anti-regression
-- ses points d'exploitation, de test et de diagnostic
+- gestion des preuves
+- cooldown progressif
+- expiration avec remboursement
+- desactivation d'abonnement en cas de rupture d'integrite metier
+- auto-remplacement des transactions terminales eligibles
+- separation admin `ACTIVE` / `HISTORY`
+- temps reel mobile et admin
 
-Le document decrit l'etat **reel** du depot au moment de sa generation.
-
----
-
-## 1. Perimetre Fonctionnel
-
-Le paiement manuel permet a un artisan de payer son abonnement via Mobile Money quand aucun flux de paiement automatique n'est utilise.
-
-Le parcours metier est le suivant :
-
-1. l'artisan initie une transaction manuelle
-2. l'application lui affiche le numero de depot selon l'operateur
-3. l'artisan effectue le paiement et envoie une preuve
-4. un administrateur valide, rejette, rouvre ou marque le remboursement
-5. le backend pilote les statuts, l'expiration, les notifications et la synchro temps reel
-
-Le module couvre :
-
-- `ORANGE_MONEY`
-- `MTN_MOMO`
-- `WAVE`
-- `MOOV_MONEY` present dans le code, mais indisponible tant qu'aucun numero receveur n'est configure
-
-Montant standard actuel :
-
-- `5000 FCFA` par defaut, configurable via `PAYMENT_MANUAL_AMOUNT_FCFA`
-
-Delai d'expiration admin actuel :
-
-- `72 heures` par defaut, configurable via `PAYMENT_MANUAL_EXPIRY_HOURS`
+Le document suit le code actuellement present dans le depot.
 
 ---
 
-## 2. Stack Technique
+## 1. Role metier
 
-## 2.1. Couches impliquees
+Le paiement manuel permet a un artisan de payer son abonnement via Mobile Money quand le flux automatique n'est pas utilise.
 
-| Couche | Role |
-|---|---|
-| `backend/` NestJS | orchestration metier, securite, statuts, notifications, cron, anti-fraude |
-| PostgreSQL | persistance des transactions et des preuves |
-| MinIO | stockage binaire des captures de preuve |
-| Redis | rate limiting des soumissions de preuve |
-| `fiers_artisans_app/` Flutter | experience artisan |
-| `admin-web/` Next.js | interface de moderation et de traitement |
-| SSE + WebSocket sync | mise a jour quasi temps reel admin et mobile |
+Le parcours nominal reste :
 
-## 2.2. Fichiers backend clefs
+1. l'artisan initie une demande
+2. l'application affiche le numero de depot selon l'operateur
+3. l'artisan paie puis envoie une preuve
+4. l'admin valide ou rejette
+5. le backend synchronise la transaction, l'abonnement, les notifications et les evenements temps reel
+
+La difference majeure aujourd'hui est la suivante :
+
+- un `REJECTED` classique avant validation reste sur la **meme transaction**
+- un `REJECTED` apres validation precedente devient **terminal**, desactive l'abonnement, puis la prochaine demande cree automatiquement une **nouvelle transaction**
+- un `EXPIRED` non rembourse bloque strictement toute nouvelle demande
+- un `EXPIRED` rembourse cree automatiquement une **nouvelle transaction**
+
+---
+
+## 2. Stack et fichiers clefs
+
+## 2.1. Couche backend
 
 | Fichier | Role |
 |---|---|
-| `backend/src/modules/payment-manual/entities/payment-manual.entity.ts` | transaction manuelle |
-| `backend/src/modules/payment-manual/entities/payment-proof.entity.ts` | preuve de paiement |
-| `backend/src/modules/payment-manual/services/payment-manual.service.ts` | logique metier principale |
+| `backend/src/modules/payment-manual/entities/payment-manual.entity.ts` | entite transaction manuelle |
+| `backend/src/modules/payment-manual/entities/payment-proof.entity.ts` | entite preuve |
+| `backend/src/modules/payment-manual/services/payment-manual.service.ts` | logique metier |
 | `backend/src/modules/payment-manual/controllers/payment-manual.controller.ts` | API artisan |
 | `backend/src/modules/payment-manual/controllers/payment-manual-admin.controller.ts` | API admin |
-| `backend/src/modules/payment-manual/cron/payment-expiration.cron.ts` | expiration horaire + verification d'integrite |
-| `backend/src/modules/payment-manual/events/payment-realtime.service.ts` | emission des evenements temps reel |
+| `backend/src/modules/payment-manual/events/payment-realtime.service.ts` | SSE/WebSocket admin et mobile |
+| `backend/src/modules/subscription/subscription.service.ts` | activation et desactivation d'abonnement |
+| `backend/src/database/migrations/AddPaymentManualReplacement1710000000002.ts` | migration `replaced_by_transaction_id` et garde DB anti-doublon `PENDING` |
 
-## 2.3. Fichiers mobile clefs
-
-| Fichier | Role |
-|---|---|
-| `fiers_artisans_app/lib/data/models/manual_payment_model.dart` | modele de transaction |
-| `fiers_artisans_app/lib/providers/payment_manual_provider.dart` | orchestration client, mapping erreurs/statuts |
-| `fiers_artisans_app/lib/presentation/artisan/manual_payment_page.dart` | ecran principal du paiement manuel |
-| `fiers_artisans_app/lib/presentation/artisan/payment_status_widget.dart` | affichage du statut, demande, tentatives, cooldown |
-
-## 2.4. Fichiers admin clefs
+## 2.2. Couche mobile Flutter
 
 | Fichier | Role |
 |---|---|
-| `admin-web/src/app/(dashboard)/payments/manual/page-client.tsx` | liste, detail, actions admin |
-| `admin-web/src/types/index.ts` | types TypeScript des paiements manuels |
+| `fiers_artisans_app/lib/data/models/manual_payment_model.dart` | modele de transaction et etats derives |
+| `fiers_artisans_app/lib/providers/payment_manual_provider.dart` | orchestration client, auto-remplacement, erreurs |
+| `fiers_artisans_app/lib/presentation/artisan/manual_payment_page.dart` | ecran principal |
+| `fiers_artisans_app/lib/presentation/artisan/payment_status_widget.dart` | affichage statut, demande, cooldown |
+
+## 2.3. Couche admin web
+
+| Fichier | Role |
+|---|---|
+| `admin-web/src/app/(dashboard)/payments/manual/page-client.tsx` | liste, detail, filtres, actions |
+| `admin-web/src/lib/api.ts` | appels admin |
+| `admin-web/src/types/index.ts` | type `PaymentManualRecord` |
 
 ---
 
-## 3. Modele de Donnees
+## 3. Modele de donnees
 
 ## 3.1. Entite `payment_manual`
 
-La table `payment_manual` represente **une demande manuelle**.
-
-Champs fonctionnels principaux :
+La table `payment_manual` represente **une demande historique** de paiement manuel.
 
 | Champ | Role |
 |---|---|
-| `id` | identifiant technique UUID |
 | `subscription_id` | rattachement a l'abonnement artisan |
-| `transaction_id` | identifiant metier visible a l'utilisateur |
-| `amount_fcfa` | montant de la demande |
+| `transaction_id` | ID visible par l'utilisateur |
 | `provider` | operateur Mobile Money |
-| `status` | statut courant de la demande |
-| `sender_number` | numero expediteur saisi par l'artisan |
-| `expires_at_admin` | deadline de traitement admin |
-| `validated_at` | date de validation |
+| `status` | statut courant |
+| `validated_at` | date de validation precedente |
 | `rejected_at` | date de rejet |
-| `rejection_reason` | motif de rejet |
-| `request_number` | numero historique de la demande pour l'abonnement |
-| `refund_required` | remboursement requis ou non |
-| `refund_done_at` | date de remboursement confirme |
-| `cooldown_until` | fin du blocage temporaire apres rejets multiples |
-| `cooldown_cycle` | cycle de blocage courant |
-| `attempted_refund_count` | nombre de fois ou un remboursement a ete necessaire |
-| `timeline` | journal metier embarque dans la ligne |
+| `rejection_reason` | motif admin |
+| `request_number` | numero historique de la demande pour cet abonnement |
+| `replaced_by_transaction_id` | nouvel ID qui remplace cette transaction, si remplacement auto |
+| `refund_required` | remboursement requis |
+| `refund_done_at` | remboursement confirme |
+| `cooldown_until` | fin du cooldown |
+| `cooldown_cycle` | cycle progressif courant |
+| `attempted_refund_count` | nombre d'expirations ayant necessite un remboursement |
+| `timeline` | journal metier embarque |
 | `deleted_at` | soft delete admin |
 
 ## 3.2. Entite `payment_proof`
 
-La table `payment_proof` represente **une preuve envoyee pour une transaction existante**.
+Chaque preuve reste rattachee a une transaction existante.
 
-Champs fonctionnels principaux :
+Points importants :
 
-| Champ | Role |
+- une preuve appartient toujours a un `payment_manual`
+- le hash SHA-256 est unique
+- le numero de tentative est calcule dans le cycle courant
+- les metadonnees EXIF et les signaux anti-fraude sont conserves
+
+## 3.3. Index et garde-fous importants
+
+| Index / contrainte | Role |
 |---|---|
-| `payment_manual_id` | rattachement a la transaction |
-| `image_url` | reference de stockage MinIO |
-| `image_hash_sha256` | hash anti-duplicat / integrite |
-| `submitted_at` | date d'envoi |
-| `declared_payment_time` | date/heure declaree par l'artisan |
-| `upload_attempt_number` | tentative dans le cycle courant |
-| `file_type` | type de fichier |
-| `file_size_kb` | poids |
-| `file_resolution` | resolution |
-| `has_exif` | EXIF present ou non |
-| `exif_capture_date` | date EXIF capture |
-| `exif_modified_date` | date EXIF modification |
-| `exif_device` | appareil |
-| `exif_software` | logiciel d'edition eventuel |
-| `ai_suspicion_score` | score de suspicion |
-| `is_suspected_fraud` | drapeau de fraude potentielle |
-| `deletion_requested` | reserve pour traitements ulterieurs |
-
-## 3.3. Index importants
-
-| Index | Role |
-|---|---|
-| `IDX_PAYMENT_MANUAL_SUB_CREATED` | retrouver rapidement les demandes d'un abonnement par anciennete |
-| `IDX_PAYMENT_MANUAL_SUB_REQUEST` | retrouver rapidement l'historique de demandes par abonnement |
-| `IDX_PAYMENT_MANUAL_STATUS_EXPIRES` | scanner les paiements a expiration |
-| `IDX_PAYMENT_PROOF_PAYMENT_SUBMITTED` | parcourir les preuves par transaction |
+| `IDX_PAYMENT_MANUAL_SUB_CREATED` | ordre chronologique des demandes |
+| `IDX_PAYMENT_MANUAL_SUB_REQUEST` | parcours rapide de l'historique par abonnement |
+| `IDX_PAYMENT_MANUAL_STATUS_EXPIRES` | balayage des expirations |
+| `IDX_PAYMENT_MANUAL_REPLACED_BY` | recherche de chaine de remplacement |
+| `idx_payment_manual_one_pending_per_subscription` | empecher deux `PENDING` simultanes pour le meme abonnement |
 
 ---
 
-## 4. Statuts et Invariants
+## 4. Etats reels du systeme
 
-## 4.1. Statuts `PaymentManualStatus`
+## 4.1. Statuts persistants
 
-| Statut | Signification |
+| Statut | Sens |
 |---|---|
-| `PENDING` | transaction creee, preuve pas encore soumise |
-| `PENDING_ADMIN` | preuve soumise, attente de traitement admin |
-| `COMPLETED` | paiement valide, abonnement active |
-| `REJECTED` | preuve rejetee |
-| `EXPIRED` | preuve non traitee dans les delais admin |
+| `PENDING` | transaction creee, preuve non soumise |
+| `PENDING_ADMIN` | preuve soumise, attente admin |
+| `COMPLETED` | paiement valide |
+| `REJECTED` | rejet admin |
+| `EXPIRED` | expiration admin |
 
-## 4.2. Invariants metier critiques
+## 4.2. Etats derives metier
 
-- Une transaction manuelle est rattachee a un abonnement artisan.
-- Une **nouvelle transaction** n'est creee que si la derniere demande ne peut pas etre reutilisee.
-- En cas de rejet, l'artisan **reste sur la meme transaction**.
-- En cas de cooldown, l'artisan **reste sur la meme transaction**, sans creation d'un nouveau `transaction_id`.
-- En cas d'expiration avec remboursement en attente, **aucune nouvelle demande** ne peut etre creee.
-- En cas d'expiration remboursee, une **nouvelle demande** peut etre creee, avec `request_number` incremente.
-- Le backend et le mobile doivent toujours raisonner sur la **demande la plus recente**.
-- Le statut `COMPLETED` ne bloque une nouvelle initiation que si l'abonnement artisan est encore actif.
+Le code distingue des sous-cas importants qui ne sont pas des nouveaux statuts DB :
 
-## 4.3. Compteurs a ne pas confondre
-
-| Compteur | Signification |
+| Etat derive | Definition |
 |---|---|
-| `request_number` | numero global de la demande historique |
-| `upload_attempt_number` | tentative d'envoi de preuve dans le cycle courant |
-| `cooldown_cycle` | numero du cycle de blocage progressif |
+| `REJECTED simple` | `status=REJECTED` et `validated_at == null` |
+| `REJECTED apres validation` | `status=REJECTED` et `validated_at != null` |
+| `EXPIRED remboursement en attente` | `status=EXPIRED` et `refund_required=true` et `refund_done_at == null` |
+| `EXPIRED remboursement traite` | `status=EXPIRED` et `refund_done_at != null` |
+| `historique archive` | `EXPIRED` ou `REJECTED apres validation` ou `replaced_by_transaction_id != null` |
+
+## 4.3. Invariants metier
+
+- Le systeme raisonne toujours sur la **derniere demande reelle**.
+- Une transaction `PENDING` ou `PENDING_ADMIN` est reutilisee, jamais dupliquee.
+- Un `REJECTED` simple reste sur la **meme transaction**.
+- Le cooldown ne cree jamais une nouvelle transaction.
+- Un `REJECTED` apres validation precedente devient terminal et prepare un **nouveau cycle**.
+- Une transaction avec remboursement en attente bloque toute nouvelle demande, quel que soit son statut terminal.
+- `request_number` est monotone croissant par abonnement.
+- Une transaction remplacee reste dans l'historique et reference sa remplaçante via `replaced_by_transaction_id`.
 
 ---
 
-## 5. API Backend
+## 5. API
 
 ## 5.1. Endpoints artisan
 
@@ -198,18 +164,20 @@ Base path : `payments/manual`
 
 | Methode | Route | Role |
 |---|---|---|
-| `POST` | `/initiate` | creer une demande ou retourner la transaction reutilisable |
-| `GET` | `/current` | recuperer la transaction courante de l'artisan |
-| `GET` | `/:transactionId` | recuperer le detail d'une transaction possedee |
-| `POST` | `/:transactionId/submit-proof` | envoyer une preuve |
-| `GET` | `/:transactionId/proof/:proofId` | obtenir une URL signee de consultation |
+| `POST` | `/initiate` | reutiliser, creer ou auto-remplacer |
+| `GET` | `/current` | transaction courante la plus recente |
+| `GET` | `/:transactionId` | detail d'une transaction possedee |
+| `POST` | `/:transactionId/submit-proof` | soumettre une preuve |
+| `GET` | `/:transactionId/proof/:proofId` | URL signee de consultation |
 
-Contraintes d'acces :
+Champs additifs exposes aujourd'hui :
 
-- JWT requis
-- role `ARTISAN`
-- telephone verifie
-- controle d'ownership sur chaque transaction
+- `request_number`
+- `refund_done_at`
+- `validated_at`
+- `replaced_by_transaction_id`
+- `cooldown_until`
+- `cooldown_cycle`
 
 ## 5.2. Endpoints admin
 
@@ -217,106 +185,122 @@ Base path : `admin`
 
 | Methode | Route | Role |
 |---|---|---|
-| `GET` | `/payment-proofs` | liste paginee des paiements manuels |
+| `GET` | `/payment-proofs` | liste paginee, avec `status` et `scope=ACTIVE|HISTORY|ALL` |
 | `GET` | `/payment-proofs/:id/details` | detail complet |
-| `PATCH` | `/payment-proofs/:id/validate` | valider la preuve |
-| `PATCH` | `/payment-proofs/:id/reject` | rejeter la preuve |
-| `PATCH` | `/payment-proofs/:id/reopen` | rouvrir la transaction |
-| `PATCH` | `/payment-proofs/:id/mark-refunded` | marquer le remboursement effectue |
+| `PATCH` | `/payment-proofs/:id/validate` | validation admin |
+| `PATCH` | `/payment-proofs/:id/reject` | rejet admin |
+| `PATCH` | `/payment-proofs/:id/reopen` | reouverture limitee |
+| `PATCH` | `/payment-proofs/:id/mark-refunded` | remboursement effectue |
 | `DELETE` | `/payment-proofs/:id` | soft delete |
 | `SSE` | `/payment-events` | flux temps reel admin |
 
-Contraintes d'acces :
-
-- JWT requis
-- role `ADMIN`
-
 ---
 
-## 6. Comportement Backend Detaille
+## 6. Logique backend detaillee
 
-## 6.1. Initiation d'une demande
+## 6.1. Initiation
 
-La methode `initiatePayment()` :
+`initiatePayment()` suit cette matrice :
 
-1. verifie si l'operateur est disponible
-2. resout le profil artisan preferentiel
-3. bloque si l'abonnement est deja actif
-4. recupere ou cree la souscription artisan associee
-5. charge la **derniere transaction seulement**
-6. bloque si cette derniere transaction est `EXPIRED + refund_required + refund_done_at == null`
-7. reutilise la transaction si elle est `PENDING`, `PENDING_ADMIN` ou `REJECTED`
-8. sinon cree une nouvelle transaction avec :
-   - nouveau `transaction_id`
-   - `request_number = count + 1`
-   - `expires_at_admin = now + 72h`
+1. verifier la disponibilite de l'operateur
+2. resoudre le bon profil artisan
+3. bloquer si l'abonnement est deja actif
+4. recuperer ou creer l'abonnement `PENDING`
+5. charger **la derniere transaction de cet abonnement**
 
-Codes metier importants :
+Decision sur la derniere transaction :
 
-- `PAYMENT_MANUAL_PROVIDER_UNAVAILABLE`
-- `PAYMENT_MANUAL_ALREADY_ACTIVE`
-- `PAYMENT_MANUAL_REFUND_PENDING`
+| Dernier etat | Comportement |
+|---|---|
+| `PENDING` | retour de la meme transaction |
+| `PENDING_ADMIN` | retour de la meme transaction |
+| `REJECTED simple` | retour de la meme transaction |
+| remboursement en attente | blocage `PAYMENT_MANUAL_REFUND_PENDING` |
+| `REJECTED apres validation` | creation automatique d'une nouvelle transaction |
+| `EXPIRED` avec remboursement deja leve | creation automatique d'une nouvelle transaction |
+| aucun cas precedent | creation normale d'une nouvelle transaction |
 
-## 6.2. Soumission d'une preuve
+## 6.2. Auto-remplacement
 
-La methode `submitProof()` :
+Quand une transaction est eligible a un remplacement automatique :
 
-1. verifie que l'utilisateur possede la transaction
-2. n'autorise l'envoi qu'en `PENDING` ou `REJECTED`
-3. bloque si un cooldown `REJECTED` est encore actif
-4. applique un rate limit Redis
-5. valide techniquement l'image
-6. calcule un hash SHA-256
-7. refuse un doublon exact de preuve
-8. extrait les metadonnees EXIF
-9. calcule un score de suspicion
-10. stocke le binaire dans MinIO
-11. cree la ligne `payment_proof`
-12. remet la transaction en `PENDING_ADMIN`
-13. vide `cooldown_until`
-14. notifie les temps reels admin et mobile
+- le backend cree un nouveau `PENDING`
+- il reutilise **le provider de l'ancienne transaction**
+- il incremente `request_number`
+- il renseigne `replaced_by_transaction_id` sur l'ancienne transaction
+- il ajoute un evenement timeline `PAYMENT_MANUAL_AUTO_REPLACED`
+- il notifie l'artisan via `PAYMENT_MANUAL_AUTO_REPLACED`
+- il emet un evenement admin `PAYMENT_MANUAL_TIMELINE_UPDATED`
 
-Codes metier et blocages :
+Deux cas ouvrent ce flux :
 
-- `PAYMENT_MANUAL_INVALID_STATUS`
-- `PAYMENT_MANUAL_COOLDOWN_ACTIVE`
-- `PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT`
-- `PAYMENT_MANUAL_SUBMIT_RATE_LIMIT`
+- `REJECTED` avec `validated_at != null`
+- `EXPIRED` dont le remboursement a deja ete leve
 
-## 6.3. Validation admin
+## 6.3. Soumission de preuve
 
-La methode `validateProof()` :
+`submitProof()` :
 
-1. exige un paiement en `PENDING_ADMIN`
-2. active l'abonnement via `SubscriptionService`
-3. passe la transaction en `COMPLETED`
-4. renseigne `validated_at`
-5. pousse une notification `PAYMENT_MANUAL_VALIDATED`
-6. pousse la synchro temps reel
+- autorise seulement `PENDING` et `REJECTED`
+- bloque si `cooldown_until` est encore dans le futur
+- applique le rate limiting
+- refuse les doublons exacts
+- cree une preuve
+- remet la transaction en `PENDING_ADMIN`
+- vide le cooldown actif
 
-## 6.4. Rejet admin
+## 6.4. Validation admin
 
-La methode `rejectProof()` :
+`validateProof()` :
 
-1. exige un paiement en `PENDING_ADMIN`
-2. compte les preuves deja soumises
-3. passe la transaction en `REJECTED`
-4. enregistre le motif
-5. declenche un cooldown tous les 3 envois de preuve
-6. envoie :
-   - `PAYMENT_MANUAL_REJECTED` s'il n'y a pas de cooldown
-   - `PAYMENT_MANUAL_COOLDOWN` s'il y a un cooldown
+- exige `PENDING_ADMIN`
+- active l'abonnement via `SubscriptionService`
+- passe la transaction en `COMPLETED`
+- renseigne `validated_at`
+- notifie l'artisan avec `PAYMENT_MANUAL_VALIDATED`
 
-## 6.5. Cooldown progressif
+## 6.5. Rejet admin
 
-Regle actuelle :
+`rejectProof()` a maintenant **deux branches metier**.
 
-- base = `5 heures`
-- progression = `5h -> 10h -> 20h -> 40h ...`
+### Rejet simple, avant validation precedente
 
-Formule :
+- statut -> `REJECTED`
+- motif enregistre
+- cooldown progressif tous les 3 envois
+- l'artisan reste sur la **meme transaction**
+- notifications :
+  - `PAYMENT_MANUAL_REJECTED`
+  - ou `PAYMENT_MANUAL_COOLDOWN`
 
-- `5h * 2^(cooldown_cycle - 1)`
+### Rejet apres validation precedente
+
+Condition :
+
+- `status` courant a rejeter = `PENDING_ADMIN`
+- `validated_at != null`
+
+Effets :
+
+- statut -> `REJECTED`
+- desactivation de l'abonnement associe si encore actif
+- aucun cooldown metier ouvert pour redemarrer sur la meme transaction
+- la transaction devient un candidat a **auto-remplacement**
+
+Desactivation d'abonnement :
+
+- raison `TRANSACTION_REJECTED`
+- `SubscriptionStatus -> CANCELLED`
+- `artisan_profile.is_subscription_active -> false`
+- log structure avec `correlation_id`
+- evenement admin `SUBSCRIPTION_UPDATED`
+
+## 6.6. Cooldown progressif
+
+Regle :
+
+- base = `5h`
+- formule = `5h * 2^(cycle - 1)`
 
 Exemples :
 
@@ -325,294 +309,98 @@ Exemples :
 | `1` | 5h |
 | `2` | 10h |
 | `3` | 20h |
-| `4` | 40h |
 
-Pendant un cooldown actif :
+Pendant ce cooldown :
 
-- l'artisan ne peut pas soumettre de nouvelle preuve
-- le champ expediteur est verrouille cote mobile
-- la selection d'image est verrouillee
-- le bouton de soumission est verrouille
-- la transaction reste la meme
+- sender bloque
+- selection d'image bloquee
+- soumission bloquee
+- la transaction reste identique
 
-## 6.6. Expiration
+## 6.7. Expiration
 
-Le cron `PaymentExpirationCron` lance `expirePayments()` toutes les heures.
+`expirePayments()` balaye les `PENDING_ADMIN` depasses.
 
-Une transaction expire si :
+Pour chaque transaction expiree :
 
-- `status == PENDING_ADMIN`
-- `expires_at_admin < now`
+1. si l'abonnement est encore actif, il est desactive avec raison `TRANSACTION_EXPIRED`
+2. la transaction passe en `EXPIRED`
+3. `refund_required = true`
+4. `attempted_refund_count += 1`
+5. timeline `PAYMENT_MANUAL_EXPIRED`
+6. notification artisan `PAYMENT_MANUAL_EXPIRED`
+7. evenement admin `PAYMENT_MANUAL_TIMELINE_UPDATED`
 
-Lors de l'expiration :
+Desactivation d'abonnement :
 
-- statut -> `EXPIRED`
-- `refund_required = true`
-- `attempted_refund_count += 1`
-- ajout timeline `PAYMENT_MANUAL_EXPIRED`
-- notification artisan `PAYMENT_MANUAL_EXPIRED`
-- synchro temps reel
+- status abonnement -> `EXPIRED`
+- `is_subscription_active -> false`
+- no-op journalise si deja inactif
 
-## 6.7. Remboursement
+## 6.8. Remboursement
 
-Quand l'admin marque un remboursement :
+`markRefundDone()` :
 
-- `refund_done_at = now`
-- `refund_required = false`
-- timeline `REFUND_PROCESSED`
-- notification artisan `REFUND_PROCESSED`
-- synchro temps reel mobile/admin
+- renseigne `refund_done_at`
+- leve `refund_required`
+- ajoute timeline `REFUND_PROCESSED`
+- envoie `REFUND_PROCESSED`
 
 Effet metier :
 
-- l'ancienne transaction reste dans l'historique
-- l'utilisateur peut ensuite creer une **nouvelle demande**
+- la transaction reste dans l'historique
+- le prochain chargement mobile ou le prochain `initiatePayment()` peut declencher l'auto-remplacement si la transaction etait `EXPIRED`
 
-## 6.8. Reouverture admin
+## 6.9. Reouverture admin
 
-L'admin peut rouvrir une transaction `REJECTED`, `EXPIRED` ou `COMPLETED`.
+`reopenProof()` reste possible seulement sur les paiements encore reouvrables.
 
-Comportement :
+Important :
 
-- si des preuves sont conservees, retour en `PENDING_ADMIN`
-- sinon retour en `PENDING`
-- remise a zero du remboursement courant
-- remise a zero du cooldown courant
-- nouvelle expiration admin a `now + 72h`
+- un paiement **historique archive** ne doit plus etre rouvert
+- donc les `EXPIRED`
+- les `REJECTED apres validation`
+- et les transactions deja remplacees
 
-## 6.9. Soft delete
+L'admin ne peut rouvrir que les transactions encore coherentes avec un cycle actif de moderation.
 
-Le soft delete admin :
+## 6.10. Soft delete
 
-- ne supprime pas physiquement la ligne
-- remplit `deleted_at`
+Le soft delete reste reserve aux transactions terminales ou remboursees.
+
+Il :
+
+- renseigne `deleted_at`
+- conserve la ligne
 - ajoute un evenement timeline
 
-Une transaction ne peut etre supprimee que si elle est :
-
-- `COMPLETED`
-- `REJECTED`
-- `EXPIRED`
-- ou remboursee
-
 ---
 
-## 7. Mobile Flutter
+## 7. Temps reel et notifications
 
-## 7.1. Ecran principal
+## 7.1. Notifications artisan
 
-L'ecran principal est `ManualPaymentPage`.
-
-Il affiche :
-
-- guide utilisateur
-- politique de remboursement
-- selection d'operateur
-- numero de depot
-- bouton d'initiation
-- statut de la transaction
-- zone de soumission de preuve
-- bloc remboursement si la transaction a expire
-
-## 7.2. Logique UI principale
-
-### Aucun paiement courant
-
-- bouton actif : `Generer une transaction manuelle`
-- champ expediteur inactif tant que la transaction n'existe pas
-
-### `PENDING`
-
-- transaction creee
-- bouton d'initiation desactive
-- numero expediteur editable
-- preuve selectionnable et soumission possible
-
-### `PENDING_ADMIN`
-
-- transaction en attente admin
-- bouton d'initiation desactive
-- champ expediteur verrouille
-- image et soumission verrouillees
-
-### `REJECTED` sans cooldown
-
-- meme transaction conservee
-- motif visible
-- nouvelle preuve autorisee
-- tentative courante visible
-
-### `REJECTED` avec cooldown actif
-
-- meme transaction conservee
-- soumission bloquee
-- compteur temps restant visible
-- texte de blocage dedie
-
-### `EXPIRED` avec remboursement en attente
-
-- bloc d'alerte dedie
-- affichage transaction, montant, date d'expiration
-- bouton WhatsApp support actif
-- nouvelle demande verrouillee
-
-### `EXPIRED` remboursee
-
-- bloc de confirmation remboursement
-- bouton principal devient reactivable
-- la prochaine initiation cree une nouvelle demande
-
-### `COMPLETED`
-
-- si l'abonnement est actif, la transaction peut rester visible
-- si l'abonnement n'est plus actif, l'API `current` renvoie `null` et l'utilisateur peut recreer une demande
-
-## 7.3. WhatsApp support
-
-En cas de remboursement en attente, le mobile peut ouvrir WhatsApp avec un message pre-rempli contenant :
-
-- `transaction_id`
-- `amount_fcfa`
-- date d'expiration
-
-Le numero cible utilise aujourd'hui le numero receveur du provider affiche.
-
----
-
-## 8. Admin Web
-
-## 8.1. Liste
-
-L'ecran admin des paiements manuels expose :
-
-- liste paginee
-- statut
-- numero de demande `request_number`
-- etat de remboursement
-- badges de remboursement requis
-- badge de cooldown actif
-
-## 8.2. Detail
-
-Le detail affiche notamment :
-
-- transaction
-- artisan
-- historique des preuves
-- `request_number`
-- `refund_required`
-- `refund_done_at`
-- `cooldown_until`
-- `cooldown_cycle`
-
-## 8.3. Actions admin
-
-Depuis l'interface admin, il est possible de :
-
-- valider
-- rejeter
-- rouvrir
-- marquer rembourse
-- supprimer logiquement
-
----
-
-## 9. Scenarios Metier de A a Z
-
-## Scenario 1. Parcours nominal
-
-1. artisan sans transaction
-2. creation -> `PENDING`
-3. soumission preuve -> `PENDING_ADMIN`
-4. validation admin -> `COMPLETED`
-5. abonnement actif
-
-## Scenario 2. Rejet simple
-
-1. transaction `PENDING`
-2. preuve soumise
-3. admin rejette
-4. transaction -> `REJECTED`
-5. l'artisan renvoie une preuve sur la **meme transaction**
-
-## Scenario 3. Trois rejets et cooldown
-
-1. meme transaction rejete plusieurs fois
-2. apres le 3e envoi du cycle, cooldown
-3. `cooldown_until` rempli
-4. mobile bloque l'envoi
-5. l'utilisateur voit le temps restant
-6. a l'expiration du cooldown, il renvoie une preuve sur la **meme transaction**
-
-## Scenario 4. Expiration sans traitement admin
-
-1. preuve soumise
-2. admin ne traite pas dans les 72h
-3. cron -> `EXPIRED`
-4. `refund_required = true`
-5. l'utilisateur voit un bloc rouge et le bouton WhatsApp
-6. aucune nouvelle demande n'est autorisee
-
-## Scenario 5. Remboursement effectue
-
-1. admin clique `mark refunded`
-2. `refund_done_at` est renseigne
-3. l'utilisateur recoit `REFUND_PROCESSED`
-4. l'ancienne transaction reste visible
-5. l'utilisateur peut creer une **nouvelle demande**
-
-## Scenario 6. Historique multiple
-
-Exemple :
-
-- demande 1 -> `COMPLETED`
-- demande 2 -> `REJECTED`
-- demande 3 -> `EXPIRED` remboursement en attente
-
-Invariant :
-
-- l'app doit presenter **la demande 3**
-- jamais une demande ancienne qui masquerait un blocage plus recent
-
-## Scenario 7. Reouverture admin
-
-1. un paiement est `REJECTED`, `EXPIRED` ou `COMPLETED`
-2. l'admin le rouvre
-3. s'il reste une preuve valide en stockage, retour `PENDING_ADMIN`
-4. sinon retour `PENDING`
-
-## Scenario 8. Abonnement expire apres ancien paiement valide
-
-1. ancien paiement `COMPLETED`
-2. abonnement devenu inactif
-3. `GET /payments/manual/current` renvoie `null`
-4. l'artisan peut lancer une nouvelle demande
-
----
-
-## 10. Notifications et Temps Reel
-
-## 10.1. Notifications artisan
-
-| Type | Emission |
+| Type | Role |
 |---|---|
-| `PAYMENT_MANUAL_VALIDATED` | validation admin |
-| `PAYMENT_MANUAL_REJECTED` | rejet sans cooldown |
+| `PAYMENT_MANUAL_VALIDATED` | validation |
+| `PAYMENT_MANUAL_REJECTED` | rejet simple |
 | `PAYMENT_MANUAL_COOLDOWN` | rejet avec blocage temporaire |
 | `PAYMENT_MANUAL_REOPENED` | reouverture admin |
 | `PAYMENT_MANUAL_EXPIRED` | expiration |
+| `PAYMENT_MANUAL_AUTO_REPLACED` | remplacement automatique |
 | `REFUND_PROCESSED` | remboursement confirme |
 
-## 10.2. Temps reel admin
+## 7.2. Temps reel admin
 
 Evenements admin :
 
 - `PAYMENT_MANUAL_NEW_PROOF`
 - `PAYMENT_MANUAL_UPDATED`
+- `PAYMENT_MANUAL_TIMELINE_UPDATED`
 
-## 10.3. Temps reel mobile
+## 7.3. Temps reel mobile
 
-Le backend emet un evenement de sync utilisateur `manualPaymentUpdated` avec :
+Le mobile recoit `manualPaymentUpdated` avec :
 
 - `paymentId`
 - `transactionId`
@@ -624,58 +412,205 @@ Le backend emet un evenement de sync utilisateur `manualPaymentUpdated` avec :
 
 ---
 
-## 11. Securite, Integrite et Anti-Fraude
+## 8. Mobile Flutter
 
-## 11.1. Controles d'acces
+## 8.1. Comportement general
 
-- verification JWT
-- role `ARTISAN` ou `ADMIN`
-- garde telephone verifie cote artisan
-- verification stricte de possession d'une transaction
+Le provider Flutter ne se contente plus d'afficher un etat statique.
 
-## 11.2. Integrite des preuves
+Il sait maintenant :
 
-- hash SHA-256 unique
-- detection de doublon exact
-- verification periodique d'integrite des hashes via cron quotidien
-- alerte admin si mismatch detecte
+- charger la transaction courante
+- detecter les cas d'auto-remplacement
+- rappeler `POST /payments/manual/initiate` avec le `previous_provider`
+- afficher un message transitoire a l'utilisateur
 
-## 11.3. Validation technique des images
+## 8.2. Etats UI importants
 
-- taille max API : `5 Mo`
-- validation mime/type
-- lecture EXIF
-- score de suspicion anti-fraude
-- detection de logiciels suspects
+### `PENDING`
 
-## 11.4. Rate limiting
+- bouton principal bloque
+- sender editable
+- soumission possible
 
-Deux protections existent :
+### `PENDING_ADMIN`
 
-- limite journaliere d'uploads
-- burst limit court via Redis
+- sender bloque
+- image bloque
+- soumission bloque
 
-Si Redis est indisponible, le service degrade proprement et journalise le probleme.
+### `REJECTED simple`
+
+- meme transaction
+- motif visible
+- nouvelle preuve possible
+- cooldown eventuel visible
+
+### `REJECTED apres validation`
+
+Ce cas est en pratique **court cote mobile** :
+
+- le backend remonte la transaction historique
+- le provider detecte l'eligibilite
+- il lance automatiquement une **nouvelle demande**
+- l'utilisateur bascule vers le nouvel ID avec un message de transition
+
+### `EXPIRED` remboursement en attente
+
+- bloc rouge dedie
+- transaction, montant et date visibles
+- bouton WhatsApp actif
+- aucune nouvelle demande
+
+### `EXPIRED` remboursement leve
+
+- auto-remplacement au chargement
+- nouvel ID cree automatiquement
+- message transitoire affiche
+
+## 8.3. WhatsApp support
+
+Le message pre-rempli contient :
+
+- `transaction_id`
+- `amount_fcfa`
+- date d'expiration
+
+Le numero cible est toujours derive du provider affiche.
 
 ---
 
-## 12. Regles Metier a Ne Pas Casser
+## 9. Admin web
 
-- Ne jamais creer un nouveau `transaction_id` si une transaction reutilisable existe deja.
-- Ne jamais autoriser une nouvelle demande quand la derniere transaction est `EXPIRED` avec remboursement en attente.
-- Ne jamais autoriser une nouvelle demande simplement parce qu'une ancienne transaction `REJECTED` existe.
-- Toujours raisonner sur la **demande la plus recente**.
-- En cas de rejet, rester sur la **meme transaction**.
-- En cas de cooldown, rester sur la **meme transaction**.
-- `request_number` doit etre monotone croissant par abonnement.
-- `refund_done_at` ne doit pas etre renseigne sans lever le blocage de remboursement.
-- Une transaction soft-delete ne doit plus remonter dans les endpoints courants.
+## 9.1. Vue principale
+
+L'admin dispose maintenant de deux scopes :
+
+- `ACTIVE`
+- `HISTORY`
+
+`ACTIVE` contient :
+
+- `PENDING`
+- `PENDING_ADMIN`
+- `COMPLETED`
+- `REJECTED` simples non archives
+
+`HISTORY` contient :
+
+- `EXPIRED`
+- `REJECTED` apres validation
+- transactions avec `replaced_by_transaction_id != null`
+
+## 9.2. Informations visibles
+
+La liste et le detail exposent notamment :
+
+- `request_number`
+- etat remboursement
+- cooldown
+- `validated_at`
+- `rejected_at`
+- `replaced_by_transaction_id`
+
+## 9.3. Regles d'action admin
+
+| Action | Paiement actif | Paiement historique |
+|---|---|---|
+| valider | oui si `PENDING_ADMIN` | non |
+| rejeter | oui si `PENDING_ADMIN` | non |
+| rouvrir | seulement si encore reouvrable | non |
+| marquer rembourse | oui si `refund_required` | oui si remboursement encore requis |
+| supprimer | selon regles de terminalite | oui |
+
+Le badge `Remplace par TX-...` doit permettre de suivre visuellement la chaine de remplacement.
 
 ---
 
-## 13. Runbook de Verification
+## 10. Scenarios metier
 
-## 13.1. Backend
+## Scenario 1. Parcours nominal
+
+1. artisan sans abonnement actif
+2. creation -> `PENDING`
+3. preuve -> `PENDING_ADMIN`
+4. validation -> `COMPLETED`
+5. abonnement actif
+
+## Scenario 2. Rejet simple
+
+1. transaction `PENDING`
+2. preuve soumise
+3. rejet admin
+4. statut `REJECTED`
+5. meme ID conserve
+6. l'artisan renvoie une preuve sur la meme transaction
+
+## Scenario 3. Troisieme rejet et cooldown
+
+1. plusieurs preuves soumises sur le meme ID
+2. au 3e rejet du cycle, `cooldown_until` est renseigne
+3. l'utilisateur voit le temps restant
+4. apres expiration, il renvoie une preuve sur le meme ID
+
+## Scenario 4. Expiration et remboursement en attente
+
+1. transaction `PENDING_ADMIN`
+2. cron -> `EXPIRED`
+3. abonnement desactive si encore actif
+4. `refund_required = true`
+5. blocage total de nouvelle demande
+
+## Scenario 5. Expiration remboursee puis remplacement auto
+
+1. `EXPIRED`
+2. admin marque `REFUND_PROCESSED`
+3. le mobile recharge
+4. nouvelle transaction `PENDING` creee automatiquement
+5. l'ancienne transaction reference `replaced_by_transaction_id`
+
+## Scenario 6. Rejet apres validation
+
+1. transaction validee -> `COMPLETED`
+2. admin rouvre
+3. verification complementaire
+4. admin rejette
+5. abonnement desactive
+6. transaction archivee
+7. la prochaine ouverture mobile cree automatiquement un nouvel ID
+
+## Scenario 7. Historique multiple
+
+Exemple :
+
+- demande 1 -> `COMPLETED`
+- demande 2 -> `REJECTED` simple
+- demande 3 -> `EXPIRED` remboursee
+- demande 4 -> auto-creee
+
+Invariant :
+
+- l'application doit toujours afficher la **plus recente**
+- jamais une ancienne transaction ne doit masquer un blocage ou un remplacement plus recent
+
+---
+
+## 11. Regles metier a ne pas casser
+
+- Ne jamais creer un nouveau `transaction_id` s'il existe un `PENDING` ou `PENDING_ADMIN` reutilisable.
+- Ne jamais ouvrir une nouvelle demande quand un remboursement est encore en attente.
+- Ne jamais transformer un `REJECTED` simple en nouvelle transaction.
+- Toujours creer une nouvelle transaction pour un `REJECTED` apres validation.
+- Toujours utiliser le `previous_provider` lors d'un auto-remplacement.
+- Toujours conserver la tracabilite via `replaced_by_transaction_id`.
+- Ne jamais laisser un abonnement actif si la transaction support qui le justifie est devenue invalide (`REJECTED apres validation` ou `EXPIRED`).
+- Ne jamais permettre a l'admin de muter une transaction historique archivee comme si elle etait encore active.
+
+---
+
+## 12. Runbook de verification
+
+## 12.1. Commandes
 
 Depuis `backend/` :
 
@@ -684,16 +619,12 @@ npm run test
 npm run test:e2e
 ```
 
-## 13.2. Flutter
-
 Depuis `fiers_artisans_app/` :
 
 ```bash
 flutter analyze
 flutter test
 ```
-
-## 13.3. Admin
 
 Depuis `admin-web/` :
 
@@ -702,72 +633,78 @@ npm run lint
 npm run build
 ```
 
-## 13.4. Checklist manuelle utile
+## 12.2. Checklist manuelle
 
 - creer une transaction
-- verifier que le bouton principal se bloque
-- envoyer une preuve
-- verifier que `sender_number` se verrouille en `PENDING_ADMIN`
+- verifier le blocage du bouton principal
+- soumettre une preuve
+- verifier le verrou `sender_number`
 - simuler 3 rejets et verifier le cooldown
-- verifier le decompte du cooldown
 - laisser expirer une transaction et verifier le bloc remboursement
-- marquer le remboursement et verifier la reouverture d'une nouvelle demande
-- verifier que `request_number` augmente seulement lors d'une vraie nouvelle demande
+- marquer le remboursement et verifier le remplacement automatique
+- simuler un `COMPLETED` rouvert puis rejete et verifier :
+  - desactivation d'abonnement
+  - archivage admin
+  - auto-remplacement mobile
+- verifier le badge `Remplace par TX-...` dans l'admin
 
 ---
 
-## 14. Diagnostic Rapide
+## 13. Diagnostic rapide
 
-## 14.1. Si l'utilisateur dit "je suis bloque"
+## 13.1. Si l'utilisateur dit "je suis bloque"
 
 Verifier dans cet ordre :
 
 1. derniere transaction reelle
 2. `status`
-3. `refund_required`
-4. `refund_done_at`
-5. `cooldown_until`
-6. nombre de preuves associees
-7. `is_subscription_active`
+3. `validated_at`
+4. `refund_required`
+5. `refund_done_at`
+6. `cooldown_until`
+7. `replaced_by_transaction_id`
+8. `is_subscription_active`
 
-## 14.2. Si l'utilisateur dit "le systeme m'affiche la mauvaise transaction"
-
-Verifier :
-
-- que `GET /payments/manual/current` renvoie bien la demande la plus recente
-- qu'aucune transaction plus ancienne ne masque un `EXPIRED` plus recent
-
-## 14.3. Si l'admin dit "je ne vois pas le remboursement"
+## 13.2. Si l'utilisateur dit "je vois un ancien ID"
 
 Verifier :
 
+- `GET /payments/manual/current`
+- `request_number`
+- `replaced_by_transaction_id`
+- presence d'un `EXPIRED` ou `REJECTED apres validation` plus recent
+
+## 13.3. Si l'admin dit "je ne peux plus rouvrir"
+
+Verifier si la transaction est archivee :
+
+- `status=EXPIRED`
+- ou `status=REJECTED` avec `validated_at != null`
+- ou `replaced_by_transaction_id != null`
+
+Dans ce cas, le comportement est normal.
+
+## 13.4. Si l'admin dit "je ne vois pas la bonne liste"
+
+Verifier :
+
+- `scope=ACTIVE|HISTORY|ALL`
+- `status`
 - `refund_required`
-- `refund_done_at`
-- statut `EXPIRED`
-- eventuels filtres admin actifs
-
-## 14.4. Si l'admin dit "l'utilisateur ne peut toujours pas recreer"
-
-Verifier :
-
-- remboursement effectivement marque
-- `refund_done_at` non nul
-- que la transaction courante n'est plus un `EXPIRED` non rembourse
-- que l'abonnement n'est pas encore actif
 
 ---
 
-## 15. Conclusion
+## 14. Conclusion
 
-Le systeme de paiement manuel de Fiers Artisans n'est pas un simple upload de capture. C'est un flux complet, stateful, avec :
+Le paiement manuel de Fiers Artisans est un flux stateful strict qui relie :
 
-- orchestration backend stricte
-- anti-spam et anti-fraude
-- moderation admin
-- remboursement controle
-- synchro mobile/admin en temps reel
-- conservation de l'historique metier
+- la transaction
+- la preuve
+- l'abonnement
+- le remboursement
+- la vue mobile
+- la vue admin
 
-Le point le plus critique a retenir est le suivant :
+Le point critique a retenir est le suivant :
 
-> la verite du systeme repose toujours sur la **derniere demande reelle**, jamais sur une transaction plus ancienne retrouvee par hasard.
+> la verite metier ne repose pas seulement sur `status`, mais sur la combinaison `status + validated_at + refund_required + refund_done_at + replaced_by_transaction_id`.

@@ -94,11 +94,12 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       });
     });
 
-    Future.microtask(
-      () => ref
+    Future.microtask(() {
+      final state = ref.read(paymentManualProvider);
+      return ref
           .read(paymentManualProvider.notifier)
-          .loadCurrentTransaction(refresh: true),
-    );
+          .loadCurrentTransaction(refresh: state.currentTransaction == null);
+    });
   }
 
   @override

@@ -37,9 +37,12 @@ enum AppErrorCode {
   authPinBlocked,
   authInvalidToken,
   authPhoneAlreadyUsed,
+  authLocationRequired,
+  profileLocationRequiredForAvailability,
 
   // Validation
   validationError,
+  tooManyRequests,
 
   // Générique serveur
   serverError,

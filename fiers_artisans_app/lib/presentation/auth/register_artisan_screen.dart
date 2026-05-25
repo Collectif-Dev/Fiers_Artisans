@@ -43,6 +43,12 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
   double? _latitude;
   double? _longitude;
 
+  bool get _hasResolvedLocation =>
+      _latitude != null &&
+      _longitude != null &&
+      _cityCtrl.text.trim().isNotEmpty &&
+      _communeCtrl.text.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -64,15 +70,14 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
     if (snapshot != null) {
       _latitude = snapshot.latitude;
       _longitude = snapshot.longitude;
+      _cityCtrl.text = snapshot.city?.trim() ?? '';
+      _communeCtrl.text = snapshot.commune?.trim() ?? '';
 
-      if (_cityCtrl.text.trim().isEmpty &&
-          (snapshot.city?.isNotEmpty ?? false)) {
-        _cityCtrl.text = snapshot.city!.trim();
-      }
-
-      if (_communeCtrl.text.trim().isEmpty &&
-          (snapshot.commune?.isNotEmpty ?? false)) {
-        _communeCtrl.text = snapshot.commune!.trim();
+      if (!_hasResolvedLocation) {
+        AppSnackBar.show(
+          context,
+          message: 'location.error_incomplete_resolved_position'.tr(),
+        );
       }
 
       if (result.issueType == LocationIssueType.reverseGeocodingFailed &&
@@ -126,6 +131,14 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
 
   Future<void> _register() async {
     setState(() => _submitAttempted = true);
+
+    if (!_hasResolvedLocation) {
+      AppSnackBar.show(
+        context,
+        message: 'location.registration_position_required'.tr(),
+      );
+      return;
+    }
 
     final formIsValid = _formKey.currentState!.validate();
     final categoryIsValid = _selectedCategoryId != null;
@@ -359,6 +372,13 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                     ),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'location.registration_hint'.tr(),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
 
                 Row(
                   children: [
@@ -368,9 +388,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         label: 'auth.city'.tr(),
                         hint: 'Abidjan',
                         prefixIcon: Icons.location_city_outlined,
+                        readOnly: true,
                         textInputAction: TextInputAction.next,
-                        validator: (v) =>
-                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -379,9 +398,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         controller: _communeCtrl,
                         label: 'auth.commune'.tr(),
                         hint: 'Cocody',
+                        readOnly: true,
                         textInputAction: TextInputAction.next,
-                        validator: (v) =>
-                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                   ],

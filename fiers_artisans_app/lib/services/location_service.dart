@@ -199,14 +199,27 @@ class LocationService {
   Future<bool> syncUserLocation({
     required double latitude,
     required double longitude,
+    String? city,
+    String? commune,
+    bool throwOnError = false,
   }) async {
     try {
+      final payload = <String, dynamic>{'lat': latitude, 'lng': longitude};
+      if (city != null && city.trim().isNotEmpty) {
+        payload['city'] = city.trim();
+      }
+      if (commune != null && commune.trim().isNotEmpty) {
+        payload['commune'] = commune.trim();
+      }
       await _api.put(
         ApiEndpoints.updateUserLocation,
-        data: {'lat': latitude, 'lng': longitude},
+        data: payload,
       );
       return true;
-    } catch (_) {
+    } catch (error) {
+      if (throwOnError) {
+        rethrow;
+      }
       return false;
     }
   }
@@ -227,6 +240,8 @@ class LocationService {
     await syncUserLocation(
       latitude: snapshot.latitude,
       longitude: snapshot.longitude,
+      city: snapshot.city,
+      commune: snapshot.commune,
     );
     return snapshot;
   }

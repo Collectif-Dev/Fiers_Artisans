@@ -56,6 +56,24 @@ export class AuthService {
     );
   }
 
+  private ensureCoordinatesPresent(
+    latitude: number | undefined,
+    longitude: number | undefined,
+    role: 'artisan' | 'client',
+  ): void {
+    if (this.hasValidCoordinates(latitude, longitude)) {
+      return;
+    }
+
+    throw new BusinessException(
+      'AUTH_LOCATION_REQUIRED',
+      role === 'artisan'
+        ? 'Votre position GPS est requise pour inscrire un artisan. Utilisez le bouton "Utiliser ma position".'
+        : 'Votre position GPS est requise pour terminer l inscription. Utilisez le bouton "Utiliser ma position".',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+
   private async setUserLocationIfProvided(
     userId: string,
     latitude?: number,
@@ -78,6 +96,12 @@ export class AuthService {
   }
 
   async registerArtisan(dto: RegisterArtisanDto) {
+    this.ensureCoordinatesPresent(
+      dto.latitude,
+      dto.longitude,
+      'artisan',
+    );
+
     // Vérifier l'unicité du numéro
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
@@ -155,6 +179,12 @@ export class AuthService {
   }
 
   async registerClient(dto: RegisterClientDto) {
+    this.ensureCoordinatesPresent(
+      dto.latitude,
+      dto.longitude,
+      'client',
+    );
+
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
     });

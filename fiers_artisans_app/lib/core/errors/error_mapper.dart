@@ -12,6 +12,9 @@ const _serverCodeMap = <String, AppErrorCode>{
   'AUTH_PIN_BLOCKED': AppErrorCode.authPinBlocked,
   'AUTH_INVALID_TOKEN': AppErrorCode.authInvalidToken,
   'AUTH_PHONE_ALREADY_USED': AppErrorCode.authPhoneAlreadyUsed,
+  'AUTH_LOCATION_REQUIRED': AppErrorCode.authLocationRequired,
+  'PROFILE_LOCATION_REQUIRED_FOR_AVAILABILITY':
+      AppErrorCode.profileLocationRequiredForAvailability,
   'INTERNAL_ERROR': AppErrorCode.internalError,
 };
 
@@ -28,6 +31,8 @@ AppErrorCode _fallbackCodeFromStatus(int? status) {
       return AppErrorCode.notFound;
     case 409:
       return AppErrorCode.conflict;
+    case 429:
+      return AppErrorCode.tooManyRequests;
     case 500:
       return AppErrorCode.serverError;
     default:
@@ -74,10 +79,16 @@ String _defaultUserMessage(AppErrorCode code) {
       return 'Session expirée. Veuillez vous reconnecter.';
     case AppErrorCode.authPhoneAlreadyUsed:
       return 'Ce numéro de téléphone est déjà utilisé.';
+    case AppErrorCode.authLocationRequired:
+      return 'Votre position GPS est requise pour continuer.';
+    case AppErrorCode.profileLocationRequiredForAvailability:
+      return 'Mettez d abord votre localisation GPS a jour pour rendre votre profil visible.';
 
     // Validation / serveur
     case AppErrorCode.validationError:
       return 'Données invalides. Vérifiez les champs.';
+    case AppErrorCode.tooManyRequests:
+      return 'Trop de requetes en peu de temps. Patientez un instant puis reessayez.';
     case AppErrorCode.serverError:
     case AppErrorCode.internalError:
       return 'Erreur interne du serveur. Réessayez plus tard.';

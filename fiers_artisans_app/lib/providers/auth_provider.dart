@@ -344,9 +344,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _bootstrapFuture;
     ChatRealtimeService().disconnect();
-    await SecureStorage.clearAuthSession();
     _rotateSessionScope();
     state = const AuthState(status: AuthStatus.unauthenticated);
+    await SecureStorage.clearAuthSession();
   }
 
   void _connectRealtime(String userId) {

@@ -22,6 +22,7 @@ class AppTextField extends StatefulWidget {
   final bool enableIMEPersonalizedLearning;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLength;
+  final bool readOnly;
 
   const AppTextField({
     super.key,
@@ -45,6 +46,7 @@ class AppTextField extends StatefulWidget {
     this.enableIMEPersonalizedLearning = true,
     this.inputFormatters,
     this.maxLength,
+    this.readOnly = false,
   });
 
   @override
@@ -86,6 +88,7 @@ class _AppTextFieldState extends State<AppTextField> {
           enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
           inputFormatters: widget.inputFormatters,
           maxLength: widget.maxLength,
+          readOnly: widget.readOnly,
           style: Theme.of(context).textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: widget.hint,

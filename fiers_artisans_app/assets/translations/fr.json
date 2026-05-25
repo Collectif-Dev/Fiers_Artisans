@@ -93,14 +93,17 @@
   "dashboard": {
     "artisan": {
       "subtitle": "Tableau de bord artisan",
-      "performance": "Performance",
-      "profile_views": "Vues du profil",
-      "unread_messages": "Messages non lus",
-      "avg_rating": "Note moyenne",
-      "total_reviews": "Total avis",
-      "reviews_history_title": "Historique des avis",
-      "quick_actions": "Actions rapides",
-      "inbox": "Messagerie"
+    "performance": "Performance",
+    "profile_views": "Vues du profil",
+    "unread_messages": "Messages non lus",
+    "avg_rating": "Note moyenne",
+    "total_reviews": "Total avis",
+    "location_required_title": "Localisation requise pour etre visible",
+    "location_required_subtitle": "Votre abonnement ou votre disponibilite est active, mais votre position GPS n est pas encore synchronisee.",
+    "location_required_action": "Mettre a jour ma localisation",
+    "reviews_history_title": "Historique des avis",
+    "quick_actions": "Actions rapides",
+    "inbox": "Messagerie"
     },
     "client": {
       "urgent_mode": "Mode urgence ⚡",
@@ -362,6 +365,10 @@
     "notifications_enabled": "Notifications système activées.",
     "notifications_open_settings_fail": "Impossible d'ouvrir les paramètres système.",
     "profile": "Mon profil",
+    "location_update": "Mettre à jour ma localisation",
+    "location_update_hint": "Synchroniser la position GPS, la ville et la commune",
+    "location_update_modal_hint": "La localisation est determinée automatiquement depuis la position GPS de l appareil.",
+    "current_location": "Localisation actuelle",
     "about": "À propos",
     "logout": "Se déconnecter",
     "logout_confirm": "Voulez-vous vraiment vous déconnecter ?",
@@ -377,13 +384,22 @@
   "location": {
     "prefill_in_progress": "Localisation en cours...",
     "use_current_position": "Utiliser ma position",
+    "registration_hint": "La ville et la commune sont remplies automatiquement depuis votre position GPS.",
+    "registration_position_required": "Utilisez votre position GPS pour continuer l inscription.",
     "open_settings": "Reglages",
     "enable_gps": "Activer GPS",
     "error_services_disabled": "La geolocalisation est desactivee. Activez le GPS puis reessayez.",
     "error_permission_required": "La permission de localisation est requise pour utiliser cette fonctionnalite.",
     "error_permission_denied_forever": "La permission de localisation est refusee de facon permanente. Activez-la dans les reglages de l'application.",
     "error_position_failed": "Impossible de recuperer votre position actuelle. Verifiez votre GPS puis reessayez.",
-    "error_reverse_geocoding_failed": "Position recuperee, mais impossible de determiner la ville/commune automatiquement."
+    "error_reverse_geocoding_failed": "Position recuperee, mais impossible de determiner la ville/commune automatiquement.",
+    "error_incomplete_resolved_position": "Position GPS detectee, mais la ville ou la commune n ont pas pu etre resolues automatiquement. Reessayez.",
+    "update_success": "Votre localisation a ete mise a jour avec succes.",
+    "update_already_current": "Votre localisation etait deja a jour.",
+    "current_unknown": "Aucune localisation resolue pour le moment.",
+    "current_missing_coordinates": "Coordonnees GPS absentes.",
+    "last_update": "Derniere mise a jour : {date}",
+    "last_update_unknown": "Derniere mise a jour inconnue."
   },
   "contact": {
     "phone": "Telephone",

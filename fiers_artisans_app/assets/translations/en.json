@@ -93,14 +93,17 @@
   "dashboard": {
     "artisan": {
       "subtitle": "Craftsman dashboard",
-      "performance": "Performance",
-      "profile_views": "Profile views",
-      "unread_messages": "Unread messages",
-      "avg_rating": "Average rating",
-      "total_reviews": "Total reviews",
-      "reviews_history_title": "Reviews history",
-      "quick_actions": "Quick actions",
-      "inbox": "Inbox"
+    "performance": "Performance",
+    "profile_views": "Profile views",
+    "unread_messages": "Unread messages",
+    "avg_rating": "Average rating",
+    "total_reviews": "Total reviews",
+    "location_required_title": "Location required to stay visible",
+    "location_required_subtitle": "Your subscription or availability is active, but your GPS position is not synced yet.",
+    "location_required_action": "Update my location",
+    "reviews_history_title": "Reviews history",
+    "quick_actions": "Quick actions",
+    "inbox": "Inbox"
     },
     "client": {
       "urgent_mode": "Urgent mode ⚡",
@@ -362,6 +365,10 @@
     "notifications_enabled": "System notifications enabled.",
     "notifications_open_settings_fail": "Unable to open system settings.",
     "profile": "My profile",
+    "location_update": "Update my location",
+    "location_update_hint": "Sync GPS position, city and district",
+    "location_update_modal_hint": "Location is resolved automatically from the device GPS position.",
+    "current_location": "Current location",
     "about": "About",
     "logout": "Log out",
     "logout_confirm": "Are you sure you want to log out?",
@@ -377,13 +384,22 @@
   "location": {
     "prefill_in_progress": "Fetching location...",
     "use_current_position": "Use my position",
+    "registration_hint": "City and district are filled automatically from your GPS position.",
+    "registration_position_required": "Use your GPS position to continue registration.",
     "open_settings": "Settings",
     "enable_gps": "Enable GPS",
     "error_services_disabled": "Location is disabled. Enable GPS then try again.",
     "error_permission_required": "Location permission is required to use this feature.",
     "error_permission_denied_forever": "Location permission is permanently denied. Enable it in app settings.",
     "error_position_failed": "Unable to read your current position. Check GPS and try again.",
-    "error_reverse_geocoding_failed": "Position found, but city/district could not be resolved automatically."
+    "error_reverse_geocoding_failed": "Position found, but city/district could not be resolved automatically.",
+    "error_incomplete_resolved_position": "GPS position was detected, but the city or district could not be resolved automatically. Please try again.",
+    "update_success": "Your location was updated successfully.",
+    "update_already_current": "Your location was already up to date.",
+    "current_unknown": "No resolved location is available yet.",
+    "current_missing_coordinates": "GPS coordinates are missing.",
+    "last_update": "Last update: {date}",
+    "last_update_unknown": "Last update is unknown."
   },
   "contact": {
     "phone": "Phone",

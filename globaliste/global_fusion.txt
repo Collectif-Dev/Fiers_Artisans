@@ -1,6 +1,6 @@
 # GLOBAL FUSION - FIERS ARTISANS
-# Generated at: 2026-05-24 05:04:06
-# Files merged: 459
+# Generated at: 2026-05-25 01:43:58
+# Files merged: 461
 
 ================================================================================
 PATH: .env.example
@@ -2906,6 +2906,10 @@ la stack active, les scripts utiles, et les documents de gouvernance.
 
 - `README.md`
   Vue d'ensemble du projet, architecture actuelle, commandes, tests, scripts
+- `DOCUMENTATION_PAIEMENT_MANUEL.md`
+  Runbook metier du paiement manuel : statuts, remboursement, cooldown, auto-remplacement, admin actif/historique
+- `DOCUMENTATION_LOCALISATION.md`
+  Runbook geolocalisation : GPS obligatoire, visibilite map, synchronisation des profils et mise a jour de localisation
 - `DOCUMENTATION_DOCKER.md`
   Runbook Docker complet : stack, nettoyage, volumes, diagnostic Portainer
 - `SECURITY_ARCHITECTURE.md`
@@ -2920,10 +2924,11 @@ la stack active, les scripts utiles, et les documents de gouvernance.
 Fiers Artisans est une marketplace multi-clients centree sur la mise en relation entre clients et artisans verifies, avec :
 
 - recherche geolocalisee
+- GPS mobile comme source de verite pour ville, commune et visibilite map
 - verification documentaire artisan
 - abonnement artisan
 - paiement Wave
-- paiement manuel avec preuve de paiement
+- paiement manuel avec preuve de paiement, cooldown, remboursement et auto-remplacement trace
 - chat temps reel
 - notifications
 - panel d'administration
@@ -3062,9 +3067,10 @@ cd fiers_artisans_app && flutter pub get && flutter run
 - Authentification et verification telephone
 - Verification artisan et moderation admin
 - Abonnement artisan via Wave
-- Paiement manuel avec upload de preuve et validation admin
+- Paiement manuel stateful avec upload de preuve, cooldown, remboursement, desactivation d'abonnement et auto-remplacement
 - Chat temps reel et notifications
 - Recherche geolocalisee et navigation profil artisan
+- Synchronisation temps reel des positions artisan/client
 
 ## Repartition des donnees
 
@@ -3130,6 +3136,14 @@ Recherche et catalogue :
 - `GET /api/v1/categories`
 - `GET /api/v1/categories/:slug`
 
+Profils et localisation :
+
+- `GET /api/v1/artisan/profile`
+- `PUT /api/v1/artisan/profile`
+- `GET /api/v1/client/profile`
+- `PUT /api/v1/client/profile`
+- `PUT /api/v1/users/location` pour synchroniser GPS et, si fournis, `ville/commune`
+
 Verification, portfolio, reviews :
 
 - `POST /api/v1/verification/submit`
@@ -3159,7 +3173,7 @@ Paiement manuel artisan :
 
 Paiement manuel admin :
 
-- `GET /api/v1/admin/payment-proofs`
+- `GET /api/v1/admin/payment-proofs` avec filtres `status` et `scope=ACTIVE|HISTORY|ALL`
 - `GET /api/v1/admin/payment-proofs/:id/details`
 - `PATCH /api/v1/admin/payment-proofs/:id/validate`
 - `PATCH /api/v1/admin/payment-proofs/:id/reject`
@@ -3227,6 +3241,14 @@ npm run test:e2e
 - Client : recherche, detail artisan, reviews
 - Artisan : dashboard, portfolio, verification, subscription, paiement manuel
 - Shared : chat, notifications, settings
+
+### Regles localisation mobile
+
+- `ville` et `commune` ne sont plus des champs de saisie libre a l'inscription
+- le bouton `Utiliser ma position` est obligatoire pour inscrire un `CLIENT` ou un `ARTISAN`
+- si le GPS est absent ou si la ville/commune ne peuvent pas etre resolues automatiquement, l'inscription est bloquee avec message utilisateur
+- `Parametres > Mettre a jour ma localisation` permet de resynchroniser GPS, ville et commune apres inscription
+- un artisan sans coordonnees GPS stockees ne peut pas devenir visible sur la map, meme s'il est disponible ou abonne actif
 
 ### Configuration reseau Flutter
 
@@ -3500,6 +3522,7 @@ Regles resumes :
 ## Politique documentaire
 
 - `README.md` doit rester la vue operationnelle actuelle du projet
+- `DOCUMENTATION_PAIEMENT_MANUEL.md` porte le detail metier complet du flux manuel
 - `DOCUMENTATION_DOCKER.md` porte le detail infra et nettoyage
 - `SECURITY_ARCHITECTURE.md` porte la politique de preservation
 - `RÈGLES GLOBALES.md` porte le pipeline IA
@@ -5347,195 +5370,161 @@ PATH: DOCUMENTATION_PAIEMENT_MANUEL.md
 
 ## Objectif
 
-Ce document decrit le systeme de paiement manuel Mobile Money de **Fiers Artisans** de bout en bout :
+Ce document decrit l'etat reel du systeme de paiement manuel Mobile Money de **Fiers Artisans** apres le durcissement recent du cycle de vie des transactions :
 
-- son role metier
-- son architecture technique
-- ses entites et ses statuts
-- ses endpoints backend
-- ses comportements mobile et admin
-- ses scenarios normaux et degrades
-- ses invariants de securite et d'anti-regression
-- ses points d'exploitation, de test et de diagnostic
+- gestion des preuves
+- cooldown progressif
+- expiration avec remboursement
+- desactivation d'abonnement en cas de rupture d'integrite metier
+- auto-remplacement des transactions terminales eligibles
+- separation admin `ACTIVE` / `HISTORY`
+- temps reel mobile et admin
 
-Le document decrit l'etat **reel** du depot au moment de sa generation.
-
----
-
-## 1. Perimetre Fonctionnel
-
-Le paiement manuel permet a un artisan de payer son abonnement via Mobile Money quand aucun flux de paiement automatique n'est utilise.
-
-Le parcours metier est le suivant :
-
-1. l'artisan initie une transaction manuelle
-2. l'application lui affiche le numero de depot selon l'operateur
-3. l'artisan effectue le paiement et envoie une preuve
-4. un administrateur valide, rejette, rouvre ou marque le remboursement
-5. le backend pilote les statuts, l'expiration, les notifications et la synchro temps reel
-
-Le module couvre :
-
-- `ORANGE_MONEY`
-- `MTN_MOMO`
-- `WAVE`
-- `MOOV_MONEY` present dans le code, mais indisponible tant qu'aucun numero receveur n'est configure
-
-Montant standard actuel :
-
-- `5000 FCFA` par defaut, configurable via `PAYMENT_MANUAL_AMOUNT_FCFA`
-
-Delai d'expiration admin actuel :
-
-- `72 heures` par defaut, configurable via `PAYMENT_MANUAL_EXPIRY_HOURS`
+Le document suit le code actuellement present dans le depot.
 
 ---
 
-## 2. Stack Technique
+## 1. Role metier
 
-## 2.1. Couches impliquees
+Le paiement manuel permet a un artisan de payer son abonnement via Mobile Money quand le flux automatique n'est pas utilise.
 
-| Couche | Role |
-|---|---|
-| `backend/` NestJS | orchestration metier, securite, statuts, notifications, cron, anti-fraude |
-| PostgreSQL | persistance des transactions et des preuves |
-| MinIO | stockage binaire des captures de preuve |
-| Redis | rate limiting des soumissions de preuve |
-| `fiers_artisans_app/` Flutter | experience artisan |
-| `admin-web/` Next.js | interface de moderation et de traitement |
-| SSE + WebSocket sync | mise a jour quasi temps reel admin et mobile |
+Le parcours nominal reste :
 
-## 2.2. Fichiers backend clefs
+1. l'artisan initie une demande
+2. l'application affiche le numero de depot selon l'operateur
+3. l'artisan paie puis envoie une preuve
+4. l'admin valide ou rejette
+5. le backend synchronise la transaction, l'abonnement, les notifications et les evenements temps reel
+
+La difference majeure aujourd'hui est la suivante :
+
+- un `REJECTED` classique avant validation reste sur la **meme transaction**
+- un `REJECTED` apres validation precedente devient **terminal**, desactive l'abonnement, puis la prochaine demande cree automatiquement une **nouvelle transaction**
+- un `EXPIRED` non rembourse bloque strictement toute nouvelle demande
+- un `EXPIRED` rembourse cree automatiquement une **nouvelle transaction**
+
+---
+
+## 2. Stack et fichiers clefs
+
+## 2.1. Couche backend
 
 | Fichier | Role |
 |---|---|
-| `backend/src/modules/payment-manual/entities/payment-manual.entity.ts` | transaction manuelle |
-| `backend/src/modules/payment-manual/entities/payment-proof.entity.ts` | preuve de paiement |
-| `backend/src/modules/payment-manual/services/payment-manual.service.ts` | logique metier principale |
+| `backend/src/modules/payment-manual/entities/payment-manual.entity.ts` | entite transaction manuelle |
+| `backend/src/modules/payment-manual/entities/payment-proof.entity.ts` | entite preuve |
+| `backend/src/modules/payment-manual/services/payment-manual.service.ts` | logique metier |
 | `backend/src/modules/payment-manual/controllers/payment-manual.controller.ts` | API artisan |
 | `backend/src/modules/payment-manual/controllers/payment-manual-admin.controller.ts` | API admin |
-| `backend/src/modules/payment-manual/cron/payment-expiration.cron.ts` | expiration horaire + verification d'integrite |
-| `backend/src/modules/payment-manual/events/payment-realtime.service.ts` | emission des evenements temps reel |
+| `backend/src/modules/payment-manual/events/payment-realtime.service.ts` | SSE/WebSocket admin et mobile |
+| `backend/src/modules/subscription/subscription.service.ts` | activation et desactivation d'abonnement |
+| `backend/src/database/migrations/AddPaymentManualReplacement1710000000002.ts` | migration `replaced_by_transaction_id` et garde DB anti-doublon `PENDING` |
 
-## 2.3. Fichiers mobile clefs
-
-| Fichier | Role |
-|---|---|
-| `fiers_artisans_app/lib/data/models/manual_payment_model.dart` | modele de transaction |
-| `fiers_artisans_app/lib/providers/payment_manual_provider.dart` | orchestration client, mapping erreurs/statuts |
-| `fiers_artisans_app/lib/presentation/artisan/manual_payment_page.dart` | ecran principal du paiement manuel |
-| `fiers_artisans_app/lib/presentation/artisan/payment_status_widget.dart` | affichage du statut, demande, tentatives, cooldown |
-
-## 2.4. Fichiers admin clefs
+## 2.2. Couche mobile Flutter
 
 | Fichier | Role |
 |---|---|
-| `admin-web/src/app/(dashboard)/payments/manual/page-client.tsx` | liste, detail, actions admin |
-| `admin-web/src/types/index.ts` | types TypeScript des paiements manuels |
+| `fiers_artisans_app/lib/data/models/manual_payment_model.dart` | modele de transaction et etats derives |
+| `fiers_artisans_app/lib/providers/payment_manual_provider.dart` | orchestration client, auto-remplacement, erreurs |
+| `fiers_artisans_app/lib/presentation/artisan/manual_payment_page.dart` | ecran principal |
+| `fiers_artisans_app/lib/presentation/artisan/payment_status_widget.dart` | affichage statut, demande, cooldown |
+
+## 2.3. Couche admin web
+
+| Fichier | Role |
+|---|---|
+| `admin-web/src/app/(dashboard)/payments/manual/page-client.tsx` | liste, detail, filtres, actions |
+| `admin-web/src/lib/api.ts` | appels admin |
+| `admin-web/src/types/index.ts` | type `PaymentManualRecord` |
 
 ---
 
-## 3. Modele de Donnees
+## 3. Modele de donnees
 
 ## 3.1. Entite `payment_manual`
 
-La table `payment_manual` represente **une demande manuelle**.
-
-Champs fonctionnels principaux :
+La table `payment_manual` represente **une demande historique** de paiement manuel.
 
 | Champ | Role |
 |---|---|
-| `id` | identifiant technique UUID |
 | `subscription_id` | rattachement a l'abonnement artisan |
-| `transaction_id` | identifiant metier visible a l'utilisateur |
-| `amount_fcfa` | montant de la demande |
+| `transaction_id` | ID visible par l'utilisateur |
 | `provider` | operateur Mobile Money |
-| `status` | statut courant de la demande |
-| `sender_number` | numero expediteur saisi par l'artisan |
-| `expires_at_admin` | deadline de traitement admin |
-| `validated_at` | date de validation |
+| `status` | statut courant |
+| `validated_at` | date de validation precedente |
 | `rejected_at` | date de rejet |
-| `rejection_reason` | motif de rejet |
-| `request_number` | numero historique de la demande pour l'abonnement |
-| `refund_required` | remboursement requis ou non |
-| `refund_done_at` | date de remboursement confirme |
-| `cooldown_until` | fin du blocage temporaire apres rejets multiples |
-| `cooldown_cycle` | cycle de blocage courant |
-| `attempted_refund_count` | nombre de fois ou un remboursement a ete necessaire |
-| `timeline` | journal metier embarque dans la ligne |
+| `rejection_reason` | motif admin |
+| `request_number` | numero historique de la demande pour cet abonnement |
+| `replaced_by_transaction_id` | nouvel ID qui remplace cette transaction, si remplacement auto |
+| `refund_required` | remboursement requis |
+| `refund_done_at` | remboursement confirme |
+| `cooldown_until` | fin du cooldown |
+| `cooldown_cycle` | cycle progressif courant |
+| `attempted_refund_count` | nombre d'expirations ayant necessite un remboursement |
+| `timeline` | journal metier embarque |
 | `deleted_at` | soft delete admin |
 
 ## 3.2. Entite `payment_proof`
 
-La table `payment_proof` represente **une preuve envoyee pour une transaction existante**.
+Chaque preuve reste rattachee a une transaction existante.
 
-Champs fonctionnels principaux :
+Points importants :
 
-| Champ | Role |
+- une preuve appartient toujours a un `payment_manual`
+- le hash SHA-256 est unique
+- le numero de tentative est calcule dans le cycle courant
+- les metadonnees EXIF et les signaux anti-fraude sont conserves
+
+## 3.3. Index et garde-fous importants
+
+| Index / contrainte | Role |
 |---|---|
-| `payment_manual_id` | rattachement a la transaction |
-| `image_url` | reference de stockage MinIO |
-| `image_hash_sha256` | hash anti-duplicat / integrite |
-| `submitted_at` | date d'envoi |
-| `declared_payment_time` | date/heure declaree par l'artisan |
-| `upload_attempt_number` | tentative dans le cycle courant |
-| `file_type` | type de fichier |
-| `file_size_kb` | poids |
-| `file_resolution` | resolution |
-| `has_exif` | EXIF present ou non |
-| `exif_capture_date` | date EXIF capture |
-| `exif_modified_date` | date EXIF modification |
-| `exif_device` | appareil |
-| `exif_software` | logiciel d'edition eventuel |
-| `ai_suspicion_score` | score de suspicion |
-| `is_suspected_fraud` | drapeau de fraude potentielle |
-| `deletion_requested` | reserve pour traitements ulterieurs |
-
-## 3.3. Index importants
-
-| Index | Role |
-|---|---|
-| `IDX_PAYMENT_MANUAL_SUB_CREATED` | retrouver rapidement les demandes d'un abonnement par anciennete |
-| `IDX_PAYMENT_MANUAL_SUB_REQUEST` | retrouver rapidement l'historique de demandes par abonnement |
-| `IDX_PAYMENT_MANUAL_STATUS_EXPIRES` | scanner les paiements a expiration |
-| `IDX_PAYMENT_PROOF_PAYMENT_SUBMITTED` | parcourir les preuves par transaction |
+| `IDX_PAYMENT_MANUAL_SUB_CREATED` | ordre chronologique des demandes |
+| `IDX_PAYMENT_MANUAL_SUB_REQUEST` | parcours rapide de l'historique par abonnement |
+| `IDX_PAYMENT_MANUAL_STATUS_EXPIRES` | balayage des expirations |
+| `IDX_PAYMENT_MANUAL_REPLACED_BY` | recherche de chaine de remplacement |
+| `idx_payment_manual_one_pending_per_subscription` | empecher deux `PENDING` simultanes pour le meme abonnement |
 
 ---
 
-## 4. Statuts et Invariants
+## 4. Etats reels du systeme
 
-## 4.1. Statuts `PaymentManualStatus`
+## 4.1. Statuts persistants
 
-| Statut | Signification |
+| Statut | Sens |
 |---|---|
-| `PENDING` | transaction creee, preuve pas encore soumise |
-| `PENDING_ADMIN` | preuve soumise, attente de traitement admin |
-| `COMPLETED` | paiement valide, abonnement active |
-| `REJECTED` | preuve rejetee |
-| `EXPIRED` | preuve non traitee dans les delais admin |
+| `PENDING` | transaction creee, preuve non soumise |
+| `PENDING_ADMIN` | preuve soumise, attente admin |
+| `COMPLETED` | paiement valide |
+| `REJECTED` | rejet admin |
+| `EXPIRED` | expiration admin |
 
-## 4.2. Invariants metier critiques
+## 4.2. Etats derives metier
 
-- Une transaction manuelle est rattachee a un abonnement artisan.
-- Une **nouvelle transaction** n'est creee que si la derniere demande ne peut pas etre reutilisee.
-- En cas de rejet, l'artisan **reste sur la meme transaction**.
-- En cas de cooldown, l'artisan **reste sur la meme transaction**, sans creation d'un nouveau `transaction_id`.
-- En cas d'expiration avec remboursement en attente, **aucune nouvelle demande** ne peut etre creee.
-- En cas d'expiration remboursee, une **nouvelle demande** peut etre creee, avec `request_number` incremente.
-- Le backend et le mobile doivent toujours raisonner sur la **demande la plus recente**.
-- Le statut `COMPLETED` ne bloque une nouvelle initiation que si l'abonnement artisan est encore actif.
+Le code distingue des sous-cas importants qui ne sont pas des nouveaux statuts DB :
 
-## 4.3. Compteurs a ne pas confondre
-
-| Compteur | Signification |
+| Etat derive | Definition |
 |---|---|
-| `request_number` | numero global de la demande historique |
-| `upload_attempt_number` | tentative d'envoi de preuve dans le cycle courant |
-| `cooldown_cycle` | numero du cycle de blocage progressif |
+| `REJECTED simple` | `status=REJECTED` et `validated_at == null` |
+| `REJECTED apres validation` | `status=REJECTED` et `validated_at != null` |
+| `EXPIRED remboursement en attente` | `status=EXPIRED` et `refund_required=true` et `refund_done_at == null` |
+| `EXPIRED remboursement traite` | `status=EXPIRED` et `refund_done_at != null` |
+| `historique archive` | `EXPIRED` ou `REJECTED apres validation` ou `replaced_by_transaction_id != null` |
+
+## 4.3. Invariants metier
+
+- Le systeme raisonne toujours sur la **derniere demande reelle**.
+- Une transaction `PENDING` ou `PENDING_ADMIN` est reutilisee, jamais dupliquee.
+- Un `REJECTED` simple reste sur la **meme transaction**.
+- Le cooldown ne cree jamais une nouvelle transaction.
+- Un `REJECTED` apres validation precedente devient terminal et prepare un **nouveau cycle**.
+- Une transaction avec remboursement en attente bloque toute nouvelle demande, quel que soit son statut terminal.
+- `request_number` est monotone croissant par abonnement.
+- Une transaction remplacee reste dans l'historique et reference sa remplaçante via `replaced_by_transaction_id`.
 
 ---
 
-## 5. API Backend
+## 5. API
 
 ## 5.1. Endpoints artisan
 
@@ -5543,18 +5532,20 @@ Base path : `payments/manual`
 
 | Methode | Route | Role |
 |---|---|---|
-| `POST` | `/initiate` | creer une demande ou retourner la transaction reutilisable |
-| `GET` | `/current` | recuperer la transaction courante de l'artisan |
-| `GET` | `/:transactionId` | recuperer le detail d'une transaction possedee |
-| `POST` | `/:transactionId/submit-proof` | envoyer une preuve |
-| `GET` | `/:transactionId/proof/:proofId` | obtenir une URL signee de consultation |
+| `POST` | `/initiate` | reutiliser, creer ou auto-remplacer |
+| `GET` | `/current` | transaction courante la plus recente |
+| `GET` | `/:transactionId` | detail d'une transaction possedee |
+| `POST` | `/:transactionId/submit-proof` | soumettre une preuve |
+| `GET` | `/:transactionId/proof/:proofId` | URL signee de consultation |
 
-Contraintes d'acces :
+Champs additifs exposes aujourd'hui :
 
-- JWT requis
-- role `ARTISAN`
-- telephone verifie
-- controle d'ownership sur chaque transaction
+- `request_number`
+- `refund_done_at`
+- `validated_at`
+- `replaced_by_transaction_id`
+- `cooldown_until`
+- `cooldown_cycle`
 
 ## 5.2. Endpoints admin
 
@@ -5562,106 +5553,122 @@ Base path : `admin`
 
 | Methode | Route | Role |
 |---|---|---|
-| `GET` | `/payment-proofs` | liste paginee des paiements manuels |
+| `GET` | `/payment-proofs` | liste paginee, avec `status` et `scope=ACTIVE|HISTORY|ALL` |
 | `GET` | `/payment-proofs/:id/details` | detail complet |
-| `PATCH` | `/payment-proofs/:id/validate` | valider la preuve |
-| `PATCH` | `/payment-proofs/:id/reject` | rejeter la preuve |
-| `PATCH` | `/payment-proofs/:id/reopen` | rouvrir la transaction |
-| `PATCH` | `/payment-proofs/:id/mark-refunded` | marquer le remboursement effectue |
+| `PATCH` | `/payment-proofs/:id/validate` | validation admin |
+| `PATCH` | `/payment-proofs/:id/reject` | rejet admin |
+| `PATCH` | `/payment-proofs/:id/reopen` | reouverture limitee |
+| `PATCH` | `/payment-proofs/:id/mark-refunded` | remboursement effectue |
 | `DELETE` | `/payment-proofs/:id` | soft delete |
 | `SSE` | `/payment-events` | flux temps reel admin |
 
-Contraintes d'acces :
-
-- JWT requis
-- role `ADMIN`
-
 ---
 
-## 6. Comportement Backend Detaille
+## 6. Logique backend detaillee
 
-## 6.1. Initiation d'une demande
+## 6.1. Initiation
 
-La methode `initiatePayment()` :
+`initiatePayment()` suit cette matrice :
 
-1. verifie si l'operateur est disponible
-2. resout le profil artisan preferentiel
-3. bloque si l'abonnement est deja actif
-4. recupere ou cree la souscription artisan associee
-5. charge la **derniere transaction seulement**
-6. bloque si cette derniere transaction est `EXPIRED + refund_required + refund_done_at == null`
-7. reutilise la transaction si elle est `PENDING`, `PENDING_ADMIN` ou `REJECTED`
-8. sinon cree une nouvelle transaction avec :
-   - nouveau `transaction_id`
-   - `request_number = count + 1`
-   - `expires_at_admin = now + 72h`
+1. verifier la disponibilite de l'operateur
+2. resoudre le bon profil artisan
+3. bloquer si l'abonnement est deja actif
+4. recuperer ou creer l'abonnement `PENDING`
+5. charger **la derniere transaction de cet abonnement**
 
-Codes metier importants :
+Decision sur la derniere transaction :
 
-- `PAYMENT_MANUAL_PROVIDER_UNAVAILABLE`
-- `PAYMENT_MANUAL_ALREADY_ACTIVE`
-- `PAYMENT_MANUAL_REFUND_PENDING`
+| Dernier etat | Comportement |
+|---|---|
+| `PENDING` | retour de la meme transaction |
+| `PENDING_ADMIN` | retour de la meme transaction |
+| `REJECTED simple` | retour de la meme transaction |
+| remboursement en attente | blocage `PAYMENT_MANUAL_REFUND_PENDING` |
+| `REJECTED apres validation` | creation automatique d'une nouvelle transaction |
+| `EXPIRED` avec remboursement deja leve | creation automatique d'une nouvelle transaction |
+| aucun cas precedent | creation normale d'une nouvelle transaction |
 
-## 6.2. Soumission d'une preuve
+## 6.2. Auto-remplacement
 
-La methode `submitProof()` :
+Quand une transaction est eligible a un remplacement automatique :
 
-1. verifie que l'utilisateur possede la transaction
-2. n'autorise l'envoi qu'en `PENDING` ou `REJECTED`
-3. bloque si un cooldown `REJECTED` est encore actif
-4. applique un rate limit Redis
-5. valide techniquement l'image
-6. calcule un hash SHA-256
-7. refuse un doublon exact de preuve
-8. extrait les metadonnees EXIF
-9. calcule un score de suspicion
-10. stocke le binaire dans MinIO
-11. cree la ligne `payment_proof`
-12. remet la transaction en `PENDING_ADMIN`
-13. vide `cooldown_until`
-14. notifie les temps reels admin et mobile
+- le backend cree un nouveau `PENDING`
+- il reutilise **le provider de l'ancienne transaction**
+- il incremente `request_number`
+- il renseigne `replaced_by_transaction_id` sur l'ancienne transaction
+- il ajoute un evenement timeline `PAYMENT_MANUAL_AUTO_REPLACED`
+- il notifie l'artisan via `PAYMENT_MANUAL_AUTO_REPLACED`
+- il emet un evenement admin `PAYMENT_MANUAL_TIMELINE_UPDATED`
 
-Codes metier et blocages :
+Deux cas ouvrent ce flux :
 
-- `PAYMENT_MANUAL_INVALID_STATUS`
-- `PAYMENT_MANUAL_COOLDOWN_ACTIVE`
-- `PAYMENT_MANUAL_DAILY_UPLOAD_LIMIT`
-- `PAYMENT_MANUAL_SUBMIT_RATE_LIMIT`
+- `REJECTED` avec `validated_at != null`
+- `EXPIRED` dont le remboursement a deja ete leve
 
-## 6.3. Validation admin
+## 6.3. Soumission de preuve
 
-La methode `validateProof()` :
+`submitProof()` :
 
-1. exige un paiement en `PENDING_ADMIN`
-2. active l'abonnement via `SubscriptionService`
-3. passe la transaction en `COMPLETED`
-4. renseigne `validated_at`
-5. pousse une notification `PAYMENT_MANUAL_VALIDATED`
-6. pousse la synchro temps reel
+- autorise seulement `PENDING` et `REJECTED`
+- bloque si `cooldown_until` est encore dans le futur
+- applique le rate limiting
+- refuse les doublons exacts
+- cree une preuve
+- remet la transaction en `PENDING_ADMIN`
+- vide le cooldown actif
 
-## 6.4. Rejet admin
+## 6.4. Validation admin
 
-La methode `rejectProof()` :
+`validateProof()` :
 
-1. exige un paiement en `PENDING_ADMIN`
-2. compte les preuves deja soumises
-3. passe la transaction en `REJECTED`
-4. enregistre le motif
-5. declenche un cooldown tous les 3 envois de preuve
-6. envoie :
-   - `PAYMENT_MANUAL_REJECTED` s'il n'y a pas de cooldown
-   - `PAYMENT_MANUAL_COOLDOWN` s'il y a un cooldown
+- exige `PENDING_ADMIN`
+- active l'abonnement via `SubscriptionService`
+- passe la transaction en `COMPLETED`
+- renseigne `validated_at`
+- notifie l'artisan avec `PAYMENT_MANUAL_VALIDATED`
 
-## 6.5. Cooldown progressif
+## 6.5. Rejet admin
 
-Regle actuelle :
+`rejectProof()` a maintenant **deux branches metier**.
 
-- base = `5 heures`
-- progression = `5h -> 10h -> 20h -> 40h ...`
+### Rejet simple, avant validation precedente
 
-Formule :
+- statut -> `REJECTED`
+- motif enregistre
+- cooldown progressif tous les 3 envois
+- l'artisan reste sur la **meme transaction**
+- notifications :
+  - `PAYMENT_MANUAL_REJECTED`
+  - ou `PAYMENT_MANUAL_COOLDOWN`
 
-- `5h * 2^(cooldown_cycle - 1)`
+### Rejet apres validation precedente
+
+Condition :
+
+- `status` courant a rejeter = `PENDING_ADMIN`
+- `validated_at != null`
+
+Effets :
+
+- statut -> `REJECTED`
+- desactivation de l'abonnement associe si encore actif
+- aucun cooldown metier ouvert pour redemarrer sur la meme transaction
+- la transaction devient un candidat a **auto-remplacement**
+
+Desactivation d'abonnement :
+
+- raison `TRANSACTION_REJECTED`
+- `SubscriptionStatus -> CANCELLED`
+- `artisan_profile.is_subscription_active -> false`
+- log structure avec `correlation_id`
+- evenement admin `SUBSCRIPTION_UPDATED`
+
+## 6.6. Cooldown progressif
+
+Regle :
+
+- base = `5h`
+- formule = `5h * 2^(cycle - 1)`
 
 Exemples :
 
@@ -5670,294 +5677,98 @@ Exemples :
 | `1` | 5h |
 | `2` | 10h |
 | `3` | 20h |
-| `4` | 40h |
 
-Pendant un cooldown actif :
+Pendant ce cooldown :
 
-- l'artisan ne peut pas soumettre de nouvelle preuve
-- le champ expediteur est verrouille cote mobile
-- la selection d'image est verrouillee
-- le bouton de soumission est verrouille
-- la transaction reste la meme
+- sender bloque
+- selection d'image bloquee
+- soumission bloquee
+- la transaction reste identique
 
-## 6.6. Expiration
+## 6.7. Expiration
 
-Le cron `PaymentExpirationCron` lance `expirePayments()` toutes les heures.
+`expirePayments()` balaye les `PENDING_ADMIN` depasses.
 
-Une transaction expire si :
+Pour chaque transaction expiree :
 
-- `status == PENDING_ADMIN`
-- `expires_at_admin < now`
+1. si l'abonnement est encore actif, il est desactive avec raison `TRANSACTION_EXPIRED`
+2. la transaction passe en `EXPIRED`
+3. `refund_required = true`
+4. `attempted_refund_count += 1`
+5. timeline `PAYMENT_MANUAL_EXPIRED`
+6. notification artisan `PAYMENT_MANUAL_EXPIRED`
+7. evenement admin `PAYMENT_MANUAL_TIMELINE_UPDATED`
 
-Lors de l'expiration :
+Desactivation d'abonnement :
 
-- statut -> `EXPIRED`
-- `refund_required = true`
-- `attempted_refund_count += 1`
-- ajout timeline `PAYMENT_MANUAL_EXPIRED`
-- notification artisan `PAYMENT_MANUAL_EXPIRED`
-- synchro temps reel
+- status abonnement -> `EXPIRED`
+- `is_subscription_active -> false`
+- no-op journalise si deja inactif
 
-## 6.7. Remboursement
+## 6.8. Remboursement
 
-Quand l'admin marque un remboursement :
+`markRefundDone()` :
 
-- `refund_done_at = now`
-- `refund_required = false`
-- timeline `REFUND_PROCESSED`
-- notification artisan `REFUND_PROCESSED`
-- synchro temps reel mobile/admin
+- renseigne `refund_done_at`
+- leve `refund_required`
+- ajoute timeline `REFUND_PROCESSED`
+- envoie `REFUND_PROCESSED`
 
 Effet metier :
 
-- l'ancienne transaction reste dans l'historique
-- l'utilisateur peut ensuite creer une **nouvelle demande**
+- la transaction reste dans l'historique
+- le prochain chargement mobile ou le prochain `initiatePayment()` peut declencher l'auto-remplacement si la transaction etait `EXPIRED`
 
-## 6.8. Reouverture admin
+## 6.9. Reouverture admin
 
-L'admin peut rouvrir une transaction `REJECTED`, `EXPIRED` ou `COMPLETED`.
+`reopenProof()` reste possible seulement sur les paiements encore reouvrables.
 
-Comportement :
+Important :
 
-- si des preuves sont conservees, retour en `PENDING_ADMIN`
-- sinon retour en `PENDING`
-- remise a zero du remboursement courant
-- remise a zero du cooldown courant
-- nouvelle expiration admin a `now + 72h`
+- un paiement **historique archive** ne doit plus etre rouvert
+- donc les `EXPIRED`
+- les `REJECTED apres validation`
+- et les transactions deja remplacees
 
-## 6.9. Soft delete
+L'admin ne peut rouvrir que les transactions encore coherentes avec un cycle actif de moderation.
 
-Le soft delete admin :
+## 6.10. Soft delete
 
-- ne supprime pas physiquement la ligne
-- remplit `deleted_at`
+Le soft delete reste reserve aux transactions terminales ou remboursees.
+
+Il :
+
+- renseigne `deleted_at`
+- conserve la ligne
 - ajoute un evenement timeline
 
-Une transaction ne peut etre supprimee que si elle est :
-
-- `COMPLETED`
-- `REJECTED`
-- `EXPIRED`
-- ou remboursee
-
 ---
 
-## 7. Mobile Flutter
+## 7. Temps reel et notifications
 
-## 7.1. Ecran principal
+## 7.1. Notifications artisan
 
-L'ecran principal est `ManualPaymentPage`.
-
-Il affiche :
-
-- guide utilisateur
-- politique de remboursement
-- selection d'operateur
-- numero de depot
-- bouton d'initiation
-- statut de la transaction
-- zone de soumission de preuve
-- bloc remboursement si la transaction a expire
-
-## 7.2. Logique UI principale
-
-### Aucun paiement courant
-
-- bouton actif : `Generer une transaction manuelle`
-- champ expediteur inactif tant que la transaction n'existe pas
-
-### `PENDING`
-
-- transaction creee
-- bouton d'initiation desactive
-- numero expediteur editable
-- preuve selectionnable et soumission possible
-
-### `PENDING_ADMIN`
-
-- transaction en attente admin
-- bouton d'initiation desactive
-- champ expediteur verrouille
-- image et soumission verrouillees
-
-### `REJECTED` sans cooldown
-
-- meme transaction conservee
-- motif visible
-- nouvelle preuve autorisee
-- tentative courante visible
-
-### `REJECTED` avec cooldown actif
-
-- meme transaction conservee
-- soumission bloquee
-- compteur temps restant visible
-- texte de blocage dedie
-
-### `EXPIRED` avec remboursement en attente
-
-- bloc d'alerte dedie
-- affichage transaction, montant, date d'expiration
-- bouton WhatsApp support actif
-- nouvelle demande verrouillee
-
-### `EXPIRED` remboursee
-
-- bloc de confirmation remboursement
-- bouton principal devient reactivable
-- la prochaine initiation cree une nouvelle demande
-
-### `COMPLETED`
-
-- si l'abonnement est actif, la transaction peut rester visible
-- si l'abonnement n'est plus actif, l'API `current` renvoie `null` et l'utilisateur peut recreer une demande
-
-## 7.3. WhatsApp support
-
-En cas de remboursement en attente, le mobile peut ouvrir WhatsApp avec un message pre-rempli contenant :
-
-- `transaction_id`
-- `amount_fcfa`
-- date d'expiration
-
-Le numero cible utilise aujourd'hui le numero receveur du provider affiche.
-
----
-
-## 8. Admin Web
-
-## 8.1. Liste
-
-L'ecran admin des paiements manuels expose :
-
-- liste paginee
-- statut
-- numero de demande `request_number`
-- etat de remboursement
-- badges de remboursement requis
-- badge de cooldown actif
-
-## 8.2. Detail
-
-Le detail affiche notamment :
-
-- transaction
-- artisan
-- historique des preuves
-- `request_number`
-- `refund_required`
-- `refund_done_at`
-- `cooldown_until`
-- `cooldown_cycle`
-
-## 8.3. Actions admin
-
-Depuis l'interface admin, il est possible de :
-
-- valider
-- rejeter
-- rouvrir
-- marquer rembourse
-- supprimer logiquement
-
----
-
-## 9. Scenarios Metier de A a Z
-
-## Scenario 1. Parcours nominal
-
-1. artisan sans transaction
-2. creation -> `PENDING`
-3. soumission preuve -> `PENDING_ADMIN`
-4. validation admin -> `COMPLETED`
-5. abonnement actif
-
-## Scenario 2. Rejet simple
-
-1. transaction `PENDING`
-2. preuve soumise
-3. admin rejette
-4. transaction -> `REJECTED`
-5. l'artisan renvoie une preuve sur la **meme transaction**
-
-## Scenario 3. Trois rejets et cooldown
-
-1. meme transaction rejete plusieurs fois
-2. apres le 3e envoi du cycle, cooldown
-3. `cooldown_until` rempli
-4. mobile bloque l'envoi
-5. l'utilisateur voit le temps restant
-6. a l'expiration du cooldown, il renvoie une preuve sur la **meme transaction**
-
-## Scenario 4. Expiration sans traitement admin
-
-1. preuve soumise
-2. admin ne traite pas dans les 72h
-3. cron -> `EXPIRED`
-4. `refund_required = true`
-5. l'utilisateur voit un bloc rouge et le bouton WhatsApp
-6. aucune nouvelle demande n'est autorisee
-
-## Scenario 5. Remboursement effectue
-
-1. admin clique `mark refunded`
-2. `refund_done_at` est renseigne
-3. l'utilisateur recoit `REFUND_PROCESSED`
-4. l'ancienne transaction reste visible
-5. l'utilisateur peut creer une **nouvelle demande**
-
-## Scenario 6. Historique multiple
-
-Exemple :
-
-- demande 1 -> `COMPLETED`
-- demande 2 -> `REJECTED`
-- demande 3 -> `EXPIRED` remboursement en attente
-
-Invariant :
-
-- l'app doit presenter **la demande 3**
-- jamais une demande ancienne qui masquerait un blocage plus recent
-
-## Scenario 7. Reouverture admin
-
-1. un paiement est `REJECTED`, `EXPIRED` ou `COMPLETED`
-2. l'admin le rouvre
-3. s'il reste une preuve valide en stockage, retour `PENDING_ADMIN`
-4. sinon retour `PENDING`
-
-## Scenario 8. Abonnement expire apres ancien paiement valide
-
-1. ancien paiement `COMPLETED`
-2. abonnement devenu inactif
-3. `GET /payments/manual/current` renvoie `null`
-4. l'artisan peut lancer une nouvelle demande
-
----
-
-## 10. Notifications et Temps Reel
-
-## 10.1. Notifications artisan
-
-| Type | Emission |
+| Type | Role |
 |---|---|
-| `PAYMENT_MANUAL_VALIDATED` | validation admin |
-| `PAYMENT_MANUAL_REJECTED` | rejet sans cooldown |
+| `PAYMENT_MANUAL_VALIDATED` | validation |
+| `PAYMENT_MANUAL_REJECTED` | rejet simple |
 | `PAYMENT_MANUAL_COOLDOWN` | rejet avec blocage temporaire |
 | `PAYMENT_MANUAL_REOPENED` | reouverture admin |
 | `PAYMENT_MANUAL_EXPIRED` | expiration |
+| `PAYMENT_MANUAL_AUTO_REPLACED` | remplacement automatique |
 | `REFUND_PROCESSED` | remboursement confirme |
 
-## 10.2. Temps reel admin
+## 7.2. Temps reel admin
 
 Evenements admin :
 
 - `PAYMENT_MANUAL_NEW_PROOF`
 - `PAYMENT_MANUAL_UPDATED`
+- `PAYMENT_MANUAL_TIMELINE_UPDATED`
 
-## 10.3. Temps reel mobile
+## 7.3. Temps reel mobile
 
-Le backend emet un evenement de sync utilisateur `manualPaymentUpdated` avec :
+Le mobile recoit `manualPaymentUpdated` avec :
 
 - `paymentId`
 - `transactionId`
@@ -5969,58 +5780,205 @@ Le backend emet un evenement de sync utilisateur `manualPaymentUpdated` avec :
 
 ---
 
-## 11. Securite, Integrite et Anti-Fraude
+## 8. Mobile Flutter
 
-## 11.1. Controles d'acces
+## 8.1. Comportement general
 
-- verification JWT
-- role `ARTISAN` ou `ADMIN`
-- garde telephone verifie cote artisan
-- verification stricte de possession d'une transaction
+Le provider Flutter ne se contente plus d'afficher un etat statique.
 
-## 11.2. Integrite des preuves
+Il sait maintenant :
 
-- hash SHA-256 unique
-- detection de doublon exact
-- verification periodique d'integrite des hashes via cron quotidien
-- alerte admin si mismatch detecte
+- charger la transaction courante
+- detecter les cas d'auto-remplacement
+- rappeler `POST /payments/manual/initiate` avec le `previous_provider`
+- afficher un message transitoire a l'utilisateur
 
-## 11.3. Validation technique des images
+## 8.2. Etats UI importants
 
-- taille max API : `5 Mo`
-- validation mime/type
-- lecture EXIF
-- score de suspicion anti-fraude
-- detection de logiciels suspects
+### `PENDING`
 
-## 11.4. Rate limiting
+- bouton principal bloque
+- sender editable
+- soumission possible
 
-Deux protections existent :
+### `PENDING_ADMIN`
 
-- limite journaliere d'uploads
-- burst limit court via Redis
+- sender bloque
+- image bloque
+- soumission bloque
 
-Si Redis est indisponible, le service degrade proprement et journalise le probleme.
+### `REJECTED simple`
+
+- meme transaction
+- motif visible
+- nouvelle preuve possible
+- cooldown eventuel visible
+
+### `REJECTED apres validation`
+
+Ce cas est en pratique **court cote mobile** :
+
+- le backend remonte la transaction historique
+- le provider detecte l'eligibilite
+- il lance automatiquement une **nouvelle demande**
+- l'utilisateur bascule vers le nouvel ID avec un message de transition
+
+### `EXPIRED` remboursement en attente
+
+- bloc rouge dedie
+- transaction, montant et date visibles
+- bouton WhatsApp actif
+- aucune nouvelle demande
+
+### `EXPIRED` remboursement leve
+
+- auto-remplacement au chargement
+- nouvel ID cree automatiquement
+- message transitoire affiche
+
+## 8.3. WhatsApp support
+
+Le message pre-rempli contient :
+
+- `transaction_id`
+- `amount_fcfa`
+- date d'expiration
+
+Le numero cible est toujours derive du provider affiche.
 
 ---
 
-## 12. Regles Metier a Ne Pas Casser
+## 9. Admin web
 
-- Ne jamais creer un nouveau `transaction_id` si une transaction reutilisable existe deja.
-- Ne jamais autoriser une nouvelle demande quand la derniere transaction est `EXPIRED` avec remboursement en attente.
-- Ne jamais autoriser une nouvelle demande simplement parce qu'une ancienne transaction `REJECTED` existe.
-- Toujours raisonner sur la **demande la plus recente**.
-- En cas de rejet, rester sur la **meme transaction**.
-- En cas de cooldown, rester sur la **meme transaction**.
-- `request_number` doit etre monotone croissant par abonnement.
-- `refund_done_at` ne doit pas etre renseigne sans lever le blocage de remboursement.
-- Une transaction soft-delete ne doit plus remonter dans les endpoints courants.
+## 9.1. Vue principale
+
+L'admin dispose maintenant de deux scopes :
+
+- `ACTIVE`
+- `HISTORY`
+
+`ACTIVE` contient :
+
+- `PENDING`
+- `PENDING_ADMIN`
+- `COMPLETED`
+- `REJECTED` simples non archives
+
+`HISTORY` contient :
+
+- `EXPIRED`
+- `REJECTED` apres validation
+- transactions avec `replaced_by_transaction_id != null`
+
+## 9.2. Informations visibles
+
+La liste et le detail exposent notamment :
+
+- `request_number`
+- etat remboursement
+- cooldown
+- `validated_at`
+- `rejected_at`
+- `replaced_by_transaction_id`
+
+## 9.3. Regles d'action admin
+
+| Action | Paiement actif | Paiement historique |
+|---|---|---|
+| valider | oui si `PENDING_ADMIN` | non |
+| rejeter | oui si `PENDING_ADMIN` | non |
+| rouvrir | seulement si encore reouvrable | non |
+| marquer rembourse | oui si `refund_required` | oui si remboursement encore requis |
+| supprimer | selon regles de terminalite | oui |
+
+Le badge `Remplace par TX-...` doit permettre de suivre visuellement la chaine de remplacement.
 
 ---
 
-## 13. Runbook de Verification
+## 10. Scenarios metier
 
-## 13.1. Backend
+## Scenario 1. Parcours nominal
+
+1. artisan sans abonnement actif
+2. creation -> `PENDING`
+3. preuve -> `PENDING_ADMIN`
+4. validation -> `COMPLETED`
+5. abonnement actif
+
+## Scenario 2. Rejet simple
+
+1. transaction `PENDING`
+2. preuve soumise
+3. rejet admin
+4. statut `REJECTED`
+5. meme ID conserve
+6. l'artisan renvoie une preuve sur la meme transaction
+
+## Scenario 3. Troisieme rejet et cooldown
+
+1. plusieurs preuves soumises sur le meme ID
+2. au 3e rejet du cycle, `cooldown_until` est renseigne
+3. l'utilisateur voit le temps restant
+4. apres expiration, il renvoie une preuve sur le meme ID
+
+## Scenario 4. Expiration et remboursement en attente
+
+1. transaction `PENDING_ADMIN`
+2. cron -> `EXPIRED`
+3. abonnement desactive si encore actif
+4. `refund_required = true`
+5. blocage total de nouvelle demande
+
+## Scenario 5. Expiration remboursee puis remplacement auto
+
+1. `EXPIRED`
+2. admin marque `REFUND_PROCESSED`
+3. le mobile recharge
+4. nouvelle transaction `PENDING` creee automatiquement
+5. l'ancienne transaction reference `replaced_by_transaction_id`
+
+## Scenario 6. Rejet apres validation
+
+1. transaction validee -> `COMPLETED`
+2. admin rouvre
+3. verification complementaire
+4. admin rejette
+5. abonnement desactive
+6. transaction archivee
+7. la prochaine ouverture mobile cree automatiquement un nouvel ID
+
+## Scenario 7. Historique multiple
+
+Exemple :
+
+- demande 1 -> `COMPLETED`
+- demande 2 -> `REJECTED` simple
+- demande 3 -> `EXPIRED` remboursee
+- demande 4 -> auto-creee
+
+Invariant :
+
+- l'application doit toujours afficher la **plus recente**
+- jamais une ancienne transaction ne doit masquer un blocage ou un remplacement plus recent
+
+---
+
+## 11. Regles metier a ne pas casser
+
+- Ne jamais creer un nouveau `transaction_id` s'il existe un `PENDING` ou `PENDING_ADMIN` reutilisable.
+- Ne jamais ouvrir une nouvelle demande quand un remboursement est encore en attente.
+- Ne jamais transformer un `REJECTED` simple en nouvelle transaction.
+- Toujours creer une nouvelle transaction pour un `REJECTED` apres validation.
+- Toujours utiliser le `previous_provider` lors d'un auto-remplacement.
+- Toujours conserver la tracabilite via `replaced_by_transaction_id`.
+- Ne jamais laisser un abonnement actif si la transaction support qui le justifie est devenue invalide (`REJECTED apres validation` ou `EXPIRED`).
+- Ne jamais permettre a l'admin de muter une transaction historique archivee comme si elle etait encore active.
+
+---
+
+## 12. Runbook de verification
+
+## 12.1. Commandes
 
 Depuis `backend/` :
 
@@ -6029,16 +5987,12 @@ npm run test
 npm run test:e2e
 ```
 
-## 13.2. Flutter
-
 Depuis `fiers_artisans_app/` :
 
 ```bash
 flutter analyze
 flutter test
 ```
-
-## 13.3. Admin
 
 Depuis `admin-web/` :
 
@@ -6047,75 +6001,295 @@ npm run lint
 npm run build
 ```
 
-## 13.4. Checklist manuelle utile
+## 12.2. Checklist manuelle
 
 - creer une transaction
-- verifier que le bouton principal se bloque
-- envoyer une preuve
-- verifier que `sender_number` se verrouille en `PENDING_ADMIN`
+- verifier le blocage du bouton principal
+- soumettre une preuve
+- verifier le verrou `sender_number`
 - simuler 3 rejets et verifier le cooldown
-- verifier le decompte du cooldown
 - laisser expirer une transaction et verifier le bloc remboursement
-- marquer le remboursement et verifier la reouverture d'une nouvelle demande
-- verifier que `request_number` augmente seulement lors d'une vraie nouvelle demande
+- marquer le remboursement et verifier le remplacement automatique
+- simuler un `COMPLETED` rouvert puis rejete et verifier :
+  - desactivation d'abonnement
+  - archivage admin
+  - auto-remplacement mobile
+- verifier le badge `Remplace par TX-...` dans l'admin
 
 ---
 
-## 14. Diagnostic Rapide
+## 13. Diagnostic rapide
 
-## 14.1. Si l'utilisateur dit "je suis bloque"
+## 13.1. Si l'utilisateur dit "je suis bloque"
 
 Verifier dans cet ordre :
 
 1. derniere transaction reelle
 2. `status`
-3. `refund_required`
-4. `refund_done_at`
-5. `cooldown_until`
-6. nombre de preuves associees
-7. `is_subscription_active`
+3. `validated_at`
+4. `refund_required`
+5. `refund_done_at`
+6. `cooldown_until`
+7. `replaced_by_transaction_id`
+8. `is_subscription_active`
 
-## 14.2. Si l'utilisateur dit "le systeme m'affiche la mauvaise transaction"
-
-Verifier :
-
-- que `GET /payments/manual/current` renvoie bien la demande la plus recente
-- qu'aucune transaction plus ancienne ne masque un `EXPIRED` plus recent
-
-## 14.3. Si l'admin dit "je ne vois pas le remboursement"
+## 13.2. Si l'utilisateur dit "je vois un ancien ID"
 
 Verifier :
 
+- `GET /payments/manual/current`
+- `request_number`
+- `replaced_by_transaction_id`
+- presence d'un `EXPIRED` ou `REJECTED apres validation` plus recent
+
+## 13.3. Si l'admin dit "je ne peux plus rouvrir"
+
+Verifier si la transaction est archivee :
+
+- `status=EXPIRED`
+- ou `status=REJECTED` avec `validated_at != null`
+- ou `replaced_by_transaction_id != null`
+
+Dans ce cas, le comportement est normal.
+
+## 13.4. Si l'admin dit "je ne vois pas la bonne liste"
+
+Verifier :
+
+- `scope=ACTIVE|HISTORY|ALL`
+- `status`
 - `refund_required`
-- `refund_done_at`
-- statut `EXPIRED`
-- eventuels filtres admin actifs
-
-## 14.4. Si l'admin dit "l'utilisateur ne peut toujours pas recreer"
-
-Verifier :
-
-- remboursement effectivement marque
-- `refund_done_at` non nul
-- que la transaction courante n'est plus un `EXPIRED` non rembourse
-- que l'abonnement n'est pas encore actif
 
 ---
 
-## 15. Conclusion
+## 14. Conclusion
 
-Le systeme de paiement manuel de Fiers Artisans n'est pas un simple upload de capture. C'est un flux complet, stateful, avec :
+Le paiement manuel de Fiers Artisans est un flux stateful strict qui relie :
 
-- orchestration backend stricte
-- anti-spam et anti-fraude
-- moderation admin
-- remboursement controle
-- synchro mobile/admin en temps reel
-- conservation de l'historique metier
+- la transaction
+- la preuve
+- l'abonnement
+- le remboursement
+- la vue mobile
+- la vue admin
 
-Le point le plus critique a retenir est le suivant :
+Le point critique a retenir est le suivant :
 
-> la verite du systeme repose toujours sur la **derniere demande reelle**, jamais sur une transaction plus ancienne retrouvee par hasard.
+> la verite metier ne repose pas seulement sur `status`, mais sur la combinaison `status + validated_at + refund_required + refund_done_at + replaced_by_transaction_id`.
+
+
+================================================================================
+PATH: DOCUMENTATION_LOCALISATION.md
+--------------------------------------------------------------------------------
+# Documentation Localisation Et Visibilite Map
+
+Ce document decrit le fonctionnement reel de la geolocalisation dans Fiers Artisans apres durcissement du flux mobile et backend.
+
+## Objectif
+
+Garantir qu'un artisan ou un client n'entre jamais dans le systeme avec une localisation incoherente entre :
+
+- la position GPS stockee
+- la ville affichee
+- la commune affichee
+- la visibilite map et recherche
+
+La source de verite fonctionnelle est maintenant :
+
+- `latitude/longitude` capturees depuis le terminal
+
+`city` et `commune` restent des champs affiches dans les profils, mais ils sont derives de la position GPS et ne sont plus saisissables manuellement a l'inscription.
+
+## Regles produit
+
+### Inscription artisan
+
+- l'utilisateur doit utiliser `Utiliser ma position`
+- `ville` et `commune` sont remplies automatiquement
+- les champs restent visibles mais non editables
+- si les coordonnees GPS sont absentes : inscription refusee
+- si la ville ou la commune n'ont pas pu etre resolues automatiquement : inscription bloquee avec message utilisateur
+
+### Inscription client
+
+- meme logique que l'inscription artisan
+- GPS obligatoire pour terminer l'inscription
+- `ville` et `commune` sont derivees de la position detectee
+
+### Visibilite artisan
+
+Un artisan ne peut pas devenir visible sur la map ou dans la recherche si sa position GPS stockee est absente.
+
+Blocage backend :
+
+- tentative `is_available = true` sans `user.location`
+- reponse : erreur metier `PROFILE_LOCATION_REQUIRED_FOR_AVAILABILITY`
+
+UX mobile :
+
+- message d'erreur explicite
+- carte d'alerte visible sur le dashboard si l'artisan est disponible ou abonne actif mais sans localisation synchronisee
+- CTA vers les parametres pour corriger la situation
+
+### Mise a jour de localisation
+
+Un bouton `Mettre a jour ma localisation` est disponible dans les parametres, pour :
+
+- `ARTISAN`
+- `CLIENT`
+
+Comportement :
+
+1. affichage de la localisation actuellement connue
+2. capture GPS a la demande
+3. reverse geocoding pour resoudre `ville` et `commune`
+4. mise a jour de `latitude/longitude`
+5. mise a jour de `city/commune`
+6. feedback utilisateur de succes, echec ou position deja a jour
+
+## Invariants backend
+
+### Inscriptions
+
+Les routes suivantes refusent toute inscription sans coordonnees valides :
+
+- `POST /api/v1/auth/register/artisan`
+- `POST /api/v1/auth/register/client`
+
+Erreur metier :
+
+- `AUTH_LOCATION_REQUIRED`
+
+### Position utilisateur
+
+La route :
+
+- `PUT /api/v1/users/location`
+
+met a jour :
+
+- `users.location`
+- `users.location_updated_at`
+- et, si fournis dans la meme requete, `city/commune` du profil associe
+
+Puis reemet les evenements temps reel deja existants pour ne pas casser les consommateurs.
+
+Cette route peut donc servir de point de synchronisation unique pour :
+
+- `latitude`
+- `longitude`
+- `city`
+- `commune`
+
+### Profils exposes
+
+Les lectures de profils remontent maintenant de facon additive :
+
+- `latitude`
+- `longitude`
+- `location_updated_at`
+- `locationUpdatedAt`
+
+Sans breaking change sur les routes existantes.
+
+## Synchronisation temps reel
+
+La mise a jour de position reutilise les contrats existants :
+
+- `ARTISAN_UPDATED`
+- `CLIENT_UPDATED`
+- `userProfileUpdated`
+- `artisanProfileUpdated`
+- `artisanVisibilityUpdated`
+
+Consequence :
+
+- les ecrans artisan/client deja relies au realtime sont rafraichis sans ajout de nouvelle route ni nouveau protocole
+- la map peut recevoir une visibilite artisan avec position fraiche
+- l'admin web continue a recevoir les mises a jour sur les profils
+
+## Impact sur la recherche geolocalisee
+
+La recherche client ne peut retourner un artisan que si les conditions metier suivantes sont vraies en meme temps :
+
+- abonnement actif
+- utilisateur actif
+- artisan disponible
+- position GPS artisan presente
+- distance dans le rayon demande
+
+En pratique, un artisan avec `location = null` ne peut pas apparaitre sur la map, meme s'il a paye et meme s'il est disponible.
+
+Ce correctif empeche desormais cet etat incoherent d'entrer ou de persister silencieusement.
+
+## Scenarios de reference
+
+### Scenario A - inscription normale
+
+1. l'utilisateur appuie sur `Utiliser ma position`
+2. l'app recupere GPS + ville + commune
+3. les champs visibles se remplissent automatiquement
+4. l'inscription est autorisee
+
+### Scenario B - GPS detecte mais ville/commune non resolues
+
+1. l'utilisateur appuie sur `Utiliser ma position`
+2. le GPS remonte une position mais le reverse geocoding est incomplet
+3. la ville ou la commune restent vides
+4. l'inscription est refusee
+5. message explicite affiche a l'utilisateur
+
+### Scenario C - artisan historique sans localisation
+
+1. artisan deja inscrit avant le durcissement
+2. abonnement actif ou disponibilite active
+3. pas de coordonnees en base
+4. dashboard affiche une alerte de synchronisation
+5. l'artisan ouvre `Parametres > Mettre a jour ma localisation`
+6. la position est capturee et synchronisee
+7. l'artisan redevient eligible a la map
+
+### Scenario D - changement de position
+
+1. l'utilisateur ouvre les parametres
+2. il clique `Mettre a jour ma localisation`
+3. le systeme capture la nouvelle position GPS
+4. ville/commune sont remises a jour
+5. les flux relies a la localisation recoivent les mises a jour temps reel
+
+## Fichiers principaux impliques
+
+Backend :
+
+- `backend/src/modules/auth/auth.service.ts`
+- `backend/src/modules/users/users.service.ts`
+
+Mobile Flutter :
+
+- `fiers_artisans_app/lib/presentation/auth/register_artisan_screen.dart`
+- `fiers_artisans_app/lib/presentation/auth/register_client_screen.dart`
+- `fiers_artisans_app/lib/presentation/artisan/artisan_dashboard.dart`
+- `fiers_artisans_app/lib/presentation/shared/settings_screen.dart`
+- `fiers_artisans_app/lib/presentation/common/app_text_field.dart`
+
+## Checklist de verification manuelle
+
+- inscription artisan sans `Utiliser ma position` : refusee
+- inscription client sans `Utiliser ma position` : refusee
+- inscription artisan avec GPS resolu : OK
+- inscription client avec GPS resolu : OK
+- artisan actif sans position : alerte dashboard visible
+- activation disponibilite artisan sans position : refusee avec message explicite
+- mise a jour depuis `Parametres > Mettre a jour ma localisation` : OK
+- apres mise a jour de localisation artisan : la recherche client et la map peuvent le retrouver si les autres conditions metier sont valides
+
+## Points volontairement non modifies
+
+- aucune nouvelle variable d'environnement
+- aucun changement de route
+- aucune modification du protocole WebSocket existant
+- aucun geocodage manuel texte -> carte sans GPS
+- aucune suppression de logique de synchronisation existante
 
 
 ================================================================================
@@ -13216,7 +13390,9 @@ void main() {
       'rejection_reason': 'Informations incoherentes',
       'refund_required': true,
       'refund_done_at': '2026-05-21T09:30:00.000Z',
+      'validated_at': '2026-05-19T09:30:00.000Z',
       'request_number': 3,
+      'replaced_by_transaction_id': 'TX-NEW-222',
       'cooldown_until': '2026-05-21T12:30:00.000Z',
       'cooldown_cycle': 2,
       'proof_count': 4,
@@ -13233,10 +13409,15 @@ void main() {
     expect(model.isRefundDone, true);
     expect(model.providerAvailable, true);
     expect(model.requestNumber, 3);
+    expect(model.validatedAt, isNotNull);
+    expect(model.isRejectedAfterValidation, true);
+    expect(model.replacedByTransactionId, 'TX-NEW-222');
+    expect(model.hasReplacement, true);
     expect(model.cooldownUntil, isNotNull);
     expect(model.cooldownCycle, 2);
     expect(model.submittedProofCount, 4);
     expect(model.currentAttemptNumber, 1);
+    expect(model.isAutoReplaceCandidate, false);
   });
 }
 
@@ -13469,6 +13650,8 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
   Object? submitProofError;
   int fetchStatusCalls = 0;
   int submitProofCalls = 0;
+  int initiateCalls = 0;
+  final List<String> initiateProviders = [];
 
   @override
   Future<ManualPaymentModel?> fetchCurrentTransaction() async {
@@ -13477,6 +13660,8 @@ class FakePaymentManualRepository implements PaymentManualRepositoryContract {
 
   @override
   Future<ManualPaymentModel> initiatePayment({required String provider}) async {
+    initiateCalls += 1;
+    initiateProviders.add(provider);
     if (initiateError != null) {
       throw initiateError!;
     }
@@ -13667,6 +13852,48 @@ void main() {
 
     expect(notifier.state.currentTransaction?.status, 'REJECTED');
     expect(notifier.state.transientMessage, 'Preuve rejetee : Capture floue');
+
+    notifier.dispose();
+    await events.close();
+  });
+
+  test('auto-replaces a terminal rejected transaction on load using its provider', () async {
+    final repo = FakePaymentManualRepository(
+      initiateResult: const ManualPaymentModel(
+        transactionId: 'TX-NEW-1',
+        provider: 'MTN_MOMO',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      statusResult: const ManualPaymentModel(
+        transactionId: 'TX-NEW-1',
+        provider: 'MTN_MOMO',
+        amountFcfa: 5000,
+        status: 'PENDING',
+      ),
+      currentResult: ManualPaymentModel(
+        transactionId: 'TX-OLD-1',
+        provider: 'MTN_MOMO',
+        amountFcfa: 5000,
+        status: 'REJECTED',
+        validatedAt: DateTime.parse('2026-05-20T10:00:00.000Z'),
+      ),
+    );
+    final events = StreamController<ChatRealtimeEvent>.broadcast();
+    final notifier = PaymentManualNotifier(
+      repository: repo,
+      domainEvents: events.stream,
+    );
+
+    await notifier.loadCurrentTransaction(refresh: true);
+
+    expect(repo.initiateCalls, 1);
+    expect(repo.initiateProviders, ['MTN_MOMO']);
+    expect(notifier.state.currentTransaction?.transactionId, 'TX-NEW-1');
+    expect(
+      notifier.state.transientMessage,
+      'Votre transaction TX-OLD-1 a ete remplacee automatiquement par TX-NEW-1.',
+    );
 
     notifier.dispose();
     await events.close();
@@ -15246,8 +15473,10 @@ class ManualPaymentModel {
   final DateTime? refundDoneAt;
   final bool providerAvailable;
   final DateTime? expiresAtAdmin;
+  final DateTime? validatedAt;
   final int submittedProofCount;
   final int requestNumber;
+  final String? replacedByTransactionId;
   final DateTime? cooldownUntil;
   final int cooldownCycle;
 
@@ -15262,8 +15491,10 @@ class ManualPaymentModel {
     this.refundDoneAt,
     this.providerAvailable = true,
     this.expiresAtAdmin,
+    this.validatedAt,
     this.submittedProofCount = 0,
     this.requestNumber = 0,
+    this.replacedByTransactionId,
     this.cooldownUntil,
     this.cooldownCycle = 0,
   });
@@ -15273,9 +15504,16 @@ class ManualPaymentModel {
   bool get isPendingAdmin => status == 'PENDING_ADMIN';
   bool get isPending => status == 'PENDING';
   bool get isExpired => status == 'EXPIRED';
-  bool get isRefundPending => isExpired && refundRequired && refundDoneAt == null;
+  bool get isRejectedAfterValidation => isRejected && validatedAt != null;
+  bool get isRefundPending => refundRequired && refundDoneAt == null;
   bool get isRefundDone => refundDoneAt != null;
-  bool get canInitiateNewRequest => isExpired && isRefundDone;
+  bool get hasReplacement =>
+      replacedByTransactionId != null && replacedByTransactionId!.trim().isNotEmpty;
+  bool get isAutoReplaceCandidate =>
+      !hasReplacement &&
+      !isRefundPending &&
+      (isRejectedAfterValidation || isExpired);
+  bool get canInitiateNewRequest => isAutoReplaceCandidate;
   bool get canInitiateNewTransaction => canInitiateNewRequest;
   bool get isCooldownActive =>
       cooldownUntil != null && cooldownUntil!.isAfter(DateTime.now());
@@ -15325,12 +15563,18 @@ class ManualPaymentModel {
       expiresAtAdmin: json['expires_at_admin'] != null
           ? DateTime.tryParse(json['expires_at_admin'].toString())
           : null,
+      validatedAt: json['validated_at'] != null
+          ? DateTime.tryParse(json['validated_at'].toString())
+          : null,
       submittedProofCount: proofCountFromPayload ?? derivedProofCount,
       requestNumber:
           int.tryParse(
             (json['request_number'] ?? json['requestNumber'] ?? 0).toString(),
           ) ??
           0,
+      replacedByTransactionId:
+          json['replaced_by_transaction_id']?.toString() ??
+          json['replacedByTransactionId']?.toString(),
       cooldownUntil: json['cooldown_until'] != null
           ? DateTime.tryParse(json['cooldown_until'].toString())
           : null,
@@ -17167,6 +17411,7 @@ class AppTextField extends StatefulWidget {
   final bool enableIMEPersonalizedLearning;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLength;
+  final bool readOnly;
 
   const AppTextField({
     super.key,
@@ -17190,6 +17435,7 @@ class AppTextField extends StatefulWidget {
     this.enableIMEPersonalizedLearning = true,
     this.inputFormatters,
     this.maxLength,
+    this.readOnly = false,
   });
 
   @override
@@ -17231,6 +17477,7 @@ class _AppTextFieldState extends State<AppTextField> {
           enableIMEPersonalizedLearning: widget.enableIMEPersonalizedLearning,
           inputFormatters: widget.inputFormatters,
           maxLength: widget.maxLength,
+          readOnly: widget.readOnly,
           style: Theme.of(context).textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: widget.hint,
@@ -18960,6 +19207,12 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
   double? _latitude;
   double? _longitude;
 
+  bool get _hasResolvedLocation =>
+      _latitude != null &&
+      _longitude != null &&
+      _cityCtrl.text.trim().isNotEmpty &&
+      _communeCtrl.text.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -18981,15 +19234,14 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
     if (snapshot != null) {
       _latitude = snapshot.latitude;
       _longitude = snapshot.longitude;
+      _cityCtrl.text = snapshot.city?.trim() ?? '';
+      _communeCtrl.text = snapshot.commune?.trim() ?? '';
 
-      if (_cityCtrl.text.trim().isEmpty &&
-          (snapshot.city?.isNotEmpty ?? false)) {
-        _cityCtrl.text = snapshot.city!.trim();
-      }
-
-      if (_communeCtrl.text.trim().isEmpty &&
-          (snapshot.commune?.isNotEmpty ?? false)) {
-        _communeCtrl.text = snapshot.commune!.trim();
+      if (!_hasResolvedLocation) {
+        AppSnackBar.show(
+          context,
+          message: 'location.error_incomplete_resolved_position'.tr(),
+        );
       }
 
       if (result.issueType == LocationIssueType.reverseGeocodingFailed &&
@@ -19043,6 +19295,14 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
 
   Future<void> _register() async {
     setState(() => _submitAttempted = true);
+
+    if (!_hasResolvedLocation) {
+      AppSnackBar.show(
+        context,
+        message: 'location.registration_position_required'.tr(),
+      );
+      return;
+    }
 
     final formIsValid = _formKey.currentState!.validate();
     final categoryIsValid = _selectedCategoryId != null;
@@ -19276,6 +19536,13 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                     ),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'location.registration_hint'.tr(),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
 
                 Row(
                   children: [
@@ -19285,9 +19552,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         label: 'auth.city'.tr(),
                         hint: 'Abidjan',
                         prefixIcon: Icons.location_city_outlined,
+                        readOnly: true,
                         textInputAction: TextInputAction.next,
-                        validator: (v) =>
-                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -19296,9 +19562,8 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                         controller: _communeCtrl,
                         label: 'auth.commune'.tr(),
                         hint: 'Cocody',
+                        readOnly: true,
                         textInputAction: TextInputAction.next,
-                        validator: (v) =>
-                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                   ],
@@ -20306,6 +20571,12 @@ class _RegisterClientScreenState extends ConsumerState<RegisterClientScreen> {
   double? _latitude;
   double? _longitude;
 
+  bool get _hasResolvedLocation =>
+      _latitude != null &&
+      _longitude != null &&
+      _cityCtrl.text.trim().isNotEmpty &&
+      _communeCtrl.text.trim().isNotEmpty;
+
   @override
   void initState() {
     super.initState();
@@ -20326,15 +20597,13 @@ class _RegisterClientScreenState extends ConsumerState<RegisterClientScreen> {
     if (snapshot != null) {
       _latitude = snapshot.latitude;
       _longitude = snapshot.longitude;
-
-      if (_cityCtrl.text.trim().isEmpty &&
-          (snapshot.city?.isNotEmpty ?? false)) {
-        _cityCtrl.text = snapshot.city!.trim();
-      }
-
-      if (_communeCtrl.text.trim().isEmpty &&
-          (snapshot.commune?.isNotEmpty ?? false)) {
-        _communeCtrl.text = snapshot.commune!.trim();
+      _cityCtrl.text = snapshot.city?.trim() ?? '';
+      _communeCtrl.text = snapshot.commune?.trim() ?? '';
+      if (!_hasResolvedLocation) {
+        AppSnackBar.show(
+          context,
+          message: 'location.error_incomplete_resolved_position'.tr(),
+        );
       }
       if (result.issueType == LocationIssueType.reverseGeocodingFailed &&
           result.message != null) {
@@ -20383,6 +20652,14 @@ class _RegisterClientScreenState extends ConsumerState<RegisterClientScreen> {
   }
 
   Future<void> _register() async {
+    if (!_hasResolvedLocation) {
+      AppSnackBar.show(
+        context,
+        message: 'location.registration_position_required'.tr(),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -20483,6 +20760,13 @@ class _RegisterClientScreenState extends ConsumerState<RegisterClientScreen> {
                     ),
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'location.registration_hint'.tr(),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
 
                 Row(
                   children: [
@@ -20492,9 +20776,8 @@ class _RegisterClientScreenState extends ConsumerState<RegisterClientScreen> {
                         label: 'auth.city'.tr(),
                         hint: 'Abidjan',
                         prefixIcon: Icons.location_city_outlined,
+                        readOnly: true,
                         textInputAction: TextInputAction.next,
-                        validator: (v) =>
-                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -20503,9 +20786,8 @@ class _RegisterClientScreenState extends ConsumerState<RegisterClientScreen> {
                         controller: _communeCtrl,
                         label: 'auth.commune'.tr(),
                         hint: 'Cocody',
+                        readOnly: true,
                         textInputAction: TextInputAction.next,
-                        validator: (v) =>
-                            v!.isEmpty ? 'common.required'.tr() : null,
                       ),
                     ),
                   ],
@@ -25017,6 +25299,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/theme.dart';
+import '../../core/errors/error_mapper.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/utils/formatters.dart';
@@ -25050,6 +25333,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
   bool _hasReviewMetricsData = false;
   bool _isStatsBackgroundRefreshing = false;
   bool _isReviewMetricsBackgroundRefreshing = false;
+  bool _isLocationMissing = false;
   double _avgRating = 0;
   int _totalReviews = 0;
   int _experienceYears = 0;
@@ -25106,13 +25390,13 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       if (val) {
         _syncLocationToBackend();
       }
-    } catch (_) {
+    } catch (error) {
       await prefs.setBool('artisan_available', previous);
       if (mounted) {
         setState(() => _isAvailable = previous);
         AppSnackBar.show(
           context,
-          message: 'dashboard.artisan.sync_unavailable'.tr(),
+          message: mapException(error).userMessage,
         );
       }
     }
@@ -25213,6 +25497,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
         _avgRating = profile.averageRating;
         _totalReviews = profile.totalReviews;
         _experienceYears = profile.experienceYears;
+        _isLocationMissing = profile.latitude == null || profile.longitude == null;
         _categoryName = categoryName;
         _subcategoryName = subcategoryName;
         _businessName = businessName;
@@ -25326,6 +25611,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     final hasManualInProgress =
         manualTx != null && (manualTx.isPending || manualTx.isPendingAdmin);
     final hasManualRejected = manualTx?.isRejected == true;
+    final showLocationAlert = _isLocationMissing && (_isAvailable || isSubActive);
 
     final showSubscriptionAlert =
         hasManualInProgress ||
@@ -25424,6 +25710,16 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
                         subState: subState,
                         manualTransaction: manualTx,
                         onTap: () => context.push('/artisan/subscription'),
+                      ),
+                    ),
+                  ),
+
+                if (showLocationAlert)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: _LocationSyncCard(
+                        onTap: () => context.push('/settings'),
                       ),
                     ),
                   ),
@@ -26145,6 +26441,91 @@ class _SubscriptionCard extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationSyncCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _LocationSyncCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.cardTheme.color,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.warning.withValues(alpha: 0.55),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.location_searching_rounded,
+                    color: AppTheme.warning,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'dashboard.artisan.location_required_title'.tr(),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'dashboard.artisan.location_required_subtitle'.tr(),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.warning,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'dashboard.artisan.location_required_action'.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -26989,6 +27370,21 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       previous,
       next,
     ) {
+      final nextMessage = next.transientMessage;
+      final previousMessage = previous?.transientMessage;
+      if (nextMessage != null &&
+          nextMessage.isNotEmpty &&
+          nextMessage != previousMessage &&
+          mounted) {
+        AppSnackBar.show(context, message: nextMessage);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) {
+            return;
+          }
+          ref.read(paymentManualProvider.notifier).clearTransientMessage();
+        });
+      }
+
       final tx = next.currentTransaction;
       if (tx == null) {
         return;
@@ -27388,7 +27784,8 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
         !isCooldownLocked &&
         !(state.hasSubmittedProof && tx.isPendingAdmin);
 
-    final buttonLabel = tx != null && tx.isExpired
+    final buttonLabel =
+        tx != null && (tx.isExpired || tx.canInitiateNewRequest)
         ? 'manual_payment.new_request'.tr()
         : 'manual_payment.generate_transaction'.tr();
 
@@ -27847,7 +28244,10 @@ class _RefundPendingWidget extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'manual_payment.refund_pending_body'.tr(
-              namedArgs: {'amount': '${transaction.amountFcfa}'},
+              namedArgs: {
+                'amount': '${transaction.amountFcfa}',
+                'transactionId': transaction.transactionId,
+              },
             ),
           ),
           const SizedBox(height: 6),
@@ -28838,9 +29238,15 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../config/theme.dart';
 import '../../config/app_config.dart';
+import '../../core/errors/error_mapper.dart';
+import '../../core/network/api_client.dart';
+import '../../core/network/api_endpoints.dart';
+import '../../data/repositories/artisan_repository.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/location_service.dart';
 import '../../services/push_notification_service.dart';
+import '../common/app_button.dart';
 import '../common/app_snackbar.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -28904,6 +29310,13 @@ class SettingsScreen extends ConsumerWidget {
             },
           ),
 
+          _SettingsTile(
+            icon: Icons.my_location_rounded,
+            title: 'settings.location_update'.tr(),
+            subtitle: 'settings.location_update_hint'.tr(),
+            onTap: () => _openLocationUpdateSheet(context, ref),
+          ),
+
           // About
           _SettingsTile(
             icon: Icons.info_outline_rounded,
@@ -28926,6 +29339,19 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _openLocationUpdateSheet(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final role = ref.read(authProvider).user?.role ?? 'client';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _LocationUpdateSheet(role: role),
     );
   }
 
@@ -29084,6 +29510,318 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
+class _LocationProfileSnapshot {
+  final String city;
+  final String commune;
+  final double? latitude;
+  final double? longitude;
+  final DateTime? locationUpdatedAt;
+
+  const _LocationProfileSnapshot({
+    required this.city,
+    required this.commune,
+    required this.latitude,
+    required this.longitude,
+    required this.locationUpdatedAt,
+  });
+
+  bool get hasLocation => latitude != null && longitude != null;
+  bool get hasResolvedAddress =>
+      city.trim().isNotEmpty && commune.trim().isNotEmpty;
+
+  String get summary {
+    if (!hasLocation && !hasResolvedAddress) {
+      return '';
+    }
+    if (city.trim().isEmpty && commune.trim().isEmpty) {
+      return '${latitude?.toStringAsFixed(6) ?? '--'}, ${longitude?.toStringAsFixed(6) ?? '--'}';
+    }
+    return '$city, $commune';
+  }
+}
+
+class _LocationUpdateSheet extends ConsumerStatefulWidget {
+  final String role;
+
+  const _LocationUpdateSheet({required this.role});
+
+  @override
+  ConsumerState<_LocationUpdateSheet> createState() =>
+      _LocationUpdateSheetState();
+}
+
+class _LocationUpdateSheetState extends ConsumerState<_LocationUpdateSheet> {
+  final ApiClient _api = ApiClient();
+  final ArtisanRepository _artisanRepository = ArtisanRepository();
+  final LocationService _locationService = LocationService();
+
+  bool _isLoading = true;
+  bool _isUpdating = false;
+  _LocationProfileSnapshot? _snapshot;
+  String? _loadError;
+
+  bool get _isArtisan => widget.role.toLowerCase() == 'artisan';
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadCurrentLocationState);
+  }
+
+  Future<void> _loadCurrentLocationState() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+
+    try {
+      final next = _isArtisan
+          ? await _loadArtisanSnapshot()
+          : await _loadClientSnapshot();
+      if (!mounted) return;
+      setState(() {
+        _snapshot = next;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = mapException(error).userMessage;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<_LocationProfileSnapshot> _loadArtisanSnapshot() async {
+    final profile = await _artisanRepository.getMyArtisanProfile();
+    return _LocationProfileSnapshot(
+      city: profile.city,
+      commune: profile.commune,
+      latitude: profile.latitude,
+      longitude: profile.longitude,
+      locationUpdatedAt: profile.locationUpdatedAt,
+    );
+  }
+
+  Future<_LocationProfileSnapshot> _loadClientSnapshot() async {
+    final response = await _api.get(ApiEndpoints.clientProfile);
+    final payload = response.data is Map<String, dynamic>
+        ? ((response.data['data'] as Map<String, dynamic>?) ?? response.data)
+        : <String, dynamic>{};
+
+    return _LocationProfileSnapshot(
+      city: (payload['city'] ?? '').toString(),
+      commune: (payload['commune'] ?? '').toString(),
+      latitude: _toDouble(payload['latitude']),
+      longitude: _toDouble(payload['longitude']),
+      locationUpdatedAt: _toDateTime(
+        payload['location_updated_at'] ?? payload['locationUpdatedAt'],
+      ),
+    );
+  }
+
+  Future<void> _refreshLocation() async {
+    if (_isUpdating) return;
+
+    setState(() => _isUpdating = true);
+    try {
+      final result = await _locationService.getCurrentLocationResult(
+        reverseGeocode: true,
+        requestPermission: true,
+      );
+
+      if (!mounted) return;
+
+      final snapshot = result.snapshot;
+      if (snapshot == null) {
+        AppSnackBar.show(
+          context,
+          message:
+              result.message ??
+              'location.error_position_failed'.tr(),
+        );
+        setState(() => _isUpdating = false);
+        return;
+      }
+
+      final city = snapshot.city?.trim() ?? '';
+      final commune = snapshot.commune?.trim() ?? '';
+      if (city.isEmpty || commune.isEmpty) {
+        AppSnackBar.show(
+          context,
+          message: 'location.error_incomplete_resolved_position'.tr(),
+        );
+        setState(() => _isUpdating = false);
+        return;
+      }
+
+      final before = _snapshot;
+      await _locationService.syncUserLocation(
+        latitude: snapshot.latitude,
+        longitude: snapshot.longitude,
+        city: city,
+        commune: commune,
+        throwOnError: true,
+      );
+
+      final next = _LocationProfileSnapshot(
+        city: city,
+        commune: commune,
+        latitude: snapshot.latitude,
+        longitude: snapshot.longitude,
+        locationUpdatedAt: DateTime.now(),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _snapshot = next;
+        _isUpdating = false;
+      });
+
+      final alreadyCurrent =
+          before != null &&
+          _sameLocation(before.latitude, next.latitude) &&
+          _sameLocation(before.longitude, next.longitude) &&
+          before.city.trim() == next.city.trim() &&
+          before.commune.trim() == next.commune.trim();
+
+      AppSnackBar.show(
+        context,
+        message: alreadyCurrent
+            ? 'location.update_already_current'.tr()
+            : 'location.update_success'.tr(),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isUpdating = false);
+      AppSnackBar.show(
+        context,
+        message: mapException(error).userMessage,
+      );
+    }
+  }
+
+  bool _sameLocation(double? a, double? b) {
+    if (a == null || b == null) return a == b;
+    return (a - b).abs() < 0.00001;
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  DateTime? _toDateTime(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final snapshot = _snapshot;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 8,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'settings.location_update'.tr(),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'settings.location_update_modal_hint'.tr(),
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_loadError != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  _loadError!,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.error,
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.cardTheme.color,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.dividerColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'settings.current_location'.tr(),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot == null || snapshot.summary.isEmpty
+                          ? 'location.current_unknown'.tr()
+                          : snapshot.summary,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot == null || !snapshot.hasLocation
+                          ? 'location.current_missing_coordinates'.tr()
+                          : '${snapshot.latitude!.toStringAsFixed(6)}, ${snapshot.longitude!.toStringAsFixed(6)}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot?.locationUpdatedAt == null
+                          ? 'location.last_update_unknown'.tr()
+                          : 'location.last_update'.tr(
+                              namedArgs: {
+                                'date': DateFormat(
+                                  'dd/MM/yyyy HH:mm',
+                                ).format(snapshot!.locationUpdatedAt!),
+                              },
+                            ),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 16),
+            AppButton(
+              text: _isUpdating
+                  ? 'location.prefill_in_progress'.tr()
+                  : 'settings.location_update'.tr(),
+              icon: Icons.my_location_rounded,
+              isLoading: _isUpdating,
+              onPressed: _isLoading ? null : _refreshLocation,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -29166,6 +29904,8 @@ enum AppErrorCode {
   authPinBlocked,
   authInvalidToken,
   authPhoneAlreadyUsed,
+  authLocationRequired,
+  profileLocationRequiredForAvailability,
 
   // Validation
   validationError,
@@ -29233,6 +29973,9 @@ const _serverCodeMap = <String, AppErrorCode>{
   'AUTH_PIN_BLOCKED': AppErrorCode.authPinBlocked,
   'AUTH_INVALID_TOKEN': AppErrorCode.authInvalidToken,
   'AUTH_PHONE_ALREADY_USED': AppErrorCode.authPhoneAlreadyUsed,
+  'AUTH_LOCATION_REQUIRED': AppErrorCode.authLocationRequired,
+  'PROFILE_LOCATION_REQUIRED_FOR_AVAILABILITY':
+      AppErrorCode.profileLocationRequiredForAvailability,
   'INTERNAL_ERROR': AppErrorCode.internalError,
 };
 
@@ -29295,6 +30038,10 @@ String _defaultUserMessage(AppErrorCode code) {
       return 'Session expirée. Veuillez vous reconnecter.';
     case AppErrorCode.authPhoneAlreadyUsed:
       return 'Ce numéro de téléphone est déjà utilisé.';
+    case AppErrorCode.authLocationRequired:
+      return 'Votre position GPS est requise pour continuer.';
+    case AppErrorCode.profileLocationRequiredForAvailability:
+      return 'Mettez d abord votre localisation GPS a jour pour rendre votre profil visible.';
 
     // Validation / serveur
     case AppErrorCode.validationError:
@@ -30675,14 +31422,27 @@ class LocationService {
   Future<bool> syncUserLocation({
     required double latitude,
     required double longitude,
+    String? city,
+    String? commune,
+    bool throwOnError = false,
   }) async {
     try {
+      final payload = <String, dynamic>{'lat': latitude, 'lng': longitude};
+      if (city != null && city.trim().isNotEmpty) {
+        payload['city'] = city.trim();
+      }
+      if (commune != null && commune.trim().isNotEmpty) {
+        payload['commune'] = commune.trim();
+      }
       await _api.put(
         ApiEndpoints.updateUserLocation,
-        data: {'lat': latitude, 'lng': longitude},
+        data: payload,
       );
       return true;
-    } catch (_) {
+    } catch (error) {
+      if (throwOnError) {
+        rethrow;
+      }
       return false;
     }
   }
@@ -30703,6 +31463,8 @@ class LocationService {
     await syncUserLocation(
       latitude: snapshot.latitude,
       longitude: snapshot.longitude,
+      city: snapshot.city,
+      commune: snapshot.commune,
     );
     return snapshot;
   }
@@ -33005,18 +33767,12 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final tx = await _repository.fetchCurrentTransaction();
-      state = state.copyWith(
-        currentTransaction: tx,
-        clearCurrentTransaction: tx == null,
-        isLoading: false,
-        hasSubmittedProof: tx?.isPendingAdmin == true,
-      );
-
-      if (tx != null && _shouldPoll(tx)) {
-        _startPolling();
-      } else {
-        _pollingTimer?.cancel();
+      final resolved = await _replaceIfEligible(tx);
+      if (resolved != null) {
+        return;
       }
+
+      _setCurrentTransaction(tx, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
@@ -33047,15 +33803,17 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
     try {
       final tx = await _repository.fetchStatus(transactionId: txId);
-      state = state.copyWith(
-        currentTransaction: tx,
+      final resolved = await _replaceIfEligible(tx);
+      if (resolved != null) {
+        return;
+      }
+      _setCurrentTransaction(
+        tx,
+        isLoading: false,
         hasSubmittedProof: tx.status == 'REJECTED'
             ? false
             : state.hasSubmittedProof,
       );
-      if (!_shouldPoll(tx)) {
-        _pollingTimer?.cancel();
-      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _toUserFacingError(e));
     }
@@ -33072,10 +33830,15 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     if (txId != null && txId.isNotEmpty) {
       try {
         final latest = await _repository.fetchStatus(transactionId: txId);
+        final replacement = await _replaceIfEligible(latest);
+        if (replacement != null) {
+          return;
+        }
         final statusChanged =
             previousStatus == null || previousStatus != latest.status;
-        state = state.copyWith(
-          currentTransaction: latest,
+        _setCurrentTransaction(
+          latest,
+          isLoading: false,
           hasSubmittedProof: latest.status == 'REJECTED'
               ? false
               : state.hasSubmittedProof,
@@ -33091,11 +33854,6 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
                 )
               : null,
         );
-        if (_shouldPoll(latest)) {
-          _startPolling();
-        } else {
-          _pollingTimer?.cancel();
-        }
         return;
       } catch (_) {
         // Fallback to payload-only status message when API refresh fails.
@@ -33154,6 +33912,53 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
   void clearTransientMessage() {
     state = state.copyWith(clearTransientMessage: true);
+  }
+
+  void _setCurrentTransaction(
+    ManualPaymentModel? tx, {
+    required bool isLoading,
+    bool? hasSubmittedProof,
+    String? transientMessage,
+  }) {
+    state = state.copyWith(
+      currentTransaction: tx,
+      clearCurrentTransaction: tx == null,
+      isLoading: isLoading,
+      hasSubmittedProof: hasSubmittedProof ?? (tx?.isPendingAdmin == true),
+      transientMessage: transientMessage,
+      clearTransientMessage: transientMessage == null,
+    );
+    if (tx != null && _shouldPoll(tx)) {
+      _startPolling();
+    } else {
+      _pollingTimer?.cancel();
+    }
+  }
+
+  Future<ManualPaymentModel?> _replaceIfEligible(ManualPaymentModel? tx) async {
+    if (tx == null || !tx.isAutoReplaceCandidate) {
+      return null;
+    }
+
+    try {
+      final replacement = await _repository.initiatePayment(provider: tx.provider);
+      _setCurrentTransaction(
+        replacement,
+        isLoading: false,
+        hasSubmittedProof: false,
+        transientMessage:
+            'Votre transaction ${tx.transactionId} a ete remplacee automatiquement par ${replacement.transactionId}.',
+      );
+      return replacement;
+    } catch (error) {
+      state = state.copyWith(
+        currentTransaction: tx,
+        isLoading: false,
+        hasSubmittedProof: tx.isPendingAdmin,
+        error: _toUserFacingError(error),
+      );
+      return tx;
+    }
   }
 
   void _startPolling() {
@@ -34272,14 +35077,17 @@ PATH: fiers_artisans_app/assets/translations/fr.json
   "dashboard": {
     "artisan": {
       "subtitle": "Tableau de bord artisan",
-      "performance": "Performance",
-      "profile_views": "Vues du profil",
-      "unread_messages": "Messages non lus",
-      "avg_rating": "Note moyenne",
-      "total_reviews": "Total avis",
-      "reviews_history_title": "Historique des avis",
-      "quick_actions": "Actions rapides",
-      "inbox": "Messagerie"
+    "performance": "Performance",
+    "profile_views": "Vues du profil",
+    "unread_messages": "Messages non lus",
+    "avg_rating": "Note moyenne",
+    "total_reviews": "Total avis",
+    "location_required_title": "Localisation requise pour etre visible",
+    "location_required_subtitle": "Votre abonnement ou votre disponibilite est active, mais votre position GPS n est pas encore synchronisee.",
+    "location_required_action": "Mettre a jour ma localisation",
+    "reviews_history_title": "Historique des avis",
+    "quick_actions": "Actions rapides",
+    "inbox": "Messagerie"
     },
     "client": {
       "urgent_mode": "Mode urgence ⚡",
@@ -34467,8 +35275,8 @@ PATH: fiers_artisans_app/assets/translations/fr.json
     "expiration_date": "Date d'expiration : {date}",
     "rejection_reason_label": "Motif du rejet : {reason}",
     "status_label": "Statut : {status}",
-    "refund_pending_title": "TRANSACTION EXPIREE - REMBOURSEMENT REQUIS",
-    "refund_pending_body": "Votre preuve n'a pas ete traitee dans les 72h. Un remboursement de {amount} FCFA est requis.",
+    "refund_pending_title": "REMBOURSEMENT REQUIS",
+    "refund_pending_body": "La transaction {transactionId} necessite un remboursement de {amount} FCFA avant toute nouvelle demande.",
     "refund_pending_support_eta": "Notre equipe traite votre remboursement sous 48h.",
     "contact_support_whatsapp": "Contacter le support sur WhatsApp",
     "new_request_locked_until_refund": "Nouvelle demande debloquee apres remboursement",
@@ -34541,6 +35349,10 @@ PATH: fiers_artisans_app/assets/translations/fr.json
     "notifications_enabled": "Notifications système activées.",
     "notifications_open_settings_fail": "Impossible d'ouvrir les paramètres système.",
     "profile": "Mon profil",
+    "location_update": "Mettre à jour ma localisation",
+    "location_update_hint": "Synchroniser la position GPS, la ville et la commune",
+    "location_update_modal_hint": "La localisation est determinée automatiquement depuis la position GPS de l appareil.",
+    "current_location": "Localisation actuelle",
     "about": "À propos",
     "logout": "Se déconnecter",
     "logout_confirm": "Voulez-vous vraiment vous déconnecter ?",
@@ -34556,13 +35368,22 @@ PATH: fiers_artisans_app/assets/translations/fr.json
   "location": {
     "prefill_in_progress": "Localisation en cours...",
     "use_current_position": "Utiliser ma position",
+    "registration_hint": "La ville et la commune sont remplies automatiquement depuis votre position GPS.",
+    "registration_position_required": "Utilisez votre position GPS pour continuer l inscription.",
     "open_settings": "Reglages",
     "enable_gps": "Activer GPS",
     "error_services_disabled": "La geolocalisation est desactivee. Activez le GPS puis reessayez.",
     "error_permission_required": "La permission de localisation est requise pour utiliser cette fonctionnalite.",
     "error_permission_denied_forever": "La permission de localisation est refusee de facon permanente. Activez-la dans les reglages de l'application.",
     "error_position_failed": "Impossible de recuperer votre position actuelle. Verifiez votre GPS puis reessayez.",
-    "error_reverse_geocoding_failed": "Position recuperee, mais impossible de determiner la ville/commune automatiquement."
+    "error_reverse_geocoding_failed": "Position recuperee, mais impossible de determiner la ville/commune automatiquement.",
+    "error_incomplete_resolved_position": "Position GPS detectee, mais la ville ou la commune n ont pas pu etre resolues automatiquement. Reessayez.",
+    "update_success": "Votre localisation a ete mise a jour avec succes.",
+    "update_already_current": "Votre localisation etait deja a jour.",
+    "current_unknown": "Aucune localisation resolue pour le moment.",
+    "current_missing_coordinates": "Coordonnees GPS absentes.",
+    "last_update": "Derniere mise a jour : {date}",
+    "last_update_unknown": "Derniere mise a jour inconnue."
   },
   "contact": {
     "phone": "Telephone",
@@ -34691,14 +35512,17 @@ PATH: fiers_artisans_app/assets/translations/en.json
   "dashboard": {
     "artisan": {
       "subtitle": "Craftsman dashboard",
-      "performance": "Performance",
-      "profile_views": "Profile views",
-      "unread_messages": "Unread messages",
-      "avg_rating": "Average rating",
-      "total_reviews": "Total reviews",
-      "reviews_history_title": "Reviews history",
-      "quick_actions": "Quick actions",
-      "inbox": "Inbox"
+    "performance": "Performance",
+    "profile_views": "Profile views",
+    "unread_messages": "Unread messages",
+    "avg_rating": "Average rating",
+    "total_reviews": "Total reviews",
+    "location_required_title": "Location required to stay visible",
+    "location_required_subtitle": "Your subscription or availability is active, but your GPS position is not synced yet.",
+    "location_required_action": "Update my location",
+    "reviews_history_title": "Reviews history",
+    "quick_actions": "Quick actions",
+    "inbox": "Inbox"
     },
     "client": {
       "urgent_mode": "Urgent mode ⚡",
@@ -34886,8 +35710,8 @@ PATH: fiers_artisans_app/assets/translations/en.json
     "expiration_date": "Expiration date: {date}",
     "rejection_reason_label": "Rejection reason: {reason}",
     "status_label": "Status: {status}",
-    "refund_pending_title": "EXPIRED TRANSACTION - REFUND REQUIRED",
-    "refund_pending_body": "Your proof was not processed within 72 hours. A refund of {amount} FCFA is required.",
+    "refund_pending_title": "REFUND REQUIRED",
+    "refund_pending_body": "Transaction {transactionId} requires a refund of {amount} FCFA before any new request.",
     "refund_pending_support_eta": "Our team processes your refund within 48 hours.",
     "contact_support_whatsapp": "Contact support on WhatsApp",
     "new_request_locked_until_refund": "New request unlocked after refund",
@@ -34960,6 +35784,10 @@ PATH: fiers_artisans_app/assets/translations/en.json
     "notifications_enabled": "System notifications enabled.",
     "notifications_open_settings_fail": "Unable to open system settings.",
     "profile": "My profile",
+    "location_update": "Update my location",
+    "location_update_hint": "Sync GPS position, city and district",
+    "location_update_modal_hint": "Location is resolved automatically from the device GPS position.",
+    "current_location": "Current location",
     "about": "About",
     "logout": "Log out",
     "logout_confirm": "Are you sure you want to log out?",
@@ -34975,13 +35803,22 @@ PATH: fiers_artisans_app/assets/translations/en.json
   "location": {
     "prefill_in_progress": "Fetching location...",
     "use_current_position": "Use my position",
+    "registration_hint": "City and district are filled automatically from your GPS position.",
+    "registration_position_required": "Use your GPS position to continue registration.",
     "open_settings": "Settings",
     "enable_gps": "Enable GPS",
     "error_services_disabled": "Location is disabled. Enable GPS then try again.",
     "error_permission_required": "Location permission is required to use this feature.",
     "error_permission_denied_forever": "Location permission is permanently denied. Enable it in app settings.",
     "error_position_failed": "Unable to read your current position. Check GPS and try again.",
-    "error_reverse_geocoding_failed": "Position found, but city/district could not be resolved automatically."
+    "error_reverse_geocoding_failed": "Position found, but city/district could not be resolved automatically.",
+    "error_incomplete_resolved_position": "GPS position was detected, but the city or district could not be resolved automatically. Please try again.",
+    "update_success": "Your location was updated successfully.",
+    "update_already_current": "Your location was already up to date.",
+    "current_unknown": "No resolved location is available yet.",
+    "current_missing_coordinates": "GPS coordinates are missing.",
+    "last_update": "Last update: {date}",
+    "last_update_unknown": "Last update is unknown."
   },
   "contact": {
     "phone": "Phone",
@@ -55102,6 +55939,46 @@ function createHarness() {
   const paymentRealtimeService = {
     emitNewProof: jest.fn(async () => ({})),
     emitPaymentUpdated: jest.fn(async () => ({})),
+    emitTimelineUpdated: jest.fn(async () => ({})),
+  } as any;
+  const subscriptionService = {
+    activateSubscriptionFromManualPayment: jest.fn(
+      async (subscriptionId: string) => {
+        const sub = state.subscriptions.find((s) => s.id === subscriptionId);
+        if (sub) {
+          sub.status = SubscriptionStatus.ACTIVE;
+          const artisan = state.artisanProfiles.find(
+            (profile) => profile.id === sub.artisan_profile_id,
+          );
+          if (artisan) {
+            artisan.is_subscription_active = true;
+          }
+        }
+      },
+    ),
+    deactivateSubscriptionFromManualPayment: jest.fn(
+      async ({
+        subscriptionId,
+        reason,
+      }: {
+        subscriptionId: string;
+        reason: 'TRANSACTION_REJECTED' | 'TRANSACTION_EXPIRED';
+      }) => {
+        const sub = state.subscriptions.find((s) => s.id === subscriptionId);
+        if (sub) {
+          sub.status =
+            reason === 'TRANSACTION_EXPIRED'
+              ? SubscriptionStatus.EXPIRED
+              : SubscriptionStatus.CANCELLED;
+          const artisan = state.artisanProfiles.find(
+            (profile) => profile.id === sub.artisan_profile_id,
+          );
+          if (artisan) {
+            artisan.is_subscription_active = false;
+          }
+        }
+      },
+    ),
   } as any;
 
   const service = new PaymentManualService(
@@ -55118,16 +55995,7 @@ function createHarness() {
       getSignedUrl: jest.fn(async () => 'https://signed-url'),
       streamFile: jest.fn(),
     } as any,
-    {
-      activateSubscriptionFromManualPayment: jest.fn(
-        async (subscriptionId: string) => {
-          const sub = state.subscriptions.find((s) => s.id === subscriptionId);
-          if (sub) {
-            sub.status = SubscriptionStatus.ACTIVE;
-          }
-        },
-      ),
-    } as any,
+    subscriptionService,
     notificationsService,
     analyticsService,
     {
@@ -55179,6 +56047,7 @@ function createHarness() {
     state,
     paymentProofRepository,
     notificationsService,
+    subscriptionService,
     mockFile,
   };
 }
@@ -55564,6 +56433,109 @@ describe('Payment Manual (e2e scenarios)', () => {
     expect(newRequest.transaction_id).not.toBe('TX-OLD-001');
     expect(newRequest.request_number).toBe(3);
     expect(newRequest.status).toBe(PaymentManualStatus.PENDING);
+  });
+
+  it('Scenario 9: a rejected payment after prior validation deactivates the subscription and auto-replaces with a new transaction', async () => {
+    const { service, state, notificationsService, mockFile, subscriptionService } =
+      createHarness();
+    const initiated = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.ORANGE_MONEY,
+    );
+
+    await service.submitProof({
+      transactionId: initiated.transaction_id,
+      userId: 'user-1',
+      file: {
+        buffer: mockFile,
+        mimetype: 'image/jpeg',
+        size: mockFile.length,
+        originalname: 'proof-initial.jpg',
+      } as Express.Multer.File,
+      senderNumber: '0700000000',
+    });
+    await service.validateProof(initiated.id, 'admin-1');
+    await service.reopenProof(initiated.id, 'admin-1', 're-review');
+    await service.rejectProof(initiated.id, 'admin-2', 'proof invalidated');
+
+    const rejected = state.payments.find((payment) => payment.id === initiated.id)!;
+    const subscription = state.subscriptions.find(
+      (row) => row.id === initiated.subscription_id,
+    );
+
+    expect(rejected.status).toBe(PaymentManualStatus.REJECTED);
+    expect(subscription?.status).toBe(SubscriptionStatus.CANCELLED);
+    expect(state.artisanProfiles[0].is_subscription_active).toBe(false);
+    expect(
+      subscriptionService.deactivateSubscriptionFromManualPayment,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: initiated.subscription_id,
+        reason: 'TRANSACTION_REJECTED',
+      }),
+    );
+
+    const replacement = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.WAVE,
+    );
+
+    expect(replacement.status).toBe(PaymentManualStatus.PENDING);
+    expect(replacement.provider).toBe(PaymentProviderManual.ORANGE_MONEY);
+    expect(replacement.request_number).toBe(2);
+    expect(rejected.replaced_by_transaction_id).toBe(
+      replacement.transaction_id,
+    );
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'PAYMENT_MANUAL_AUTO_REPLACED',
+        data: expect.objectContaining({
+          previousTransactionId: initiated.transaction_id,
+          transactionId: replacement.transaction_id,
+        }),
+      }),
+    );
+  });
+
+  it('Scenario 10: expiration deactivates an active subscription before archiving the transaction', async () => {
+    const { service, state, subscriptionService } = createHarness();
+    state.artisanProfiles[0].is_subscription_active = true;
+    const subscription = {
+      id: 'sub-exp-active-1',
+      artisan_profile_id: 'artisan-1',
+      amount_fcfa: 5000,
+      status: SubscriptionStatus.ACTIVE,
+      created_at: new Date('2026-05-01T08:00:00.000Z'),
+    };
+    state.subscriptions.push(subscription);
+    state.payments.push({
+      id: 'pm-exp-active-1',
+      subscription_id: subscription.id,
+      transaction_id: 'TX-EXP-ACTIVE',
+      amount_fcfa: 5000,
+      provider: PaymentProviderManual.WAVE,
+      status: PaymentManualStatus.PENDING_ADMIN,
+      refund_required: false,
+      attempted_refund_count: 0,
+      created_at: new Date(),
+      expires_at_admin: new Date(Date.now() - 60_000),
+      timeline: [],
+      subscription,
+    });
+
+    await service.expirePayments();
+
+    expect(subscription.status).toBe(SubscriptionStatus.EXPIRED);
+    expect(state.artisanProfiles[0].is_subscription_active).toBe(false);
+    expect(
+      subscriptionService.deactivateSubscriptionFromManualPayment,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: subscription.id,
+        reason: 'TRANSACTION_EXPIRED',
+      }),
+    );
   });
 });
 
@@ -56253,7 +57225,8 @@ export type AdminRealtimeEventType =
   | 'PAYMENT_UPDATED'
   | 'ACTIVITY_LOGGED'
   | 'PAYMENT_MANUAL_NEW_PROOF'
-  | 'PAYMENT_MANUAL_UPDATED';
+  | 'PAYMENT_MANUAL_UPDATED'
+  | 'PAYMENT_MANUAL_TIMELINE_UPDATED';
 
 export interface AdminRealtimeEvent<
   TPayload extends Record<string, unknown> = Record<string, unknown>,
@@ -56684,6 +57657,51 @@ export async function seedCategories(dataSource: DataSource): Promise<void> {
   }
 
   console.log('✅ Categories seeded successfully');
+}
+
+
+================================================================================
+PATH: backend/src/database/migrations/AddPaymentManualReplacement1710000000002.ts
+--------------------------------------------------------------------------------
+import { MigrationInterface, QueryRunner } from 'typeorm';
+
+export class AddPaymentManualReplacement1710000000002
+  implements MigrationInterface
+{
+  name = 'AddPaymentManualReplacement1710000000002';
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+      ALTER TABLE payment_manual
+      ADD COLUMN replaced_by_transaction_id VARCHAR NULL
+    `);
+
+    await queryRunner.query(`
+      CREATE INDEX IF NOT EXISTS idx_payment_manual_replaced_by
+      ON payment_manual(replaced_by_transaction_id)
+    `);
+
+    await queryRunner.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_manual_one_pending_per_subscription
+      ON payment_manual(subscription_id)
+      WHERE status = 'PENDING' AND deleted_at IS NULL
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+      DROP INDEX IF EXISTS idx_payment_manual_one_pending_per_subscription
+    `);
+
+    await queryRunner.query(`
+      DROP INDEX IF EXISTS idx_payment_manual_replaced_by
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE payment_manual
+      DROP COLUMN IF EXISTS replaced_by_transaction_id
+    `);
+  }
 }
 
 
@@ -57864,6 +58882,24 @@ export class AuthService {
     );
   }
 
+  private ensureCoordinatesPresent(
+    latitude: number | undefined,
+    longitude: number | undefined,
+    role: 'artisan' | 'client',
+  ): void {
+    if (this.hasValidCoordinates(latitude, longitude)) {
+      return;
+    }
+
+    throw new BusinessException(
+      'AUTH_LOCATION_REQUIRED',
+      role === 'artisan'
+        ? 'Votre position GPS est requise pour inscrire un artisan. Utilisez le bouton "Utiliser ma position".'
+        : 'Votre position GPS est requise pour terminer l inscription. Utilisez le bouton "Utiliser ma position".',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+
   private async setUserLocationIfProvided(
     userId: string,
     latitude?: number,
@@ -57886,6 +58922,12 @@ export class AuthService {
   }
 
   async registerArtisan(dto: RegisterArtisanDto) {
+    this.ensureCoordinatesPresent(
+      dto.latitude,
+      dto.longitude,
+      'artisan',
+    );
+
     // Vérifier l'unicité du numéro
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
@@ -57963,6 +59005,12 @@ export class AuthService {
   }
 
   async registerClient(dto: RegisterClientDto) {
+    this.ensureCoordinatesPresent(
+      dto.latitude,
+      dto.longitude,
+      'client',
+    );
+
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
     });
@@ -60158,6 +61206,7 @@ export class Notification extends Document {
       'PAYMENT_MANUAL_COOLDOWN',
       'PAYMENT_MANUAL_REOPENED',
       'PAYMENT_MANUAL_EXPIRED',
+      'PAYMENT_MANUAL_AUTO_REPLACED',
       'PAYMENT_MANUAL_INTEGRITY_ALERT',
       'REFUND_PROCESSED',
     ],
@@ -60359,7 +61408,13 @@ export class UsersController {
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateLocationDto,
   ) {
-    return this.usersService.updateUserLocation(userId, dto.lat, dto.lng);
+    return this.usersService.updateUserLocation(
+      userId,
+      dto.lat,
+      dto.lng,
+      dto.city,
+      dto.commune,
+    );
   }
 
   // ── Artisan Profile ─────────────────────────────────────────────
@@ -60636,7 +61691,7 @@ export class MapVisibilityGateway
 ================================================================================
 PATH: backend/src/modules/users/users.service.ts
 --------------------------------------------------------------------------------
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserRole } from './entities/user.entity';
@@ -60650,6 +61705,13 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { MapVisibilityGateway } from './map-visibility.gateway';
 import { AdminRealtimeService } from '../../common/realtime/admin-realtime.service';
+import { BusinessException } from '../../common/exceptions/business.exception';
+
+type UserLocationSnapshot = {
+  latitude: number | null;
+  longitude: number | null;
+  locationUpdatedAt: Date | null;
+};
 
 @Injectable()
 export class UsersService {
@@ -60669,6 +61731,67 @@ export class UsersService {
     private readonly mapVisibilityGateway: MapVisibilityGateway,
     private readonly adminRealtimeService: AdminRealtimeService,
   ) {}
+
+  private async getUserLocationSnapshot(
+    userId: string,
+  ): Promise<UserLocationSnapshot> {
+    const rawLocation = await this.userRepository
+      .createQueryBuilder('u')
+      .select('u.location_updated_at', 'location_updated_at')
+      .addSelect('ST_Y(u.location::geometry)', 'latitude')
+      .addSelect('ST_X(u.location::geometry)', 'longitude')
+      .where('u.id = :id', { id: userId })
+      .getRawOne<{
+        location_updated_at: string | Date | null;
+        latitude: string | null;
+        longitude: string | null;
+      }>();
+
+    return {
+      latitude:
+        rawLocation?.latitude != null ? Number(rawLocation.latitude) : null,
+      longitude:
+        rawLocation?.longitude != null ? Number(rawLocation.longitude) : null,
+      locationUpdatedAt: rawLocation?.location_updated_at
+        ? new Date(rawLocation.location_updated_at)
+        : null,
+    };
+  }
+
+  private async attachLocationSnapshot<
+    T extends { user_id?: string; user?: { id?: string | null } | null },
+  >(entity: T): Promise<T> {
+    const userId = entity.user_id ?? entity.user?.id ?? null;
+    if (!userId) {
+      return entity;
+    }
+
+    const snapshot = await this.getUserLocationSnapshot(userId);
+    Object.assign(entity as Record<string, unknown>, {
+      latitude: snapshot.latitude,
+      longitude: snapshot.longitude,
+      location_updated_at: snapshot.locationUpdatedAt,
+      locationUpdatedAt: snapshot.locationUpdatedAt,
+    });
+    return entity;
+  }
+
+  private async userHasStoredLocation(userId: string): Promise<boolean> {
+    const snapshot = await this.getUserLocationSnapshot(userId);
+    return snapshot.latitude != null && snapshot.longitude != null;
+  }
+
+  private async ensureArtisanLocationForVisibility(userId: string): Promise<void> {
+    if (await this.userHasStoredLocation(userId)) {
+      return;
+    }
+
+    throw new BusinessException(
+      'PROFILE_LOCATION_REQUIRED_FOR_AVAILABILITY',
+      'Impossible de rendre votre profil visible sans position GPS valide. Mettez d abord votre localisation a jour.',
+      HttpStatus.BAD_REQUEST,
+    );
+  }
 
   private async emitMapVisibilityUpdate(
     artisanUserId: string,
@@ -60698,30 +61821,16 @@ export class UsersService {
       return;
     }
 
-    const rawLocation = await this.userRepository
-      .createQueryBuilder('u')
-      .select('u.location_updated_at', 'location_updated_at')
-      .addSelect('ST_Y(u.location::geometry)', 'latitude')
-      .addSelect('ST_X(u.location::geometry)', 'longitude')
-      .where('u.id = :id', { id: artisanUserId })
-      .getRawOne<{
-        location_updated_at: string | Date | null;
-        latitude: string | null;
-        longitude: string | null;
-      }>();
+    const rawLocation = await this.getUserLocationSnapshot(artisanUserId);
 
     await this.mapVisibilityGateway.emitArtisanVisibilityUpdated({
       artisanUserId,
       isAvailable: isAvailable && profile.is_subscription_active,
       categoryId: profile.category_id,
       subcategoryId: profile.subcategory_id,
-      latitude:
-        rawLocation?.latitude != null ? Number(rawLocation.latitude) : null,
-      longitude:
-        rawLocation?.longitude != null ? Number(rawLocation.longitude) : null,
-      locationUpdatedAt: rawLocation?.location_updated_at
-        ? new Date(rawLocation.location_updated_at)
-        : null,
+      latitude: rawLocation.latitude,
+      longitude: rawLocation.longitude,
+      locationUpdatedAt: rawLocation.locationUpdatedAt,
     });
   }
 
@@ -60751,7 +61860,7 @@ export class UsersService {
     if (!profile) {
       throw new NotFoundException('Profil artisan non trouvé.');
     }
-    return profile;
+    return this.attachLocationSnapshot(profile);
   }
 
   async getArtisanPublicProfile(artisanId: string): Promise<ArtisanProfile> {
@@ -60776,15 +61885,25 @@ export class UsersService {
       targetId: profile.id,
     }).catch(() => {});
 
-    return profile;
+    return this.attachLocationSnapshot(profile);
   }
 
   async updateArtisanProfile(
     userId: string,
     dto: UpdateArtisanProfileDto,
   ): Promise<ArtisanProfile> {
-    const profile = await this.getArtisanProfile(userId);
+    const profile = await this.artisanProfileRepository.findOne({
+      where: { user_id: userId },
+      relations: ['subcategory'],
+    });
+    if (!profile) {
+      throw new NotFoundException('Profil artisan non trouvé.');
+    }
     const previousAvailability = profile.is_available;
+
+    if (dto.is_available === true) {
+      await this.ensureArtisanLocationForVisibility(userId);
+    }
 
     if (dto.subcategory_id) {
       const subcategory = await this.subcategoryRepository.findOne({
@@ -60863,7 +61982,7 @@ export class UsersService {
       })
       .catch(() => {});
 
-    return savedProfile;
+    return this.attachLocationSnapshot(savedProfile);
   }
 
   async getArtisanStats(userId: string): Promise<{
@@ -60889,14 +62008,19 @@ export class UsersService {
     if (!profile) {
       throw new NotFoundException('Profil client non trouvé.');
     }
-    return profile;
+    return this.attachLocationSnapshot(profile);
   }
 
   async updateClientProfile(
     userId: string,
     dto: UpdateClientProfileDto,
   ): Promise<ClientProfile> {
-    const profile = await this.getClientProfile(userId);
+    const profile = await this.clientProfileRepository.findOne({
+      where: { user_id: userId },
+    });
+    if (!profile) {
+      throw new NotFoundException('Profil client non trouvé.');
+    }
     Object.assign(profile, dto);
     const saved = await this.clientProfileRepository.save(profile);
     this.adminRealtimeService.emit('CLIENT_UPDATED', {
@@ -60911,7 +62035,7 @@ export class UsersService {
         updatedAt: new Date().toISOString(),
       })
       .catch(() => {});
-    return saved;
+    return this.attachLocationSnapshot(saved);
   }
 
   async listFavoriteArtisans(clientUserId: string): Promise<Record<string, any>[]> {
@@ -61061,17 +62185,59 @@ export class UsersService {
     userId: string,
     lat: number,
     lng: number,
+    city?: string,
+    commune?: string,
   ): Promise<void> {
-    await this.userRepository
-      .createQueryBuilder()
-      .update(User)
-      .set({
-        location: () => 'ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)',
-        location_updated_at: () => 'CURRENT_TIMESTAMP',
-      })
-      .where('id = :id', { id: userId })
-      .setParameters({ lat, lng })
-      .execute();
+    const normalizedCity = city?.trim();
+    const normalizedCommune = commune?.trim();
+
+    await this.userRepository.manager.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder()
+        .update(User)
+        .set({
+          location: () => 'ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)',
+          location_updated_at: () => 'CURRENT_TIMESTAMP',
+        })
+        .where('id = :id', { id: userId })
+        .setParameters({ lat, lng })
+        .execute();
+
+      const user = await manager.getRepository(User).findOne({
+        where: { id: userId },
+        select: ['id', 'role'],
+      });
+
+      if (
+        user?.role === UserRole.ARTISAN &&
+        (normalizedCity || normalizedCommune)
+      ) {
+        await manager.getRepository(ArtisanProfile).update(
+          { user_id: userId },
+          {
+            ...(normalizedCity ? { city: normalizedCity } : {}),
+            ...(normalizedCommune ? { commune: normalizedCommune } : {}),
+          },
+        );
+      }
+
+      if (
+        user?.role === UserRole.CLIENT &&
+        (normalizedCity || normalizedCommune)
+      ) {
+        await manager.getRepository(ClientProfile).update(
+          { user_id: userId },
+          {
+            ...(normalizedCity ? { city: normalizedCity } : {}),
+            ...(normalizedCommune ? { commune: normalizedCommune } : {}),
+          },
+        );
+      }
+    });
+
+    const snapshot = await this.getUserLocationSnapshot(userId);
+    const updatedAtIso =
+      snapshot.locationUpdatedAt?.toISOString() ?? new Date().toISOString();
 
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -61098,7 +62264,67 @@ export class UsersService {
           subcategory_id: artisanProfile.subcategory_id,
           is_subscription_active: artisanProfile.is_subscription_active,
         }).catch(() => {});
+
+        this.adminRealtimeService.emit('ARTISAN_UPDATED', {
+          userId,
+          artisanProfileId: artisanProfile.id,
+          categoryId: artisanProfile.category_id,
+          subcategoryId: artisanProfile.subcategory_id,
+          isAvailable: artisanProfile.is_available,
+          isSubscriptionActive: artisanProfile.is_subscription_active,
+          latitude: snapshot.latitude,
+          longitude: snapshot.longitude,
+          locationUpdatedAt: updatedAtIso,
+        });
+        this.chatGateway
+          .emitUserSyncEvent(userId, 'userProfileUpdated', {
+            role: 'ARTISAN',
+            updatedAt: updatedAtIso,
+            locationUpdatedAt: updatedAtIso,
+          })
+          .catch(() => {});
+        this.chatGateway
+          .emitGlobalSyncEvent('artisanProfileUpdated', {
+            artisanUserId: userId,
+            artisanProfileId: artisanProfile.id,
+            isAvailable: artisanProfile.is_available,
+            categoryId: artisanProfile.category_id,
+            subcategoryId: artisanProfile.subcategory_id,
+            isSubscriptionActive: artisanProfile.is_subscription_active,
+            latitude: snapshot.latitude,
+            longitude: snapshot.longitude,
+            locationUpdatedAt: updatedAtIso,
+            updatedAt: updatedAtIso,
+          })
+          .catch(() => {});
       }
+
+      return;
+    }
+
+    if (user?.role === UserRole.CLIENT) {
+      const clientProfile = await this.clientProfileRepository.findOne({
+        where: { user_id: userId },
+        loadEagerRelations: false,
+        select: ['id', 'user_id', 'city', 'commune'],
+      });
+
+      this.adminRealtimeService.emit('CLIENT_UPDATED', {
+        userId,
+        clientProfileId: clientProfile?.id ?? null,
+        city: clientProfile?.city ?? null,
+        commune: clientProfile?.commune ?? null,
+        latitude: snapshot.latitude,
+        longitude: snapshot.longitude,
+        locationUpdatedAt: updatedAtIso,
+      });
+      this.chatGateway
+        .emitUserSyncEvent(userId, 'userProfileUpdated', {
+          role: 'CLIENT',
+          updatedAt: updatedAtIso,
+          locationUpdatedAt: updatedAtIso,
+        })
+        .catch(() => {});
     }
   }
 
@@ -61143,7 +62369,7 @@ export class UpdateClientProfileDto {
 ================================================================================
 PATH: backend/src/modules/users/dto/update-location.dto.ts
 --------------------------------------------------------------------------------
-import { Max, Min, IsNumber } from 'class-validator';
+import { Max, Min, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateLocationDto {
@@ -61158,6 +62384,14 @@ export class UpdateLocationDto {
   @Min(-180)
   @Max(180)
   lng: number;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  commune?: string;
 }
 
 
@@ -62003,6 +63237,8 @@ PATH: backend/src/modules/payment-manual/events/payment.events.ts
 --------------------------------------------------------------------------------
 export const PAYMENT_MANUAL_NEW_PROOF = 'PAYMENT_MANUAL_NEW_PROOF';
 export const PAYMENT_MANUAL_UPDATED = 'PAYMENT_MANUAL_UPDATED';
+export const PAYMENT_MANUAL_TIMELINE_UPDATED =
+  'PAYMENT_MANUAL_TIMELINE_UPDATED';
 
 
 ================================================================================
@@ -62013,6 +63249,7 @@ import { AdminRealtimeService } from '../../../common/realtime/admin-realtime.se
 import { ChatGateway } from '../../chat/chat.gateway';
 import {
   PAYMENT_MANUAL_NEW_PROOF,
+  PAYMENT_MANUAL_TIMELINE_UPDATED,
   PAYMENT_MANUAL_UPDATED,
 } from './payment.events';
 
@@ -62050,6 +63287,10 @@ export class PaymentRealtimeService {
         updatedAt: payload.updatedAt,
       });
     }
+  }
+
+  async emitTimelineUpdated(payload: Record<string, unknown>): Promise<void> {
+    this.adminRealtimeService.emit(PAYMENT_MANUAL_TIMELINE_UPDATED, payload);
   }
 }
 
@@ -62128,6 +63369,10 @@ import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { PaymentManualStatus } from '../entities/payment-manual.entity';
 
 export class AdminFilterDto {
+  @IsOptional()
+  @IsIn(['ACTIVE', 'HISTORY', 'ALL'])
+  scope?: 'ACTIVE' | 'HISTORY' | 'ALL';
+
   @IsOptional()
   @IsIn([
     PaymentManualStatus.PENDING,
@@ -62211,6 +63456,10 @@ import { BusinessException } from '../../../common/exceptions/business.exception
 
 describe('PaymentManualService', () => {
   let service: PaymentManualService;
+  let subscriptionService: {
+    activateSubscriptionFromManualPayment: jest.Mock;
+    deactivateSubscriptionFromManualPayment: jest.Mock;
+  };
 
   const paymentManualRepository = {
     findOne: jest.fn(),
@@ -62248,6 +63497,11 @@ describe('PaymentManualService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    subscriptionService = {
+      activateSubscriptionFromManualPayment: jest.fn(),
+      deactivateSubscriptionFromManualPayment: jest.fn(),
+    };
+
     service = new PaymentManualService(
       paymentManualRepository,
       paymentProofRepository,
@@ -62259,9 +63513,7 @@ describe('PaymentManualService', () => {
         getSignedUrl: jest.fn(),
         streamFile: jest.fn(),
       } as any,
-      {
-        activateSubscriptionFromManualPayment: jest.fn(),
-      } as any,
+      subscriptionService as any,
       {
         create: jest.fn(),
       } as any,
@@ -62281,6 +63533,7 @@ describe('PaymentManualService', () => {
       {
         emitNewProof: jest.fn(),
         emitPaymentUpdated: jest.fn(),
+        emitTimelineUpdated: jest.fn(),
       } as any,
       {
         get: jest.fn((key: string) => {
@@ -62426,6 +63679,68 @@ describe('PaymentManualService', () => {
       service.initiatePayment('user-1', PaymentProviderManual.MOOV_MONEY),
     ).rejects.toBeInstanceOf(BusinessException);
   });
+
+  it('auto-replaces a rejected payment that had already been validated using the previous provider', async () => {
+    artisanProfileRepository.find = jest.fn().mockResolvedValue([
+      {
+        id: 'artisan-1',
+        user_id: 'user-1',
+        is_subscription_active: false,
+      },
+    ]);
+    subscriptionRepository.findOne = jest.fn().mockResolvedValue({
+      id: 'sub-1',
+      status: 'CANCELLED',
+      artisan_profile_id: 'artisan-1',
+      amount_fcfa: 5000,
+    });
+    subscriptionRepository.find = jest.fn().mockResolvedValue([]);
+    paymentManualRepository.findOne = jest
+      .fn()
+      .mockResolvedValueOnce({
+        id: 'pm-old-1',
+        subscription_id: 'sub-1',
+        transaction_id: 'TX-OLD-1',
+        provider: PaymentProviderManual.MTN_MOMO,
+        amount_fcfa: 5000,
+        status: PaymentManualStatus.REJECTED,
+        validated_at: new Date('2026-05-01T08:00:00.000Z'),
+        refund_required: false,
+        refund_done_at: null,
+        proofs: [],
+        timeline: [],
+      });
+    paymentManualRepository.count = jest.fn().mockResolvedValue(1);
+    paymentManualRepository.save = jest
+      .fn()
+      .mockImplementationOnce(async (payload) => ({
+        id: 'pm-new-1',
+        ...payload,
+      }))
+      .mockImplementationOnce(async (payload) => payload);
+
+    const payment = await service.initiatePayment(
+      'user-1',
+      PaymentProviderManual.WAVE,
+    );
+
+    expect(payment.provider).toBe(PaymentProviderManual.MTN_MOMO);
+    expect(payment.request_number).toBe(2);
+    expect(paymentManualRepository.save).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        provider: PaymentProviderManual.MTN_MOMO,
+        request_number: 2,
+      }),
+    );
+    expect(paymentManualRepository.save).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        id: 'pm-old-1',
+        replaced_by_transaction_id: payment.transaction_id,
+      }),
+    );
+  });
 });
 
 
@@ -62549,11 +63864,16 @@ import { PaymentRealtimeService } from '../events/payment-realtime.service';
 import { BusinessException } from '../../../common/exceptions/business.exception';
 
 interface AdminListFilters {
+  scope?: 'ACTIVE' | 'HISTORY' | 'ALL';
   status?: PaymentManualStatus | 'REFUND_REQUIRED';
   page?: number;
   limit?: number;
   sort?: 'asc' | 'desc' | string;
 }
+
+type AutoReplacementReason =
+  | 'REJECTED_AFTER_VALIDATION'
+  | 'EXPIRED_REFUND_CLEARED';
 
 const MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE = 3;
 const MANUAL_PAYMENT_COOLDOWN_BASE_HOURS = 5;
@@ -62779,11 +64099,7 @@ export class PaymentManualService implements OnModuleDestroy {
       relations: ['proofs'],
     });
 
-    if (
-      latestPayment?.status === PaymentManualStatus.EXPIRED &&
-      latestPayment.refund_required &&
-      !latestPayment.refund_done_at
-    ) {
+    if (latestPayment && this.hasPendingRefund(latestPayment)) {
       throw new BusinessException(
         'PAYMENT_MANUAL_REFUND_PENDING',
         'Un remboursement est en cours. Vous ne pouvez pas creer une nouvelle demande.',
@@ -62796,41 +64112,31 @@ export class PaymentManualService implements OnModuleDestroy {
       [
         PaymentManualStatus.PENDING,
         PaymentManualStatus.PENDING_ADMIN,
-        PaymentManualStatus.REJECTED,
       ].includes(latestPayment.status)
     ) {
       return latestPayment;
     }
 
-    const requestNumber =
-      (await this.paymentManualRepository.count({
-        where: { subscription_id: subscription.id },
-        withDeleted: true,
-      })) + 1;
+    if (
+      latestPayment?.status === PaymentManualStatus.REJECTED &&
+      !this.isRejectedAfterValidation(latestPayment)
+    ) {
+      return latestPayment;
+    }
 
-    const now = new Date();
-    const expiresAtAdmin = new Date(
-      now.getTime() + this.expiryHours * 60 * 60 * 1000,
-    );
+    if (latestPayment && this.isAutoReplacementCandidate(latestPayment)) {
+      return this.createReplacementPayment({
+        previousPayment: latestPayment,
+        subscription,
+        userId,
+      });
+    }
 
-    const payment = await this.paymentManualRepository.save(
-      this.paymentManualRepository.create({
-        subscription_id: subscription.id,
-        transaction_id: this.generateTransactionId(),
-        amount_fcfa: subscription.amount_fcfa || this.amountFcfa,
-        provider,
-        status: PaymentManualStatus.PENDING,
-        request_number: requestNumber,
-        expires_at_admin: expiresAtAdmin,
-        timeline: [
-          this.timelineEvent('PAYMENT_MANUAL_INITIATED', {
-            byUserId: userId,
-            provider,
-            amountFcfa: subscription.amount_fcfa || this.amountFcfa,
-          }),
-        ],
-      }),
-    );
+    const payment = await this.createPendingPayment({
+      subscription,
+      provider,
+      userId,
+    });
 
     this.analyticsService
       .logActivity({
@@ -63111,9 +64417,12 @@ export class PaymentManualService implements OnModuleDestroy {
     const proofCount = await this.paymentProofRepository.count({
       where: { payment_manual_id: payment.id, deleted_at: IsNull() },
     });
+    const rejectedAfterValidation = payment.validated_at != null;
     const shouldStartCooldown =
+      !rejectedAfterValidation &&
       proofCount > 0 &&
       proofCount % MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE === 0;
+    const correlationId = randomUUID();
 
     payment.status = PaymentManualStatus.REJECTED;
     payment.rejected_at = new Date();
@@ -63126,6 +64435,9 @@ export class PaymentManualService implements OnModuleDestroy {
       payment.cooldown_cycle = nextCooldownCycle;
       payment.cooldown_until = cooldownUntil;
     } else {
+      if (rejectedAfterValidation) {
+        payment.cooldown_cycle = 0;
+      }
       payment.cooldown_until = null;
     }
     payment.timeline = [
@@ -63133,11 +64445,46 @@ export class PaymentManualService implements OnModuleDestroy {
       this.timelineEvent('PAYMENT_MANUAL_REJECTED', {
         byAdminId: adminId,
         reason,
+        rejectedAfterValidation,
         cooldownCycle: payment.cooldown_cycle || 0,
         cooldownUntil: payment.cooldown_until?.toISOString?.() || null,
       }),
     ];
+
+    if (
+      rejectedAfterValidation &&
+      !this.hasPendingRefund(payment) &&
+      payment.subscription?.status === SubscriptionStatus.ACTIVE
+    ) {
+      payment.timeline.push(
+        this.timelineEvent('SUBSCRIPTION_DEACTIVATION_REQUESTED', {
+          byAdminId: adminId,
+          correlationId,
+          reason: 'TRANSACTION_REJECTED',
+        }),
+      );
+    }
     await this.paymentManualRepository.save(payment);
+
+    if (
+      rejectedAfterValidation &&
+      !this.hasPendingRefund(payment) &&
+      payment.subscription?.status === SubscriptionStatus.ACTIVE
+    ) {
+      await this.subscriptionService.deactivateSubscriptionFromManualPayment({
+        subscriptionId: payment.subscription_id,
+        paymentManualId: payment.id,
+        reason: 'TRANSACTION_REJECTED',
+        actorId: adminId,
+        correlationId,
+      });
+      await this.paymentRealtimeService.emitTimelineUpdated({
+        paymentId: payment.id,
+        transactionId: payment.transaction_id,
+        correlationId,
+        reason: 'TRANSACTION_REJECTED',
+      });
+    }
 
     const artisanUserId = payment.subscription?.artisan_profile?.user_id;
     if (artisanUserId) {
@@ -63198,6 +64545,12 @@ export class PaymentManualService implements OnModuleDestroy {
 
     if (!payment) {
       throw new NotFoundException('Paiement manuel introuvable.');
+    }
+
+    if (this.isHistoricalPayment(payment)) {
+      throw new BadRequestException(
+        'Les paiements historiques remplaces ou expires ne peuvent plus etre rouverts.',
+      );
     }
 
     const canReopenByStatus = [
@@ -63356,17 +64709,49 @@ export class PaymentManualService implements OnModuleDestroy {
       }
 
       for (const payment of stale) {
+        const correlationId = randomUUID();
+        const shouldDeactivateSubscription =
+          !this.hasPendingRefund(payment) &&
+          payment.subscription?.status === SubscriptionStatus.ACTIVE;
+        if (
+          shouldDeactivateSubscription
+        ) {
+          await this.subscriptionService.deactivateSubscriptionFromManualPayment(
+            {
+              subscriptionId: payment.subscription_id,
+              paymentManualId: payment.id,
+              reason: 'TRANSACTION_EXPIRED',
+              correlationId,
+            },
+          );
+        }
+
         payment.status = PaymentManualStatus.EXPIRED;
         payment.refund_required = true;
         payment.attempted_refund_count =
           (payment.attempted_refund_count || 0) + 1;
         payment.timeline = [
           ...(payment.timeline || []),
+          ...(shouldDeactivateSubscription
+            ? [
+                this.timelineEvent('SUBSCRIPTION_DEACTIVATION_REQUESTED', {
+                  correlationId,
+                  reason: 'TRANSACTION_EXPIRED',
+                }),
+              ]
+            : []),
           this.timelineEvent('PAYMENT_MANUAL_EXPIRED', {
             reason: 'PENDING_ADMIN_TIMEOUT',
+            correlationId,
           }),
         ];
         await this.paymentManualRepository.save(payment);
+        await this.paymentRealtimeService.emitTimelineUpdated({
+          paymentId: payment.id,
+          transactionId: payment.transaction_id,
+          correlationId,
+          reason: 'TRANSACTION_EXPIRED',
+        });
 
         const artisanUserId = payment.subscription?.artisan_profile?.user_id;
         if (artisanUserId) {
@@ -63481,6 +64866,20 @@ export class PaymentManualService implements OnModuleDestroy {
       .leftJoinAndSelect('s.artisan_profile', 'artisan')
       .leftJoinAndSelect('artisan.user', 'user')
       .where('pm.deleted_at IS NULL');
+
+    const archivedPredicate = `(pm.status = :expiredStatus OR (pm.status = :rejectedStatus AND pm.validated_at IS NOT NULL) OR pm.replaced_by_transaction_id IS NOT NULL)`;
+
+    if (filters.scope === 'ACTIVE') {
+      qb.andWhere(`NOT ${archivedPredicate}`, {
+        expiredStatus: PaymentManualStatus.EXPIRED,
+        rejectedStatus: PaymentManualStatus.REJECTED,
+      });
+    } else if (filters.scope === 'HISTORY') {
+      qb.andWhere(archivedPredicate, {
+        expiredStatus: PaymentManualStatus.EXPIRED,
+        rejectedStatus: PaymentManualStatus.REJECTED,
+      });
+    }
 
     if (filters.status) {
       if (filters.status === 'REFUND_REQUIRED') {
@@ -63835,6 +65234,223 @@ export class PaymentManualService implements OnModuleDestroy {
     }
 
     return payment.cooldown_until.getTime() > Date.now();
+  }
+
+  private hasPendingRefund(
+    payment: Pick<PaymentManual, 'refund_required' | 'refund_done_at'>,
+  ): boolean {
+    return payment.refund_required && !payment.refund_done_at;
+  }
+
+  private isRejectedAfterValidation(
+    payment: Pick<PaymentManual, 'status' | 'validated_at'>,
+  ): boolean {
+    return (
+      payment.status === PaymentManualStatus.REJECTED &&
+      payment.validated_at != null
+    );
+  }
+
+  private isHistoricalPayment(
+    payment: Pick<
+      PaymentManual,
+      'status' | 'validated_at' | 'replaced_by_transaction_id'
+    >,
+  ): boolean {
+    return (
+      payment.status === PaymentManualStatus.EXPIRED ||
+      this.isRejectedAfterValidation(payment) ||
+      Boolean(payment.replaced_by_transaction_id)
+    );
+  }
+
+  private isAutoReplacementCandidate(
+    payment: Pick<
+      PaymentManual,
+      'status' | 'validated_at' | 'refund_required' | 'refund_done_at'
+    >,
+  ): boolean {
+    if (this.hasPendingRefund(payment)) {
+      return false;
+    }
+
+    if (payment.status === PaymentManualStatus.EXPIRED) {
+      return true;
+    }
+
+    return this.isRejectedAfterValidation(payment);
+  }
+
+  private autoReplacementReason(
+    payment: Pick<PaymentManual, 'status' | 'validated_at'>,
+  ): AutoReplacementReason {
+    return this.isRejectedAfterValidation(payment)
+      ? 'REJECTED_AFTER_VALIDATION'
+      : 'EXPIRED_REFUND_CLEARED';
+  }
+
+  private async createPendingPayment(params: {
+    subscription: Pick<Subscription, 'id' | 'amount_fcfa'>;
+    provider: PaymentProviderManual;
+    userId: string;
+    reason?: AutoReplacementReason;
+    previousTransactionId?: string;
+    correlationId?: string;
+  }): Promise<PaymentManual> {
+    const requestNumber =
+      (await this.paymentManualRepository.count({
+        where: { subscription_id: params.subscription.id },
+        withDeleted: true,
+      })) + 1;
+
+    const now = new Date();
+    const expiresAtAdmin = new Date(
+      now.getTime() + this.expiryHours * 60 * 60 * 1000,
+    );
+    const timelineType = params.reason
+      ? 'PAYMENT_MANUAL_AUTO_REPLACEMENT_CREATED'
+      : 'PAYMENT_MANUAL_INITIATED';
+
+    const payload = this.paymentManualRepository.create({
+      subscription_id: params.subscription.id,
+      transaction_id: this.generateTransactionId(),
+      amount_fcfa: params.subscription.amount_fcfa || this.amountFcfa,
+      provider: params.provider,
+      status: PaymentManualStatus.PENDING,
+      request_number: requestNumber,
+      expires_at_admin: expiresAtAdmin,
+      timeline: [
+        this.timelineEvent(timelineType, {
+          byUserId: params.userId,
+          provider: params.provider,
+          amountFcfa: params.subscription.amount_fcfa || this.amountFcfa,
+          previousTransactionId: params.previousTransactionId || null,
+          reason: params.reason || null,
+          correlationId: params.correlationId || null,
+        }),
+      ],
+    });
+
+    try {
+      return await this.paymentManualRepository.save(payload);
+    } catch (error) {
+      const isUniqueViolation =
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: string }).code === '23505';
+      if (!isUniqueViolation) {
+        throw error;
+      }
+
+      const existingPending = await this.paymentManualRepository.findOne({
+        where: {
+          subscription_id: params.subscription.id,
+          status: PaymentManualStatus.PENDING,
+          deleted_at: IsNull(),
+        },
+        relations: ['proofs'],
+        order: {
+          created_at: 'DESC',
+        },
+      });
+      if (existingPending) {
+        return existingPending;
+      }
+
+      throw error;
+    }
+  }
+
+  private async createReplacementPayment(params: {
+    previousPayment: PaymentManual;
+    subscription: Pick<Subscription, 'id' | 'amount_fcfa'>;
+    userId: string;
+  }): Promise<PaymentManual> {
+    const reason = this.autoReplacementReason(params.previousPayment);
+    const correlationId = randomUUID();
+    const payment = await this.createPendingPayment({
+      subscription: params.subscription,
+      provider: params.previousPayment.provider,
+      userId: params.userId,
+      reason,
+      previousTransactionId: params.previousPayment.transaction_id,
+      correlationId,
+    });
+
+    params.previousPayment.replaced_by_transaction_id = payment.transaction_id;
+    params.previousPayment.timeline = [
+      ...(params.previousPayment.timeline || []),
+      this.timelineEvent('PAYMENT_MANUAL_AUTO_REPLACED', {
+        byUserId: params.userId,
+        previousTransactionId: params.previousPayment.transaction_id,
+        replacedByTransactionId: payment.transaction_id,
+        reason,
+        correlationId,
+      }),
+    ];
+    await this.paymentManualRepository.save(params.previousPayment);
+
+    const artisanProfile =
+      await this.resolvePreferredArtisanProfileForUser(params.userId);
+    const artisanUserId = artisanProfile.user_id;
+
+    if (artisanUserId) {
+      try {
+        await this.notificationsService.create({
+          userId: artisanUserId,
+          type: 'PAYMENT_MANUAL_AUTO_REPLACED',
+          title: 'Nouvelle demande creee automatiquement',
+          body: `Votre transaction ${params.previousPayment.transaction_id} a ete remplacee par ${payment.transaction_id}.`,
+          data: {
+            previousTransactionId: params.previousPayment.transaction_id,
+            transactionId: payment.transaction_id,
+            paymentId: payment.id,
+            reason,
+            correlationId,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Notification non bloquante ignoree pour transaction=${payment.transaction_id} type=PAYMENT_MANUAL_AUTO_REPLACED: ${error}`,
+        );
+      }
+    }
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'manual_payment_auto_replaced',
+        correlation_id: correlationId,
+        previousTransactionId: params.previousPayment.transaction_id,
+        replacementTransactionId: payment.transaction_id,
+        reason,
+      }),
+    );
+
+    await this.paymentRealtimeService.emitTimelineUpdated({
+      paymentId: params.previousPayment.id,
+      transactionId: params.previousPayment.transaction_id,
+      replacedByTransactionId: payment.transaction_id,
+      reason,
+      correlationId,
+    });
+
+    this.analyticsService
+      .logActivity({
+        actorId: params.userId,
+        action: 'PAYMENT_MANUAL_INITIATED',
+        targetId: payment.id,
+        metadata: {
+          transactionId: payment.transaction_id,
+          provider: payment.provider,
+          source: 'AUTO_REPLACEMENT',
+          previousTransactionId: params.previousPayment.transaction_id,
+          correlationId,
+        },
+      })
+      .catch(() => {});
+
+    return payment;
   }
 
   private formatRemainingDuration(target: Date): string {
@@ -64344,7 +65960,9 @@ export class PaymentManualController {
       request_number: payment.request_number,
       refund_required: payment.refund_required,
       refund_done_at: payment.refund_done_at,
+      validated_at: payment.validated_at,
       rejection_reason: payment.rejection_reason,
+      replaced_by_transaction_id: payment.replaced_by_transaction_id,
       cooldown_until: payment.cooldown_until,
       cooldown_cycle: payment.cooldown_cycle,
       proof_count: payment.proofs?.length || 0,
@@ -64685,6 +66303,7 @@ export enum PaymentManualStatus {
 @Index('IDX_PAYMENT_MANUAL_SUB_CREATED', ['subscription_id', 'created_at'])
 @Index('IDX_PAYMENT_MANUAL_SUB_REQUEST', ['subscription_id', 'request_number'])
 @Index('IDX_PAYMENT_MANUAL_STATUS_EXPIRES', ['status', 'expires_at_admin'])
+@Index('IDX_PAYMENT_MANUAL_REPLACED_BY', ['replaced_by_transaction_id'])
 @Entity('payment_manual')
 export class PaymentManual {
   @PrimaryGeneratedColumn('uuid')
@@ -64741,6 +66360,9 @@ export class PaymentManual {
 
   @Column({ type: 'int', default: 1 })
   request_number: number;
+
+  @Column({ type: 'varchar', nullable: true })
+  replaced_by_transaction_id: string | null;
 
   @Column({ default: false })
   refund_required: boolean;
@@ -66949,31 +68571,89 @@ export const PAYMENT_PROVIDERS = {
 ================================================================================
 PATH: backend/src/modules/subscription/subscription.service.spec.ts
 --------------------------------------------------------------------------------
+import { ArtisanProfile } from '../users/entities/artisan-profile.entity';
+import { Subscription } from './entities/subscription.entity';
+import { SubscriptionStatus } from './entities/subscription.entity';
 import { SubscriptionService } from './subscription.service';
 
-describe('SubscriptionService.getStatus', () => {
+describe('SubscriptionService', () => {
   function createService() {
     const artisanProfileRepository = {
       find: jest.fn(),
+      update: jest.fn(),
+      findOne: jest.fn(),
     };
 
     const subscriptionRepository = {
       find: jest.fn(),
+      findOne: jest.fn(),
+      update: jest.fn(),
+    };
+
+    const notificationsService = {
+      create: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const adminRealtimeService = {
+      emit: jest.fn(),
+    };
+
+    const chatGateway = {
+      emitUserSyncEvent: jest.fn(),
+      emitGlobalSyncEvent: jest.fn(),
+    };
+
+    const transactionSubscriptionRepository = {
+      findOne: jest.fn(),
+      update: jest.fn(),
+    };
+    const transactionArtisanProfileRepository = {
+      findOne: jest.fn(),
+      update: jest.fn(),
+    };
+    const dataSource = {
+      transaction: jest.fn(
+        async (
+          callback: (manager: {
+            getRepository: (entity: unknown) => unknown;
+          }) => Promise<unknown>,
+        ) =>
+          callback({
+            getRepository: (entity: unknown) => {
+              if (entity === Subscription) {
+                return transactionSubscriptionRepository;
+              }
+              if (entity === ArtisanProfile) {
+                return transactionArtisanProfileRepository;
+              }
+              throw new Error(`Unexpected repository lookup: ${String(entity)}`);
+            },
+          }),
+      ),
     };
 
     const service = new SubscriptionService(
       subscriptionRepository as any,
       {} as any,
       artisanProfileRepository as any,
+      dataSource as any,
       {} as any,
-      {} as any,
-      { logActivity: jest.fn() } as any,
-      { emit: jest.fn() } as any,
-      { create: jest.fn() } as any,
-      { emitUserSyncEvent: jest.fn(), emitGlobalSyncEvent: jest.fn() } as any,
+      { logActivity: jest.fn().mockResolvedValue(undefined) } as any,
+      adminRealtimeService as any,
+      notificationsService as any,
+      chatGateway as any,
     );
 
-    return { service, artisanProfileRepository, subscriptionRepository };
+    return {
+      service,
+      artisanProfileRepository,
+      subscriptionRepository,
+      transactionSubscriptionRepository,
+      transactionArtisanProfileRepository,
+      notificationsService,
+      adminRealtimeService,
+      chatGateway,
+    };
   }
 
   it('keeps duplicate artisan profiles readable by resolving the latest scoped subscription', async () => {
@@ -67054,6 +68734,64 @@ describe('SubscriptionService.getStatus', () => {
 
     expect(result.subscription).toBeNull();
     expect(result.is_active).toBe(true);
+  });
+
+  it('deactivates an active subscription after manual payment rejection', async () => {
+    const {
+      service,
+      transactionSubscriptionRepository,
+      transactionArtisanProfileRepository,
+      notificationsService,
+      adminRealtimeService,
+      chatGateway,
+    } = createService();
+
+    transactionSubscriptionRepository.findOne.mockResolvedValue({
+      id: 'sub-1',
+      artisan_profile_id: 'profile-1',
+      status: SubscriptionStatus.ACTIVE,
+    });
+    transactionArtisanProfileRepository.findOne.mockResolvedValue({
+      id: 'profile-1',
+      user_id: 'user-1',
+      is_subscription_active: true,
+    });
+
+    await service.deactivateSubscriptionFromManualPayment({
+      subscriptionId: 'sub-1',
+      paymentManualId: 'pm-1',
+      reason: 'TRANSACTION_REJECTED',
+      correlationId: 'corr-1',
+      actorId: 'admin-1',
+    });
+
+    expect(transactionSubscriptionRepository.update).toHaveBeenCalledWith(
+      'sub-1',
+      expect.objectContaining({
+        status: SubscriptionStatus.CANCELLED,
+      }),
+    );
+    expect(transactionArtisanProfileRepository.update).toHaveBeenCalledWith(
+      'profile-1',
+      expect.objectContaining({
+        is_subscription_active: false,
+      }),
+    );
+    expect(adminRealtimeService.emit).toHaveBeenCalledWith(
+      'SUBSCRIPTION_UPDATED',
+      expect.objectContaining({
+        subscriptionId: 'sub-1',
+        status: SubscriptionStatus.CANCELLED,
+        source: 'TRANSACTION_REJECTED',
+      }),
+    );
+    expect(notificationsService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        type: 'SUBSCRIPTION_UPDATED',
+      }),
+    );
+    expect(chatGateway.emitUserSyncEvent).toHaveBeenCalled();
   });
 });
 
@@ -67600,6 +69338,147 @@ export class SubscriptionService {
         metadata: {
           source: 'MANUAL_PAYMENT',
           paymentManualId,
+        },
+      })
+      .catch(() => {});
+  }
+
+  async deactivateSubscriptionFromManualPayment(params: {
+    subscriptionId: string;
+    paymentManualId: string;
+    reason: 'TRANSACTION_REJECTED' | 'TRANSACTION_EXPIRED';
+    actorId?: string;
+    correlationId: string;
+  }): Promise<void> {
+    const nextStatus =
+      params.reason === 'TRANSACTION_EXPIRED'
+        ? SubscriptionStatus.EXPIRED
+        : SubscriptionStatus.CANCELLED;
+
+    const payload = await this.dataSource.transaction(async (manager) => {
+      const subscriptionRepository = manager.getRepository(Subscription);
+      const artisanProfileRepository = manager.getRepository(ArtisanProfile);
+
+      const subscription = await subscriptionRepository.findOne({
+        where: { id: params.subscriptionId },
+      });
+      if (!subscription) {
+        throw new NotFoundException('Abonnement introuvable.');
+      }
+
+      const artisanProfile = await artisanProfileRepository.findOne({
+        where: { id: subscription.artisan_profile_id },
+        select: ['id', 'user_id', 'is_subscription_active'],
+      });
+
+      if (
+        subscription.status !== SubscriptionStatus.ACTIVE &&
+        !artisanProfile?.is_subscription_active
+      ) {
+        this.logger.log(
+          JSON.stringify({
+            event: 'manual_payment_subscription_deactivation_noop',
+            correlation_id: params.correlationId,
+            subscriptionId: subscription.id,
+            paymentManualId: params.paymentManualId,
+            reason: params.reason,
+          }),
+        );
+
+        return {
+          subscriptionId: subscription.id,
+          artisanProfileId: subscription.artisan_profile_id,
+          artisanUserId: artisanProfile?.user_id || null,
+          wasChanged: false,
+          nextStatus: subscription.status,
+        };
+      }
+
+      await subscriptionRepository.update(subscription.id, {
+        status: nextStatus,
+      });
+      await artisanProfileRepository.update(subscription.artisan_profile_id, {
+        is_subscription_active: false,
+      });
+
+      return {
+        subscriptionId: subscription.id,
+        artisanProfileId: subscription.artisan_profile_id,
+        artisanUserId: artisanProfile?.user_id || null,
+        wasChanged: true,
+        nextStatus,
+      };
+    });
+
+    if (!payload.wasChanged) {
+      return;
+    }
+
+    this.adminRealtimeService.emit('SUBSCRIPTION_UPDATED', {
+      subscriptionId: payload.subscriptionId,
+      artisanProfileId: payload.artisanProfileId,
+      status: payload.nextStatus,
+      source: params.reason,
+      paymentManualId: params.paymentManualId,
+      correlationId: params.correlationId,
+    });
+
+    if (payload.artisanUserId) {
+      try {
+        await this.notificationsService.create({
+          userId: payload.artisanUserId,
+          type: 'SUBSCRIPTION_UPDATED',
+          title:
+            params.reason === 'TRANSACTION_EXPIRED'
+              ? 'Abonnement desactive'
+              : 'Abonnement annule',
+          body:
+            params.reason === 'TRANSACTION_EXPIRED'
+              ? 'Votre abonnement a ete desactive car la transaction manuelle a expire.'
+              : 'Votre abonnement a ete annule apres rejet de la transaction manuelle.',
+          data: {
+            subscriptionId: payload.subscriptionId,
+            status: payload.nextStatus,
+            source: params.reason,
+            paymentManualId: params.paymentManualId,
+            correlationId: params.correlationId,
+          },
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Notification non bloquante ignoree pour user=${payload.artisanUserId} type=SUBSCRIPTION_UPDATED: ${error}`,
+        );
+      }
+
+      this.emitSubscriptionRealtimeEvent({
+        artisanUserId: payload.artisanUserId,
+        artisanProfileId: payload.artisanProfileId,
+        subscriptionId: payload.subscriptionId,
+        subscriptionStatus: payload.nextStatus,
+        isSubscriptionActive: false,
+      }).catch(() => {});
+    }
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'manual_payment_subscription_deactivated',
+        correlation_id: params.correlationId,
+        subscriptionId: payload.subscriptionId,
+        paymentManualId: params.paymentManualId,
+        reason: params.reason,
+        status: payload.nextStatus,
+      }),
+    );
+
+    this.analyticsService
+      .logActivity({
+        actorId: params.actorId || 'system',
+        action: 'SUBSCRIPTION_UPDATED',
+        targetId: payload.subscriptionId,
+        metadata: {
+          source: params.reason,
+          paymentManualId: params.paymentManualId,
+          correlationId: params.correlationId,
         },
       })
       .catch(() => {});
@@ -79783,6 +81662,8 @@ PATH: admin-web/src/messages/fr.json
     "sender_number": "Numéro expéditeur",
     "refund": "Remboursement",
     "cooldown": "Blocage temporaire",
+    "active_tab": "Actifs",
+    "history_tab": "Historique",
     "submitted_at": "Soumis le",
     "status": "Statut",
     "actions": "Actions",
@@ -79807,6 +81688,11 @@ PATH: admin-web/src/messages/fr.json
     "cooldown_active_until": "Actif jusqu'au {date}",
     "cooldown_elapsed_on": "Terminé le {date}",
     "cooldown_none": "Aucun",
+    "validated_at": "Validé le",
+    "rejected_at": "Rejeté le",
+    "replaced_by_label": "Remplacé par",
+    "replaced_by": "Remplacé par {id}",
+    "archived_notice": "Paiement historique : lecture seule sauf remboursement/suppression.",
     "timeline": "Historique",
     "proofs": "Preuves",
     "no_proof_submitted": "Aucune preuve soumise pour le moment",
@@ -80015,6 +81901,8 @@ PATH: admin-web/src/messages/en.json
     "sender_number": "Sender number",
     "refund": "Refund",
     "cooldown": "Temporary block",
+    "active_tab": "Active",
+    "history_tab": "History",
     "submitted_at": "Submitted at",
     "status": "Status",
     "actions": "Actions",
@@ -80039,6 +81927,11 @@ PATH: admin-web/src/messages/en.json
     "cooldown_active_until": "Active until {date}",
     "cooldown_elapsed_on": "Ended on {date}",
     "cooldown_none": "None",
+    "validated_at": "Validated on",
+    "rejected_at": "Rejected on",
+    "replaced_by_label": "Replaced by",
+    "replaced_by": "Replaced by {id}",
+    "archived_notice": "Historical payment: read-only except refund/delete.",
     "timeline": "Timeline",
     "proofs": "Proofs",
     "no_proof_submitted": "No proof submitted yet",
@@ -80516,10 +82409,14 @@ export async function getManualPayments(
   page = 1,
   limit = 20,
   status?: string,
+  scope?: "ACTIVE" | "HISTORY" | "ALL",
 ): Promise<PaginatedResult<PaymentManualRecord>> {
   const params: Record<string, string | number> = { page, limit };
   if (status && status !== "all") {
     params.status = status;
+  }
+  if (scope && scope !== "ALL") {
+    params.scope = scope;
   }
   const { data } = await api.get("/admin/payment-proofs", { params });
   return toPaginatedResult<PaymentManualRecord>(data, page, limit);
@@ -81356,6 +83253,14 @@ function parseImageRef(
   return { bucket: parts[0], objectKey: parts.slice(1).join("/") };
 }
 
+function isArchivedRecord(record: PaymentManualRecord): boolean {
+  return (
+    record.status === "EXPIRED" ||
+    (record.status === "REJECTED" && Boolean(record.validated_at)) ||
+    Boolean(record.replaced_by_transaction_id)
+  );
+}
+
 export default function PaymentManualPage() {
   const { t, locale } = useTranslations("payment_manual");
   const { t: tApp } = useTranslations("app");
@@ -81364,16 +83269,8 @@ export default function PaymentManualPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
-  const [status, setStatus] = useState(() => {
-    if (typeof window === "undefined") {
-      return "PENDING_ADMIN";
-    }
-
-    return (
-      new URLSearchParams(window.location.search).get("status") ??
-      "PENDING_ADMIN"
-    );
-  });
+  const [status, setStatus] = useState("all");
+  const [scope, setScope] = useState<"ACTIVE" | "HISTORY">("ACTIVE");
 
   const [selected, setSelected] = useState<PaymentManualRecord | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -81389,7 +83286,7 @@ export default function PaymentManualPage() {
     async (showLoading = true) => {
       if (showLoading) setLoading(true);
       try {
-        const result = await getManualPayments(page, PAGE_SIZE, status);
+        const result = await getManualPayments(page, PAGE_SIZE, status, scope);
         setItems(result.data);
         setTotal(result.total);
       } catch {
@@ -81398,7 +83295,7 @@ export default function PaymentManualPage() {
         if (showLoading) setLoading(false);
       }
     },
-    [page, status, tApp],
+    [page, scope, status, tApp],
   );
 
   useEffect(() => {
@@ -81413,7 +83310,11 @@ export default function PaymentManualPage() {
       void load(false);
     },
     {
-      eventTypes: ["PAYMENT_MANUAL_NEW_PROOF", "PAYMENT_MANUAL_UPDATED"],
+      eventTypes: [
+        "PAYMENT_MANUAL_NEW_PROOF",
+        "PAYMENT_MANUAL_UPDATED",
+        "PAYMENT_MANUAL_TIMELINE_UPDATED",
+      ],
     },
   );
 
@@ -81546,6 +83447,8 @@ export default function PaymentManualPage() {
     [t],
   );
 
+  const selectedIsArchived = selected ? isArchivedRecord(selected) : false;
+
   return (
     <div className="space-y-6">
       <div>
@@ -81554,6 +83457,26 @@ export default function PaymentManualPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap">
+        <div className="flex gap-2">
+          <Button
+            variant={scope === "ACTIVE" ? "default" : "outline"}
+            onClick={() => {
+              setScope("ACTIVE");
+              setPage(1);
+            }}
+          >
+            {t("active_tab")}
+          </Button>
+          <Button
+            variant={scope === "HISTORY" ? "default" : "outline"}
+            onClick={() => {
+              setScope("HISTORY");
+              setPage(1);
+            }}
+          >
+            {t("history_tab")}
+          </Button>
+        </div>
         <Select
           value={status}
           onValueChange={(value) => {
@@ -81622,7 +83545,17 @@ export default function PaymentManualPage() {
                     {items.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">
-                          {item.transaction_id}
+                          <div className="space-y-1">
+                            <div>{item.transaction_id}</div>
+                            {item.replaced_by_transaction_id && (
+                              <Badge variant="outline">
+                                {t("replaced_by").replace(
+                                  "{id}",
+                                  item.replaced_by_transaction_id,
+                                )}
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {item.subscription?.artisan_profile?.user
@@ -81742,6 +83675,11 @@ export default function PaymentManualPage() {
                 <p>
                   <strong>{t("status")}:</strong> {selected.status}
                 </p>
+                {selectedIsArchived && (
+                  <div className="rounded border border-orange-400/40 bg-orange-500/10 p-2 text-orange-700 text-xs">
+                    {t("archived_notice")}
+                  </div>
+                )}
                 <p>
                   <strong>{t("amount")}:</strong> {selected.amount_fcfa} FCFA
                 </p>
@@ -81752,6 +83690,22 @@ export default function PaymentManualPage() {
                 <p>
                   <strong>{t("request_number")}:</strong>{" "}
                   {selected.request_number || "—"}
+                </p>
+                <p>
+                  <strong>{t("validated_at")}:</strong>{" "}
+                  {selected.validated_at
+                    ? formatDateTime(selected.validated_at, locale)
+                    : "—"}
+                </p>
+                <p>
+                  <strong>{t("rejected_at")}:</strong>{" "}
+                  {selected.rejected_at
+                    ? formatDateTime(selected.rejected_at, locale)
+                    : "—"}
+                </p>
+                <p>
+                  <strong>{t("replaced_by_label")}:</strong>{" "}
+                  {selected.replaced_by_transaction_id || "—"}
                 </p>
                 <p>
                   <strong>{t("sender_number")}:</strong>{" "}
@@ -81795,6 +83749,7 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
+                selectedIsArchived ||
                 selected.status !== "PENDING_ADMIN" ||
                 (selected.proofs?.length ?? 0) === 0
               }
@@ -81807,6 +83762,7 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
+                selectedIsArchived ||
                 selected.status !== "PENDING_ADMIN" ||
                 (selected.proofs?.length ?? 0) === 0
               }
@@ -81826,10 +83782,10 @@ export default function PaymentManualPage() {
               disabled={
                 actionLoading ||
                 !selected ||
+                selectedIsArchived ||
                 !(
-                  ["REJECTED", "EXPIRED", "COMPLETED"].includes(
-                    selected.status,
-                  ) || Boolean(selected.refund_done_at)
+                  ["REJECTED", "COMPLETED"].includes(selected.status) ||
+                  Boolean(selected.refund_done_at)
                 )
               }
             >
@@ -85838,6 +87794,7 @@ export interface PaymentManualRecord {
   rejected_at?: string | null;
   rejection_reason?: string | null;
   request_number: number;
+  replaced_by_transaction_id?: string | null;
   refund_required: boolean;
   refund_done_at?: string | null;
   cooldown_until?: string | null;
@@ -86365,585 +88322,453 @@ PATH: admin-web/.next.root-owned-backup/dev/logs/next-development.log
 ================================================================================
 PATH: ajout_ref_fiers_Art_pay_methode/payment_system_map.txt
 --------------------------------------------------------------------------------
-﻿Système de paiement manuel — Wave / Mobile Money (CI)
-Modélisation MVP · Côte d'Ivoire uniquement · prêt à évoluer
+Systeme de paiement manuel - Wave / Mobile Money (CI)
+Carte metier synchronisee avec le code actuel du projet Fiers Artisans
 
-Vue d’ensemble
-    • Mode actif : Paiement manuel (Wave / Orange Money / MTN / Moov) 
-    • Statut Wave API : configuré mais indisponible (fallback manuel) 
-    • Abonnement : 5 000 FCFA / mois 
-    • Validation : 100% humaine (admin) 
-    • Délai de traitement : 48 à 72 heures (admin) 
+Source de verite detaillee :
+- DOCUMENTATION_PAIEMENT_MANUEL.md
 
-1. Flow complet
-Étapes du système
-1. Création de transaction
-    • Le client clique sur “Payer par Mobile Money” 
-    • Génération d’un identifiant : 
-        ◦ TX-XXXXXXXX 
-    • Statut initial : PENDING 
-    • Affichage : 
-        ◦ numéro destinataire 
-        ◦ montant exact (5 000 FCFA) 
-        ◦ instructions 
+1. Vue d'ensemble
+- Mode actif : paiement manuel Mobile Money
+- Wave API : conservee, mais le flux principal reste manuel
+- Abonnement : 5 000 FCFA / mois
+- Validation : humaine cote admin
+- Temps reel : mobile + admin
 
-2. Paiement externe
-    • Le client effectue le paiement hors système : 
-        ◦ Wave 
-        ◦ Orange Money 
-        ◦ MTN Money 
-        ◦ Moov Money 
-    • Le client doit : 
-        ◦ conserver la capture d’écran 
-        ◦ noter le numéro expéditeur 
+2. Cycle nominal
+1. L'artisan initie une demande
+   - creation ou reutilisation d'une transaction
+   - statut initial : PENDING
+2. L'artisan paie hors systeme
+   - Wave manuel / Orange Money / MTN / Moov
+3. L'artisan envoie une preuve
+   - capture ecran
+   - numero expediteur
+4. Le backend valide la preuve
+   - transaction existante
+   - hash image unique
+   - format image autorise
+   - sender_number coherent
+5. L'admin traite
+   - validation
+   - rejet
+   - reouverture limitee
+6. Le backend synchronise
+   - transaction
+   - abonnement
+   - notifications
+   - temps reel
 
-3. Soumission de preuve
-Champs obligatoires :
-    • capture écran du paiement 
-    • numéro expéditeur 
-    • (optionnel) heure déclarée du paiement 
-Traitement backend :
-    • hash SHA-256 de l’image 
-    • stockage metadata 
-    • timestamp submitted_at 
+3. Etats persistants
+- PENDING
+- PENDING_ADMIN
+- COMPLETED
+- REJECTED
+- EXPIRED
 
-4. Vérifications automatiques
-Contrôles :
-    • transaction existante 
-    • statut = PENDING 
-    • image unique (anti-doublon) 
-    • sender_number valide 
-    • transaction non expirée 
-Résultat :
-    • OK → en attente admin 
-    • KO → rejet automatique 
+4. Etats metier derives
+- REJECTED simple
+  - validated_at = null
+  - meme transaction reutilisee
+- REJECTED apres validation
+  - validated_at != null
+  - abonnement desactive si encore actif
+  - transaction historique
+  - prochaine demande = auto-remplacement
+- EXPIRED remboursement en attente
+  - refund_required = true
+  - refund_done_at = null
+  - toute nouvelle demande bloquee
+- EXPIRED remboursement traite
+  - refund_done_at != null
+  - nouvelle transaction creee automatiquement a la reprise
 
-5. Validation admin
-L’admin vérifie :
-    • montant réel 
-    • cohérence preuve 
-    • numéro expéditeur 
-    • metadata image 
-Décision :
-    • valider 
-    • rejeter (avec motif) 
+5. Regles critiques
+- Toujours raisonner sur la derniere transaction reelle
+- Ne jamais creer un doublon si une transaction PENDING ou PENDING_ADMIN existe deja
+- Un REJECTED simple reste sur la meme transaction
+- Le cooldown ne cree jamais un nouvel ID
+- Un REJECTED apres validation precedente cree un nouveau cycle
+- Un EXPIRED non rembourse bloque strictement toute nouvelle demande
+- request_number augmente de facon monotone par abonnement
+- Toute transaction remplacee conserve la trace vers le nouvel ID
 
-6. Résultats finaux
-A. COMPLETED
-    • abonnement activé 
-    • notification client 
-B. REJECTED
-    • motif affiché 
-    • retour à l’étape paiement 
-C. EXPIRED
-    • délai dépassé (48–72h) 
-    • statut EXPIRED 
-    • flag REFUND_REQUIRED 
+6. Rejet et cooldown
+- Le cooldown concerne le rejet simple avant validation precedente
+- Base : 5 heures
+- Progression : 5h -> 10h -> 20h -> ...
+- Pendant le cooldown :
+  - sender bloque
+  - upload image bloque
+  - soumission bloquee
+  - meme transaction conservee
 
-Règle critique montant
-    • Montant attendu : 5 000 FCFA nets reçus 
-    • Si frais opérateur réduisent le montant : 
-        ◦ rejet automatique 
-        ◦ remboursement manuel 
-    • Message obligatoire avant paiement 
+7. Expiration et remboursement
+- Le cron expire les PENDING_ADMIN hors delai
+- Si abonnement actif :
+  - desactivation avec raison TRANSACTION_EXPIRED
+- Puis :
+  - status = EXPIRED
+  - refund_required = true
+  - notification artisan
+  - evenement temps reel admin
+- Tant que refund_done_at est null :
+  - aucune nouvelle demande autorisee
 
-2. Structure des données
-Transaction
-Champ
-Type
-Description
-id
-string
-TX-XXXXXXXX
-user_id
-uuid
-utilisateur
-amount
-integer
-montant FCFA
-status
-enum
-PENDING / COMPLETED / REJECTED / EXPIRED
-created_at
-timestamp
-création
-expires_at_admin
-timestamp
-deadline admin
-validated_at
-timestamp
-validation
-rejected_at
-timestamp
-rejet
-rejection_reason
-string
-motif
-refund_required
-boolean
-remboursement requis
+8. Auto-remplacement
+Cas eligibles :
+- REJECTED apres validation
+- EXPIRED avec remboursement deja traite
 
-Payment Proof
-Champ
-Type
-Description
-transaction_id
-string
-lien transaction
-image_url
-string
-capture
-image_hash
-string
-SHA-256
-sender_number
-string
-numéro expéditeur
-submitted_at
-timestamp
-date soumission
-declared_payment_time
-timestamp
-optionnel
-file_type
-string
-jpg/png/webp
-file_size_kb
-int
-taille
-resolution
-string
-ex: 1080x1920
-exif_capture_date
-timestamp
-EXIF
-exif_modified_date
-timestamp
-EXIF
-exif_device
-string
-appareil
-ai_suspicion_score
-float
-0–1
-upload_attempt
-int
-max 3
+Effets :
+- creation d'une nouvelle transaction PENDING
+- reutilisation du previous_provider
+- incrementation de request_number
+- lien historique via replaced_by_transaction_id
+- notification PAYMENT_MANUAL_AUTO_REPLACED
+- evenement timeline + temps reel admin
 
-Transitions de statut
-    • PENDING → COMPLETED (validation admin) 
-    • PENDING → REJECTED (fraude / erreur) 
-    • PENDING → EXPIRED (timeout admin) 
-Règle :
-    • COMPLETED et REJECTED sont définitifs 
+9. UI artisan
+- PENDING :
+  - sender actif
+  - bouton principal bloque
+- PENDING_ADMIN :
+  - sender bloque
+  - preuve bloquee
+- REJECTED simple :
+  - motif visible
+  - meme ID
+  - cooldown visible si actif
+- EXPIRED remboursement en attente :
+  - bloc rouge dedie
+  - bouton WhatsApp
+  - nouvelle demande interdite
+- REJECTED apres validation / EXPIRED rembourse :
+  - bascule automatique vers un nouvel ID
 
-3. Frontend client
-Page paiement
-Bloc Wave API
-    • déjà existant 
-    • désactivé visuellement 
-    • affiché comme “indisponible” 
+10. UI admin
+- Scope ACTIVE :
+  - PENDING
+  - PENDING_ADMIN
+  - COMPLETED
+  - REJECTED simples non archives
+- Scope HISTORY :
+  - EXPIRED
+  - REJECTED apres validation
+  - transactions remplacees
+- Actions interdites sur historique :
+  - validate
+  - reject
+  - reopen
 
-Bloc paiement manuel
-    • visible sous Wave 
-    • méthodes : 
-        ◦ Wave manuel 
-        ◦ Orange Money 
-        ◦ MTN Money 
-        ◦ Moov Money 
+11. Donnees importantes
+payment_manual
+- transaction_id
+- subscription_id
+- provider
+- status
+- validated_at
+- rejected_at
+- rejection_reason
+- request_number
+- replaced_by_transaction_id
+- refund_required
+- refund_done_at
+- cooldown_until
+- cooldown_cycle
 
-Informations obligatoires
-Avant paiement :
-    • numéro destinataire 
-    • montant exact : 5 000 FCFA 
-    • frais opérateur inclus 
-    • délai 48–72h 
-    • preuve obligatoire 
+payment_proofs
+- image_hash unique
+- sender_number
+- uploaded_at / submitted_at
+- upload_attempt
+- metadata antifraude
 
-Formulaire preuve
-Champs :
-    • numéro expéditeur (obligatoire) 
-    • capture écran (obligatoire) 
-    • heure paiement (optionnel) 
-Contraintes :
-    • format image : jpg / png / webp 
-    • max 3 tentatives 
-
-États client
-PENDING
-“Votre preuve est en cours de vérification (48–72h)”
-COMPLETED
-“Paiement validé, abonnement actif”
-REJECTED
-“Paiement rejeté + motif”
-EXPIRED
-“Délai dépassé, remboursement en cours”
-
-Message de sécurité
-    • utiliser numéro officiel uniquement 
-    • envoyer 5 000 FCFA nets 
-    • conserver capture 
-    • noter numéro expéditeur 
-    • remboursement si erreur montant 
-    • délai max 72h 
-
-4. Dashboard admin
-Tableau principal
-    • transaction_id 
-    • user (nom + email) 
-    • amount 
-    • created_at 
-    • submitted_at 
-    • sender_number 
-    • status 
-    • temps écoulé 
-    • actions (valider / rejeter) 
-
-Détails image
-    • aperçu image 
-    • type fichier 
-    • taille 
-    • résolution 
-    • EXIF (date, device) 
-    • SHA-256 hash 
-    • score IA suspicion 
-    • détection doublons 
-
-Filtres
-    • PENDING 
-    • COMPLETED 
-    • REJECTED 
-    • EXPIRED 
-    • REFUND_REQUIRED 
-
-Remboursement
-Si EXPIRED + preuve soumise :
-    • afficher sender_number 
-    • afficher montant 
-    • action manuelle de remboursement 
-
-5. Sécurité
-Anti-fraude
-    • SHA-256 unique par image 
-    • sender_number obligatoire 
-    • max 3 uploads 
-    • expiration automatique 48–72h 
-    • validation humaine obligatoire 
-    • extraction EXIF 
-    • détection doublons 
-
-Limites système
-    • pas de validation automatique Wave (phase 1) 
-    • pas de bypass admin 
-    • pas de modification après décision finale 
-
-6. Règles métier
-Règles fondamentales
-    1. 1 transaction = 1 paiement 
-    2. aucune validation sans preuve 
-    3. statuts finaux immuables 
-    4. EXPIRED + preuve = remboursement obligatoire 
-    5. montant exact obligatoire (5 000 FCFA nets) 
-    6. sender_number obligatoire 
-    7. pas de contrainte côté client pour soumission 
-    8. système limité à la Côte d’Ivoire uniquement 
-
-Roadmap
-Phase 1 — actuelle
-    • système manuel complet 
-    • validation admin 
-Phase 2
-    • intégration API Wave 
-    • vérification automatique hybride 
-Phase 3
-    • automatisation partielle 
-    • détection intelligente des paiements
-
+12. Invariant de securite
+- un abonnement actif doit rester coherent avec une transaction valide
+- une transaction historique ne doit plus etre mutable
+- aucune demande nouvelle si remboursement en attente
+- aucune duplication de transaction PENDING pour un meme abonnement
 
 
 ================================================================================
 PATH: ajout_ref_fiers_Art_pay_methode/payment_system_enriched_map.txt
 --------------------------------------------------------------------------------
-Système de paiement manuel — Wave / Mobile Money (Côte d’Ivoire)
-Map technique complète · Architecture produit + backend + UX + anti-fraude
+Systeme de paiement manuel - Wave / Mobile Money (Cote d'Ivoire)
+Map technique enrichie synchronisee avec le code actuel
 
-1. Vue d’ensemble
-Architecture
-    • Wave API (optionnel / futur) : désactivé temporairement 
-    • Paiement manuel (actif) : principal système 
-    • Les deux coexistent sur la page paiement 
-Objectif
-Valider des paiements mobiles (Wave / Orange Money / MTN / Moov) via :
-    • preuve utilisateur (capture écran) 
-    • validation admin 
-    • contrôle anti-fraude automatisé 
+Document de reference detaille :
+- DOCUMENTATION_PAIEMENT_MANUEL.md
 
-2. Paramètres système
-Élément
-Valeur
-Abonnement
-5 000 FCFA / mois
-Délai admin
-48 à 72 heures
-Upload max preuve
-3 tentatives
-Hash image
-SHA-256 (déduplication globale)
+1. Vue systeme
+- Flux principal : paiement manuel Mobile Money
+- Operateurs : Wave manuel, Orange Money, MTN, Moov
+- Montant : 5 000 FCFA
+- Validation : admin
+- Stockage : PostgreSQL + MinIO + notifications Mongo/temps reel
 
-3. Flow complet A → Z
-1. Création transaction
-POST /api/transactions
-{
-  "transaction_id": "TX-A4F2C9B1",
-  "status": "PENDING",
-  "created_at": "2025-07-01T10:00:00Z",
-  "expires_at_admin": "2025-07-03T10:00:00Z"
-}
+2. Couches impliquees
+Backend
+- payment-manual.entity.ts
+- payment-proof.entity.ts
+- payment-manual.service.ts
+- payment-manual.controller.ts
+- payment-manual-admin.controller.ts
+- payment-realtime.service.ts
+- subscription.service.ts
 
-2. Paiement hors système
-L’utilisateur :
-    • ouvre Wave / Orange Money / MTN / Moov 
-    • envoie 5 000 FCFA + frais opérateur 
-    • conserve la capture écran 
+Mobile Flutter
+- manual_payment_model.dart
+- payment_manual_provider.dart
+- manual_payment_page.dart
+- payment_status_widget.dart
 
-3. Soumission preuve
-POST /api/transactions/:id/proof
-Content-Type: multipart/form-data
-{
-  "image": "[file]",
-  "sender_number": "0701234567",
-  "declared_time": "10h15"
-}
-Retour :
-{
-  "proof_id": "PRF-XXX",
-  "submitted_at": "2025-07-01T10:35:00Z",
-  "image_hash": "a3f9..."
-}
+Admin Web
+- payments/manual/page-client.tsx
+- src/lib/api.ts
+- src/types/index.ts
 
-4. Validations backend (bloquantes)
-    1. Transaction existe 
-    2. Status = PENDING 
-    3. Non expirée 
-    4. Hash image unique 
-    5. sender_number valide (CI) 
-Si OK → stockage preuve
+3. Etats persistants
+- PENDING
+- PENDING_ADMIN
+- COMPLETED
+- REJECTED
+- EXPIRED
 
-5. Traitement admin
-L’admin voit :
-    • image 
-    • sender_number 
-    • timestamp 
-    • métadonnées EXIF 
-Actions :
-    • Valider 
-    • Rejeter (avec motif) 
+4. Etats derives
+- REJECTED simple
+  - status = REJECTED
+  - validated_at = null
+- REJECTED apres validation
+  - status = REJECTED
+  - validated_at != null
+- EXPIRED remboursement en attente
+  - status = EXPIRED
+  - refund_required = true
+  - refund_done_at = null
+- EXPIRED remboursement traite
+  - status = EXPIRED
+  - refund_done_at != null
+- Historique archive
+  - EXPIRED
+  - REJECTED apres validation
+  - replaced_by_transaction_id != null
 
-6A. Validation
-PATCH /api/transactions/:id/validate
-{
-  "status": "COMPLETED",
-  "validated_at": "2025-07-01T14:20:00Z"
-}
-→ abonnement activé
+5. Initiation
+Entree :
+- POST /api/v1/payments/manual/initiate
 
-6B. Rejet
-PATCH /api/transactions/:id/reject
-{
-  "reason": "Montant insuffisant"
-}
-→ status = REJECTED
+Resolution :
+1. verifier provider disponible
+2. resoudre l'artisan et l'abonnement
+3. bloquer si abonnement deja actif
+4. charger la derniere transaction reelle
+5. appliquer la matrice suivante
 
-6C. Expiration automatique
-Cron (chaque heure) :
-UPDATE transactions
-SET status = 'EXPIRED',
-    refund_required = true
-WHERE status = 'PENDING'
-AND expires_at_admin < NOW()
-AND proof EXISTS;
+Matrice :
+- PENDING
+  - retourner la meme transaction
+- PENDING_ADMIN
+  - retourner la meme transaction
+- REJECTED simple
+  - retourner la meme transaction
+- remboursement en attente
+  - erreur PAYMENT_MANUAL_REFUND_PENDING
+- REJECTED apres validation
+  - creer un nouvel ID automatiquement
+- EXPIRED remboursement traite
+  - creer un nouvel ID automatiquement
+- aucun historique coherent
+  - creation normale
 
-4. Scénarios métiers
-✔ Cas normal
-    • paiement correct 
-    • validation admin 
-    • statut COMPLETED 
+6. Auto-remplacement
+Declencheurs :
+- REJECTED apres validation
+- EXPIRED avec remboursement deja traite
 
-⚠ Frais opérateur oubliés
-    • montant reçu < 5000 FCFA 
-    • rejet admin 
-    • nouvelle tentative client 
+Effets backend :
+- nouvelle transaction PENDING
+- previous_provider reutilise
+- request_number = precedent + 1
+- ancienne transaction.replaced_by_transaction_id = nouvel ID
+- timeline : PAYMENT_MANUAL_AUTO_REPLACED
+- notification : PAYMENT_MANUAL_AUTO_REPLACED
+- SSE admin : PAYMENT_MANUAL_TIMELINE_UPDATED
 
-⚠ Admin absent
-    • dépasse 72h 
-    • passage EXPIRED 
-    • remboursement manuel 
+7. Soumission de preuve
+Entree :
+- POST /api/v1/payments/manual/:transactionId/submit-proof
 
-🚨 Réutilisation image
-    • hash déjà existant 
-    • rejet automatique immédiat 
+Controles :
+- ownership
+- status autorise : PENDING ou REJECTED simple
+- cooldown_until absent ou depasse
+- hash image non duplique
+- fichier image valide
+- sender_number valide
 
-🚨 Image modifiée / suspecte
-    • EXIF Photoshop / Canva 
-    • score IA élevé 
-    • rejet ou flag admin 
+Effets :
+- creation payment_proof
+- status -> PENDING_ADMIN
+- reset cooldown actif
 
-⚠ 3 tentatives upload dépassées
-    • blocage 429 
-    • support requis 
+8. Validation admin
+Entree :
+- PATCH /api/v1/admin/payment-proofs/:id/validate
 
-5. Frontend (structure logique)
-États paiement
-    • PENDING → en attente validation 
-    • COMPLETED → abonnement actif 
-    • REJECTED → paiement refusé 
-    • EXPIRED → délai dépassé 
+Effets :
+- status -> COMPLETED
+- validated_at renseigne
+- activation abonnement
+- notification PAYMENT_MANUAL_VALIDATED
+- push / temps reel
 
-Champs formulaire preuve
-    • image (jpg/png/webp) 
-    • sender_number (obligatoire) 
-    • declared_time (optionnel) 
-    • compteur tentative (max 3) 
+9. Rejet admin
+Entree :
+- PATCH /api/v1/admin/payment-proofs/:id/reject
 
-Règles UI
-    • Wave API visible mais désactivé 
-    • paiement manuel actif 
-    • confirmation obligatoire avant envoi 
+Branche A - rejet simple
+- transaction en cycle normal
+- validated_at = null
+- status -> REJECTED
+- motif enregistre
+- cooldown progressif tous les 3 rejets du cycle
+- notification :
+  - PAYMENT_MANUAL_REJECTED
+  - ou PAYMENT_MANUAL_COOLDOWN
 
-6. Backend API
-Endpoint
-Rôle
-POST /transactions
-créer transaction
-GET /transactions/:id
-statut client
-POST /transactions/:id/proof
-upload preuve
-PATCH /validate
-validation admin
-PATCH /reject
-rejet admin
-GET /admin/transactions
-dashboard
-PATCH /refund-done
-remboursement
+Branche B - rejet apres validation
+- validated_at != null
+- status -> REJECTED
+- abonnement desactive si actif
+- raison : TRANSACTION_REJECTED
+- aucun cooldown pour reutiliser la meme transaction
+- transaction archivee
+- prochain chargement / initiate = auto-remplacement
 
-7. Modèle de données
-transactions
-    • id (TX-XXXX) 
-    • user_id 
-    • amount = 5000 
-    • status (PENDING / COMPLETED / REJECTED / EXPIRED) 
-    • created_at 
-    • expires_at_admin 
-    • validated_at 
-    • rejected_at 
-    • rejection_reason 
-    • refund_required 
-    • refund_done 
+10. Cooldown
+Champs :
+- cooldown_until
+- cooldown_cycle
 
-payment_proofs
-    • id 
-    • transaction_id 
-    • image_url 
-    • image_hash (UNIQUE) 
-    • sender_number 
-    • submitted_at 
-    • declared_payment_time 
-    • upload_attempt 
-    • file_type 
-    • file_size 
-    • exif_data 
-    • ai_suspicion_score 
-    • is_suspicious 
+Formule :
+- 5h * 2^(cycle - 1)
 
-8. Sécurité
-Bloquants
-    • hash image doublon → rejet immédiat 
-    • sender_number invalide → 400 
-    • fichier > 5MB → 413 
-    • format interdit → 415 
-    • 3 uploads max → 429 
+Exemples :
+- cycle 1 = 5h
+- cycle 2 = 10h
+- cycle 3 = 20h
 
-Anti-fraude
-    • détection EXIF Photoshop 
-    • score IA suspicion 
-    • comparaison dates EXIF vs transaction 
-    • tracking global hash image 
+Effets UX :
+- sender bloque
+- upload bloque
+- bouton de soumission bloque
+- temps restant affiche en temps reel
 
-Accès
-    • client → uniquement ses transactions 
-    • admin → endpoints protégés 
-    • images → URL signée (expiration 1h) 
+11. Expiration
+Traitement cron :
+- selection des PENDING_ADMIN hors delai
 
-9. Gestion des erreurs
-Code
-Cas
-Message
-400
-numéro invalide
-numéro CI requis
-403
-accès interdit
-non autorisé
-404
-transaction inconnue
-introuvable
-409
-déjà traité
-transaction déjà validée
-413
-fichier trop lourd
-max 5MB
-415
-format invalide
-JPG/PNG/WEBP uniquement
-429
-trop de tentatives
-support requis
-500
-erreur serveur
-retry sécurisé
+Effets :
+1. si abonnement encore actif :
+   - deactivateSubscription(reason = TRANSACTION_EXPIRED)
+2. status -> EXPIRED
+3. refund_required = true
+4. attempted_refund_count + 1
+5. timeline PAYMENT_MANUAL_EXPIRED
+6. notification PAYMENT_MANUAL_EXPIRED
+7. SSE admin timeline updated
 
-10. Cron système
--- toutes les heures
-SELECT * FROM transactions
-WHERE status = 'PENDING'
-AND expires_at_admin < NOW();
-Actions :
-    • EXPIRED 
-    • refund_required = true 
-    • notification admin 
+12. Remboursement
+Entree :
+- PATCH /api/v1/admin/payment-proofs/:id/mark-refunded
 
-11. Dashboard admin
-Colonnes
-    • TX ID 
-    • Client 
-    • Montant 
-    • Proof 
-    • sender_number 
-    • Status 
-    • délai restant 
-    • actions 
+Effets :
+- refund_done_at renseigne
+- refund_required = false
+- timeline REFUND_PROCESSED
+- notification REFUND_PROCESSED
+- transaction reste historique
+- prochain initiate peut auto-remplacer si EXPIRED
 
-Onglets transaction
-    • résumé 
-    • preuve 
-    • métadonnées EXIF 
-    • remboursement 
+13. Reouverture admin
+Autorisee uniquement pour les transactions encore coherentes avec un cycle actif.
 
-12. Règles critiques
-    • image_hash = UNIQUE global 
-    • une seule preuve active par transaction 
-    • aucune modification après statut final 
-    • remboursement obligatoire si EXPIRED + preuve 
-    • logs admin obligatoires 
+Interdit sur :
+- EXPIRED
+- REJECTED apres validation
+- transaction deja remplacee
 
-13. Points techniques importants
-    • EXIF peut être absent (iOS) 
-    • hash calculé AVANT stockage S3 
-    • polling recommandé (30s) ou SSE 
-    • sender_number doit rester brut (format exact) 
-    • Wave API conservée mais inactive
+14. Filtres admin
+GET /api/v1/admin/payment-proofs
 
+Scopes :
+- ACTIVE
+- HISTORY
+- ALL
+
+ACTIVE :
+- PENDING
+- PENDING_ADMIN
+- COMPLETED
+- REJECTED simples non archives
+
+HISTORY :
+- EXPIRED
+- REJECTED apres validation
+- transactions remplacees
+
+15. Traçabilite
+Champs :
+- request_number
+- replaced_by_transaction_id
+- validated_at
+- rejected_at
+- refund_required
+- refund_done_at
+- cooldown_until
+- cooldown_cycle
+
+Evenements :
+- PAYMENT_MANUAL_NEW_PROOF
+- PAYMENT_MANUAL_UPDATED
+- PAYMENT_MANUAL_TIMELINE_UPDATED
+- PAYMENT_MANUAL_AUTO_REPLACED
+- REFUND_PROCESSED
+
+16. Scenarios de reference
+Scenario A - nominal
+- PENDING -> PENDING_ADMIN -> COMPLETED
+
+Scenario B - rejet simple
+- PENDING -> PENDING_ADMIN -> REJECTED
+- meme transaction reutilisee
+
+Scenario C - cooldown
+- 3 rejets du cycle
+- cooldown_until renseigne
+- attente avant nouvel upload
+
+Scenario D - expiration
+- PENDING_ADMIN -> EXPIRED
+- abonnement desactive
+- remboursement requis
+
+Scenario E - expiration remboursee
+- EXPIRED + refund_done_at
+- nouvelle transaction auto-creee
+
+Scenario F - rejet apres validation
+- transaction deja validee par le passe
+- nouvelle preuve rejetee
+- abonnement desactive
+- transaction archivee
+- nouveau TX ID cree au prochain chargement/initiate
+
+17. Garde-fous de coherence
+- ne jamais raisonner sur une vieille transaction au lieu de la derniere
+- ne jamais creer de doublon PENDING pour un meme abonnement
+- ne jamais ouvrir une nouvelle demande pendant un remboursement en attente
+- ne jamais modifier une transaction historique archivee
+- toujours reutiliser previous_provider lors d'un auto-remplacement
 

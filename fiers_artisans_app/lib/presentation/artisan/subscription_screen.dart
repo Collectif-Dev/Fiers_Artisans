@@ -20,10 +20,17 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   void initState() {
     super.initState();
     Future.microtask(() async {
-      await ref.read(subscriptionProvider.notifier).loadStatus();
-      await ref
-          .read(paymentManualProvider.notifier)
-          .loadCurrentTransaction(refresh: true);
+      final subState = ref.read(subscriptionProvider);
+      final manualState = ref.read(paymentManualProvider);
+
+      if (!subState.hasLoaded && subState.subscription == null) {
+        await ref.read(subscriptionProvider.notifier).loadStatus();
+      }
+      if (manualState.currentTransaction == null) {
+        await ref
+            .read(paymentManualProvider.notifier)
+            .loadCurrentTransaction(refresh: true);
+      }
     });
   }
 
@@ -154,7 +161,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        if (subState.error != null)
+                        if (subState.error != null && subscription == null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Text(

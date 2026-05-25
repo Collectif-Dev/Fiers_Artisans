@@ -1,4 +1,4 @@
-import { Max, Min, IsNumber } from 'class-validator';
+import { Max, Min, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateLocationDto {
@@ -13,4 +13,12 @@ export class UpdateLocationDto {
   @Min(-180)
   @Max(180)
   lng: number;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  commune?: string;
 }

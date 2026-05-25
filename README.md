@@ -8,6 +8,10 @@ la stack active, les scripts utiles, et les documents de gouvernance.
 
 - `README.md`
   Vue d'ensemble du projet, architecture actuelle, commandes, tests, scripts
+- `DOCUMENTATION_PAIEMENT_MANUEL.md`
+  Runbook metier du paiement manuel : statuts, remboursement, cooldown, auto-remplacement, admin actif/historique
+- `DOCUMENTATION_LOCALISATION.md`
+  Runbook geolocalisation : GPS obligatoire, visibilite map, synchronisation des profils et mise a jour de localisation
 - `DOCUMENTATION_DOCKER.md`
   Runbook Docker complet : stack, nettoyage, volumes, diagnostic Portainer
 - `SECURITY_ARCHITECTURE.md`
@@ -22,10 +26,11 @@ la stack active, les scripts utiles, et les documents de gouvernance.
 Fiers Artisans est une marketplace multi-clients centree sur la mise en relation entre clients et artisans verifies, avec :
 
 - recherche geolocalisee
+- GPS mobile comme source de verite pour ville, commune et visibilite map
 - verification documentaire artisan
 - abonnement artisan
 - paiement Wave
-- paiement manuel avec preuve de paiement
+- paiement manuel avec preuve de paiement, cooldown, remboursement et auto-remplacement trace
 - chat temps reel
 - notifications
 - panel d'administration
@@ -164,9 +169,10 @@ cd fiers_artisans_app && flutter pub get && flutter run
 - Authentification et verification telephone
 - Verification artisan et moderation admin
 - Abonnement artisan via Wave
-- Paiement manuel avec upload de preuve et validation admin
+- Paiement manuel stateful avec upload de preuve, cooldown, remboursement, desactivation d'abonnement et auto-remplacement
 - Chat temps reel et notifications
 - Recherche geolocalisee et navigation profil artisan
+- Synchronisation temps reel des positions artisan/client
 
 ## Repartition des donnees
 
@@ -232,6 +238,14 @@ Recherche et catalogue :
 - `GET /api/v1/categories`
 - `GET /api/v1/categories/:slug`
 
+Profils et localisation :
+
+- `GET /api/v1/artisan/profile`
+- `PUT /api/v1/artisan/profile`
+- `GET /api/v1/client/profile`
+- `PUT /api/v1/client/profile`
+- `PUT /api/v1/users/location` pour synchroniser GPS et, si fournis, `ville/commune`
+
 Verification, portfolio, reviews :
 
 - `POST /api/v1/verification/submit`
@@ -261,7 +275,7 @@ Paiement manuel artisan :
 
 Paiement manuel admin :
 
-- `GET /api/v1/admin/payment-proofs`
+- `GET /api/v1/admin/payment-proofs` avec filtres `status` et `scope=ACTIVE|HISTORY|ALL`
 - `GET /api/v1/admin/payment-proofs/:id/details`
 - `PATCH /api/v1/admin/payment-proofs/:id/validate`
 - `PATCH /api/v1/admin/payment-proofs/:id/reject`
@@ -329,6 +343,14 @@ npm run test:e2e
 - Client : recherche, detail artisan, reviews
 - Artisan : dashboard, portfolio, verification, subscription, paiement manuel
 - Shared : chat, notifications, settings
+
+### Regles localisation mobile
+
+- `ville` et `commune` ne sont plus des champs de saisie libre a l'inscription
+- le bouton `Utiliser ma position` est obligatoire pour inscrire un `CLIENT` ou un `ARTISAN`
+- si le GPS est absent ou si la ville/commune ne peuvent pas etre resolues automatiquement, l'inscription est bloquee avec message utilisateur
+- `Parametres > Mettre a jour ma localisation` permet de resynchroniser GPS, ville et commune apres inscription
+- un artisan sans coordonnees GPS stockees ne peut pas devenir visible sur la map, meme s'il est disponible ou abonne actif
 
 ### Configuration reseau Flutter
 
@@ -602,6 +624,7 @@ Regles resumes :
 ## Politique documentaire
 
 - `README.md` doit rester la vue operationnelle actuelle du projet
+- `DOCUMENTATION_PAIEMENT_MANUEL.md` porte le detail metier complet du flux manuel
 - `DOCUMENTATION_DOCKER.md` porte le detail infra et nettoyage
 - `SECURITY_ARCHITECTURE.md` porte la politique de preservation
 - `RÈGLES GLOBALES.md` porte le pipeline IA

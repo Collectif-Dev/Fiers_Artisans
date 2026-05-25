@@ -1,294 +1,167 @@
-﻿Système de paiement manuel — Wave / Mobile Money (CI)
-Modélisation MVP · Côte d'Ivoire uniquement · prêt à évoluer
+Systeme de paiement manuel - Wave / Mobile Money (CI)
+Carte metier synchronisee avec le code actuel du projet Fiers Artisans
 
-Vue d’ensemble
-    • Mode actif : Paiement manuel (Wave / Orange Money / MTN / Moov) 
-    • Statut Wave API : configuré mais indisponible (fallback manuel) 
-    • Abonnement : 5 000 FCFA / mois 
-    • Validation : 100% humaine (admin) 
-    • Délai de traitement : 48 à 72 heures (admin) 
+Source de verite detaillee :
+- DOCUMENTATION_PAIEMENT_MANUEL.md
 
-1. Flow complet
-Étapes du système
-1. Création de transaction
-    • Le client clique sur “Payer par Mobile Money” 
-    • Génération d’un identifiant : 
-        ◦ TX-XXXXXXXX 
-    • Statut initial : PENDING 
-    • Affichage : 
-        ◦ numéro destinataire 
-        ◦ montant exact (5 000 FCFA) 
-        ◦ instructions 
+1. Vue d'ensemble
+- Mode actif : paiement manuel Mobile Money
+- Wave API : conservee, mais le flux principal reste manuel
+- Abonnement : 5 000 FCFA / mois
+- Validation : humaine cote admin
+- Temps reel : mobile + admin
 
-2. Paiement externe
-    • Le client effectue le paiement hors système : 
-        ◦ Wave 
-        ◦ Orange Money 
-        ◦ MTN Money 
-        ◦ Moov Money 
-    • Le client doit : 
-        ◦ conserver la capture d’écran 
-        ◦ noter le numéro expéditeur 
+2. Cycle nominal
+1. L'artisan initie une demande
+   - creation ou reutilisation d'une transaction
+   - statut initial : PENDING
+2. L'artisan paie hors systeme
+   - Wave manuel / Orange Money / MTN / Moov
+3. L'artisan envoie une preuve
+   - capture ecran
+   - numero expediteur
+4. Le backend valide la preuve
+   - transaction existante
+   - hash image unique
+   - format image autorise
+   - sender_number coherent
+5. L'admin traite
+   - validation
+   - rejet
+   - reouverture limitee
+6. Le backend synchronise
+   - transaction
+   - abonnement
+   - notifications
+   - temps reel
 
-3. Soumission de preuve
-Champs obligatoires :
-    • capture écran du paiement 
-    • numéro expéditeur 
-    • (optionnel) heure déclarée du paiement 
-Traitement backend :
-    • hash SHA-256 de l’image 
-    • stockage metadata 
-    • timestamp submitted_at 
+3. Etats persistants
+- PENDING
+- PENDING_ADMIN
+- COMPLETED
+- REJECTED
+- EXPIRED
 
-4. Vérifications automatiques
-Contrôles :
-    • transaction existante 
-    • statut = PENDING 
-    • image unique (anti-doublon) 
-    • sender_number valide 
-    • transaction non expirée 
-Résultat :
-    • OK → en attente admin 
-    • KO → rejet automatique 
+4. Etats metier derives
+- REJECTED simple
+  - validated_at = null
+  - meme transaction reutilisee
+- REJECTED apres validation
+  - validated_at != null
+  - abonnement desactive si encore actif
+  - transaction historique
+  - prochaine demande = auto-remplacement
+- EXPIRED remboursement en attente
+  - refund_required = true
+  - refund_done_at = null
+  - toute nouvelle demande bloquee
+- EXPIRED remboursement traite
+  - refund_done_at != null
+  - nouvelle transaction creee automatiquement a la reprise
 
-5. Validation admin
-L’admin vérifie :
-    • montant réel 
-    • cohérence preuve 
-    • numéro expéditeur 
-    • metadata image 
-Décision :
-    • valider 
-    • rejeter (avec motif) 
+5. Regles critiques
+- Toujours raisonner sur la derniere transaction reelle
+- Ne jamais creer un doublon si une transaction PENDING ou PENDING_ADMIN existe deja
+- Un REJECTED simple reste sur la meme transaction
+- Le cooldown ne cree jamais un nouvel ID
+- Un REJECTED apres validation precedente cree un nouveau cycle
+- Un EXPIRED non rembourse bloque strictement toute nouvelle demande
+- request_number augmente de facon monotone par abonnement
+- Toute transaction remplacee conserve la trace vers le nouvel ID
 
-6. Résultats finaux
-A. COMPLETED
-    • abonnement activé 
-    • notification client 
-B. REJECTED
-    • motif affiché 
-    • retour à l’étape paiement 
-C. EXPIRED
-    • délai dépassé (48–72h) 
-    • statut EXPIRED 
-    • flag REFUND_REQUIRED 
+6. Rejet et cooldown
+- Le cooldown concerne le rejet simple avant validation precedente
+- Base : 5 heures
+- Progression : 5h -> 10h -> 20h -> ...
+- Pendant le cooldown :
+  - sender bloque
+  - upload image bloque
+  - soumission bloquee
+  - meme transaction conservee
 
-Règle critique montant
-    • Montant attendu : 5 000 FCFA nets reçus 
-    • Si frais opérateur réduisent le montant : 
-        ◦ rejet automatique 
-        ◦ remboursement manuel 
-    • Message obligatoire avant paiement 
+7. Expiration et remboursement
+- Le cron expire les PENDING_ADMIN hors delai
+- Si abonnement actif :
+  - desactivation avec raison TRANSACTION_EXPIRED
+- Puis :
+  - status = EXPIRED
+  - refund_required = true
+  - notification artisan
+  - evenement temps reel admin
+- Tant que refund_done_at est null :
+  - aucune nouvelle demande autorisee
 
-2. Structure des données
-Transaction
-Champ
-Type
-Description
-id
-string
-TX-XXXXXXXX
-user_id
-uuid
-utilisateur
-amount
-integer
-montant FCFA
-status
-enum
-PENDING / COMPLETED / REJECTED / EXPIRED
-created_at
-timestamp
-création
-expires_at_admin
-timestamp
-deadline admin
-validated_at
-timestamp
-validation
-rejected_at
-timestamp
-rejet
-rejection_reason
-string
-motif
-refund_required
-boolean
-remboursement requis
+8. Auto-remplacement
+Cas eligibles :
+- REJECTED apres validation
+- EXPIRED avec remboursement deja traite
 
-Payment Proof
-Champ
-Type
-Description
-transaction_id
-string
-lien transaction
-image_url
-string
-capture
-image_hash
-string
-SHA-256
-sender_number
-string
-numéro expéditeur
-submitted_at
-timestamp
-date soumission
-declared_payment_time
-timestamp
-optionnel
-file_type
-string
-jpg/png/webp
-file_size_kb
-int
-taille
-resolution
-string
-ex: 1080x1920
-exif_capture_date
-timestamp
-EXIF
-exif_modified_date
-timestamp
-EXIF
-exif_device
-string
-appareil
-ai_suspicion_score
-float
-0–1
-upload_attempt
-int
-max 3
+Effets :
+- creation d'une nouvelle transaction PENDING
+- reutilisation du previous_provider
+- incrementation de request_number
+- lien historique via replaced_by_transaction_id
+- notification PAYMENT_MANUAL_AUTO_REPLACED
+- evenement timeline + temps reel admin
 
-Transitions de statut
-    • PENDING → COMPLETED (validation admin) 
-    • PENDING → REJECTED (fraude / erreur) 
-    • PENDING → EXPIRED (timeout admin) 
-Règle :
-    • COMPLETED et REJECTED sont définitifs 
+9. UI artisan
+- PENDING :
+  - sender actif
+  - bouton principal bloque
+- PENDING_ADMIN :
+  - sender bloque
+  - preuve bloquee
+- REJECTED simple :
+  - motif visible
+  - meme ID
+  - cooldown visible si actif
+- EXPIRED remboursement en attente :
+  - bloc rouge dedie
+  - bouton WhatsApp
+  - nouvelle demande interdite
+- REJECTED apres validation / EXPIRED rembourse :
+  - bascule automatique vers un nouvel ID
 
-3. Frontend client
-Page paiement
-Bloc Wave API
-    • déjà existant 
-    • désactivé visuellement 
-    • affiché comme “indisponible” 
+10. UI admin
+- Scope ACTIVE :
+  - PENDING
+  - PENDING_ADMIN
+  - COMPLETED
+  - REJECTED simples non archives
+- Scope HISTORY :
+  - EXPIRED
+  - REJECTED apres validation
+  - transactions remplacees
+- Actions interdites sur historique :
+  - validate
+  - reject
+  - reopen
 
-Bloc paiement manuel
-    • visible sous Wave 
-    • méthodes : 
-        ◦ Wave manuel 
-        ◦ Orange Money 
-        ◦ MTN Money 
-        ◦ Moov Money 
+11. Donnees importantes
+payment_manual
+- transaction_id
+- subscription_id
+- provider
+- status
+- validated_at
+- rejected_at
+- rejection_reason
+- request_number
+- replaced_by_transaction_id
+- refund_required
+- refund_done_at
+- cooldown_until
+- cooldown_cycle
 
-Informations obligatoires
-Avant paiement :
-    • numéro destinataire 
-    • montant exact : 5 000 FCFA 
-    • frais opérateur inclus 
-    • délai 48–72h 
-    • preuve obligatoire 
+payment_proofs
+- image_hash unique
+- sender_number
+- uploaded_at / submitted_at
+- upload_attempt
+- metadata antifraude
 
-Formulaire preuve
-Champs :
-    • numéro expéditeur (obligatoire) 
-    • capture écran (obligatoire) 
-    • heure paiement (optionnel) 
-Contraintes :
-    • format image : jpg / png / webp 
-    • max 3 tentatives 
-
-États client
-PENDING
-“Votre preuve est en cours de vérification (48–72h)”
-COMPLETED
-“Paiement validé, abonnement actif”
-REJECTED
-“Paiement rejeté + motif”
-EXPIRED
-“Délai dépassé, remboursement en cours”
-
-Message de sécurité
-    • utiliser numéro officiel uniquement 
-    • envoyer 5 000 FCFA nets 
-    • conserver capture 
-    • noter numéro expéditeur 
-    • remboursement si erreur montant 
-    • délai max 72h 
-
-4. Dashboard admin
-Tableau principal
-    • transaction_id 
-    • user (nom + email) 
-    • amount 
-    • created_at 
-    • submitted_at 
-    • sender_number 
-    • status 
-    • temps écoulé 
-    • actions (valider / rejeter) 
-
-Détails image
-    • aperçu image 
-    • type fichier 
-    • taille 
-    • résolution 
-    • EXIF (date, device) 
-    • SHA-256 hash 
-    • score IA suspicion 
-    • détection doublons 
-
-Filtres
-    • PENDING 
-    • COMPLETED 
-    • REJECTED 
-    • EXPIRED 
-    • REFUND_REQUIRED 
-
-Remboursement
-Si EXPIRED + preuve soumise :
-    • afficher sender_number 
-    • afficher montant 
-    • action manuelle de remboursement 
-
-5. Sécurité
-Anti-fraude
-    • SHA-256 unique par image 
-    • sender_number obligatoire 
-    • max 3 uploads 
-    • expiration automatique 48–72h 
-    • validation humaine obligatoire 
-    • extraction EXIF 
-    • détection doublons 
-
-Limites système
-    • pas de validation automatique Wave (phase 1) 
-    • pas de bypass admin 
-    • pas de modification après décision finale 
-
-6. Règles métier
-Règles fondamentales
-    1. 1 transaction = 1 paiement 
-    2. aucune validation sans preuve 
-    3. statuts finaux immuables 
-    4. EXPIRED + preuve = remboursement obligatoire 
-    5. montant exact obligatoire (5 000 FCFA nets) 
-    6. sender_number obligatoire 
-    7. pas de contrainte côté client pour soumission 
-    8. système limité à la Côte d’Ivoire uniquement 
-
-Roadmap
-Phase 1 — actuelle
-    • système manuel complet 
-    • validation admin 
-Phase 2
-    • intégration API Wave 
-    • vérification automatique hybride 
-Phase 3
-    • automatisation partielle 
-    • détection intelligente des paiements
-
+12. Invariant de securite
+- un abonnement actif doit rester coherent avec une transaction valide
+- une transaction historique ne doit plus etre mutable
+- aucune demande nouvelle si remboursement en attente
+- aucune duplication de transaction PENDING pour un meme abonnement

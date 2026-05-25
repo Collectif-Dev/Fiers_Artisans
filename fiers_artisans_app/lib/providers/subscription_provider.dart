@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/errors/error_mapper.dart';
 import '../data/models/subscription_model.dart';
 import '../data/repositories/subscription_repository.dart';
 import 'session_scope_provider.dart';
@@ -50,6 +52,7 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
   final PushNotificationService? _push;
   StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
   late final void Function() _onSubscriptionUpdate;
+  Future<void>? _inFlightLoadStatus;
 
   SubscriptionNotifier({
     SubscriptionRepositoryContract? repository,
@@ -90,12 +93,20 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
     super.dispose();
   }
 
-  Future<void> loadStatus() async {
-    state = state.copyWith(
-      isLoading: true,
-      clearSubscription: true,
-      error: null,
-    );
+  Future<void> loadStatus() {
+    if (_inFlightLoadStatus != null) {
+      return _inFlightLoadStatus!;
+    }
+
+    final future = _loadStatusInternal();
+    _inFlightLoadStatus = future;
+    return future.whenComplete(() {
+      _inFlightLoadStatus = null;
+    });
+  }
+
+  Future<void> _loadStatusInternal() async {
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final sub = await _repo.getStatus();
       state = state.copyWith(
@@ -109,7 +120,7 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
         clearSubscription: true,
         isLoading: false,
         hasLoaded: true,
-        error: e.toString(),
+        error: e is DioException ? mapException(e).userMessage : e.toString(),
       );
     }
   }
@@ -121,7 +132,10 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
       state = state.copyWith(isLoading: false);
       return data;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: e is DioException ? mapException(e).userMessage : e.toString(),
+      );
       return null;
     }
   }

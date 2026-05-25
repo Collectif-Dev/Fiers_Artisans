@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/theme.dart';
+import '../../core/errors/error_mapper.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/utils/formatters.dart';
@@ -39,6 +40,8 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
   bool _hasReviewMetricsData = false;
   bool _isStatsBackgroundRefreshing = false;
   bool _isReviewMetricsBackgroundRefreshing = false;
+  bool _isLocationMissing = false;
+  bool _isStatusCardsHydrating = true;
   double _avgRating = 0;
   int _totalReviews = 0;
   int _experienceYears = 0;
@@ -63,20 +66,26 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
 
-    _loadAvailability();
     Future.microtask(() {
-      ref.read(subscriptionProvider.notifier).loadStatus();
-      ref
-          .read(paymentManualProvider.notifier)
-          .loadCurrentTransaction(refresh: true);
-      ref.read(chatProvider.notifier).loadConversations();
-      ref.read(verificationProvider.notifier).refresh();
-      _syncAvailabilityFromBackend();
-      _syncLocationToBackend();
-      _loadArtisanStats();
-      _loadReviewMetrics();
+      _bootstrapDashboard();
     });
     _realtimeSub = _realtime.domainEvents.listen(_handleRealtimeEvent);
+  }
+
+  Future<void> _bootstrapDashboard() async {
+    await _loadAvailability();
+    await Future.wait([
+      ref.read(subscriptionProvider.notifier).loadStatus(),
+      ref.read(paymentManualProvider.notifier).loadCurrentTransaction(refresh: true),
+      ref.read(chatProvider.notifier).loadConversations(),
+      ref.read(verificationProvider.notifier).refresh(),
+      _syncAvailabilityFromBackend(),
+      _syncLocationToBackend(),
+      _loadArtisanStats(),
+    ]);
+    await _loadReviewMetrics();
+    if (!mounted) return;
+    setState(() => _isStatusCardsHydrating = false);
   }
 
   Future<void> _loadAvailability() async {
@@ -95,13 +104,13 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       if (val) {
         _syncLocationToBackend();
       }
-    } catch (_) {
+    } catch (error) {
       await prefs.setBool('artisan_available', previous);
       if (mounted) {
         setState(() => _isAvailable = previous);
         AppSnackBar.show(
           context,
-          message: 'dashboard.artisan.sync_unavailable'.tr(),
+          message: mapException(error).userMessage,
         );
       }
     }
@@ -202,6 +211,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
         _avgRating = profile.averageRating;
         _totalReviews = profile.totalReviews;
         _experienceYears = profile.experienceYears;
+        _isLocationMissing = profile.latitude == null || profile.longitude == null;
         _categoryName = categoryName;
         _subcategoryName = subcategoryName;
         _businessName = businessName;
@@ -315,13 +325,18 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     final hasManualInProgress =
         manualTx != null && (manualTx.isPending || manualTx.isPendingAdmin);
     final hasManualRejected = manualTx?.isRejected == true;
+    final showLocationAlert =
+        !_isStatusCardsHydrating &&
+        _isLocationMissing &&
+        (_isAvailable || isSubActive);
 
     final showSubscriptionAlert =
-        hasManualInProgress ||
-        hasManualRejected ||
-        (subState.hasLoaded &&
-            subState.error == null &&
-            (!isSubActive || subDaysRemaining <= 4));
+        !_isStatusCardsHydrating &&
+        (hasManualInProgress ||
+            hasManualRejected ||
+            (subState.hasLoaded &&
+                subState.error == null &&
+                (!isSubActive || subDaysRemaining <= 4)));
 
     final unreadMessages = chatState.conversations.fold<int>(
       0,
@@ -413,6 +428,16 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
                         subState: subState,
                         manualTransaction: manualTx,
                         onTap: () => context.push('/artisan/subscription'),
+                      ),
+                    ),
+                  ),
+
+                if (showLocationAlert)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: _LocationSyncCard(
+                        onTap: () => context.push('/settings'),
                       ),
                     ),
                   ),
@@ -1134,6 +1159,91 @@ class _SubscriptionCard extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationSyncCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _LocationSyncCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.cardTheme.color,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppTheme.warning.withValues(alpha: 0.55),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppTheme.warning.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.location_searching_rounded,
+                    color: AppTheme.warning,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'dashboard.artisan.location_required_title'.tr(),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'dashboard.artisan.location_required_subtitle'.tr(),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppTheme.warning,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.warning,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'dashboard.artisan.location_required_action'.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
           ],
         ),
       ),
