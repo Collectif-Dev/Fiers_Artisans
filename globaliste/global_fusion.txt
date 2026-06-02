@@ -1,6 +1,6 @@
 # GLOBAL FUSION - FIERS ARTISANS
-# Generated at: 2026-05-25 01:43:58
-# Files merged: 461
+# Generated at: 2026-06-02 03:04:57
+# Files merged: 462
 
 ================================================================================
 PATH: .env.example
@@ -6079,6 +6079,247 @@ Le point critique a retenir est le suivant :
 
 
 ================================================================================
+PATH: Git_Team.md
+--------------------------------------------------------------------------------
+# 🚀 Workflow Git - Structure des Branches Équipe
+
+## 📋 Vue d'ensemble
+
+Ce document définit la structure de branches et le workflow pour une équipe de **4 développeurs** travaillant sur le projet **Fiers Artisants**.
+
+---
+
+## 📦 Structure Complète des Branches par Domaine
+
+### AUTHENTICATION
+```
+├── feature/auth/login-oauth (Dev_1)
+├── feature/auth/jwt-refresh (Dev_2)
+└── feature/auth/2fa-setup (Dev_3)
+```
+
+### PAYMENT
+```
+├── feature/payment/stripe-integration (Dev_1)
+├── fix/payment/refund-logic (Dev_2)
+└── feature/payment/manual-payment (Dev_3)
+```
+
+### UI FRONTEND
+```
+├── feature/ui/responsive-mobile (Dev_1)
+├── feature/ui/dark-mode (Dev_2)
+└── fix/ui/button-accessibility (Dev_3)
+```
+
+### BACKEND/API
+```
+├── feature/api/search-optimization (Dev_1)
+├── fix/api/rate-limiting (Dev_2)
+└── feature/api/webhook-events (Dev_3)
+```
+
+### DATABASE
+```
+├── feature/db/mongodb-migration (Dev_1)
+└── fix/db/query-performance (Dev_2)
+```
+
+### DOCKER
+```
+├── feature/docker/multi-stage-build (Dev_1)
+├── fix/docker/image-optimization (Dev_2)
+└── feature/docker/compose-services (Dev_3)
+```
+
+### RÉSEAU
+```
+├── feature/network/load-balancer (Dev_2)
+├── fix/network/nginx-config (Dev_3)
+└── feature/network/ssl-cert-automation (Dev_1)
+```
+
+### DEVOPS
+```
+├── feature/devops/ci-cd-github-actions (Dev_1)
+├── fix/devops/deployment-script (Dev_2)
+└── feature/devops/monitoring-setup (Dev_3)
+```
+
+---
+
+## 🔄 Workflow Pyramidal - Flux des Merges
+
+```
+TOUTES LES BRANCHES feature/* et fix/*
+        ↓
+        ↓ (PR + Code Review)
+        ↓
+    develop (INTÉGRATION)
+        ↓
+        ↓ (Tests QA)
+        ↓
+    merge (QA/TESTS)
+        ↓
+        ↓ (Validation Staging)
+        ↓
+    vers_production (STAGING)
+        ↓
+        ↓ (Déploiement Production)
+        ↓
+    main (PRODUCTION) 🚀
+```
+
+---
+
+## 📌 Conventions de Nommage
+
+### Branches Feature
+```
+feature/<domaine>/<description-en-kebab-case>
+```
+**Exemples** :
+- `feature/auth/login-oauth`
+- `feature/payment/stripe-integration`
+- `feature/ui/responsive-mobile`
+
+### Branches Fix
+```
+fix/<domaine>/<description-en-kebab-case>
+```
+**Exemples** :
+- `fix/payment/refund-logic`
+- `fix/api/rate-limiting`
+- `fix/ui/button-accessibility`
+
+---
+
+## 🛠️ Hiérarchie des Branches
+
+| Branche | Rôle | Protégée | Merges autorisés depuis |
+|---------|------|---------|------------------------|
+| `main` | 🚀 Production | ✅ Oui | `vers_production` uniquement |
+| `vers_production` | 🔍 Staging | ✅ Oui | `merge` uniquement |
+| `merge` | 🧪 QA/Tests | ✅ Oui | `develop` uniquement |
+| `develop` | 🔄 Intégration | ✅ Oui | `feature/*` et `fix/*` uniquement |
+| `feature/*` | 👨‍💻 Dev | ❌ Non | Ouvert (chaque dev) |
+| `fix/*` | 🔧 Dev | ❌ Non | Ouvert (chaque dev) |
+
+---
+
+## 📝 Processus de Travail - Par Développeur
+
+### 1️⃣ Créer sa branche feature/fix
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/auth/login-oauth
+```
+
+### 2️⃣ Travailler et commiter
+```bash
+git add .
+git commit -m "feat(auth): add OAuth login flow"
+git push origin feature/auth/login-oauth
+```
+
+### 3️⃣ Créer une Pull Request (PR)
+- Vers : `develop`
+- Titre : `[FEATURE] Auth: Add OAuth login`
+- Description : Détails des changements
+
+### 4️⃣ Code Review & Merge
+- Minimum 1 approval requis
+- ✅ Merger vers `develop` une fois approuvé
+- 🗑️ Supprimer la branche après merge
+
+---
+
+## 🔀 Flux de Promotion des Branches
+
+### Phase 1 : Développement
+```
+Dev_1: feature/auth/login-oauth ────┐
+Dev_2: feature/payment/stripe       ├──→ develop
+Dev_3: fix/ui/button-access         │
+Dev_4: feature/db/mongodb           ┘
+```
+
+### Phase 2 : Intégration & Tests
+```
+develop ────→ merge (Intégration + Tests QA)
+```
+
+### Phase 3 : Staging
+```
+merge ────→ vers_production (Validation Staging)
+```
+
+### Phase 4 : Production
+```
+vers_production ────→ main 🚀 (Déploiement Production)
+```
+
+---
+
+## ⚠️ Règles Importantes
+
+✅ **À FAIRE** :
+- Créer une PR avant de merger vers `develop`
+- Attendre l'approval avant de merger
+- Faire des commits atomiques et descriptifs
+- Mettre à jour `develop` avant de créer une branche feature
+- Supprimer sa branche après merge
+
+❌ **À NE PAS FAIRE** :
+- Merger directement sur `develop` sans PR
+- Pusher directement sur `main` ou `vers_production`
+- Créer des branches hors de la structure définie
+- Commiter sur `develop` ou `main` directement
+- Oublier de synchroniser sa branche
+
+---
+
+## 📊 Assignation des Domaines (Exemple)
+
+| Domaine | Dev_1 | Dev_2 | Dev_3 | Dev_4 |
+|---------|-------|-------|-------|-------|
+| Authentication | ✅ | | | |
+| Payment | ✅ | ✅ | ✅ | |
+| UI Frontend | ✅ | ✅ | ✅ | |
+| Backend/API | ✅ | ✅ | ✅ | |
+| Database | ✅ | ✅ | | |
+| Docker | ✅ | ✅ | ✅ | |
+| Réseau | ✅ | ✅ | ✅ | |
+| DevOps | ✅ | ✅ | ✅ | |
+
+---
+
+## 🚀 Checklist de Mise en Place
+
+- [ ] Tous les devs clonent le repo avec la branche `develop`
+- [ ] Chaque dev crée ses branches feature/fix personnelles
+- [ ] Configurer la protection des branches (`main`, `vers_production`, `merge`, `develop`)
+- [ ] Mettre en place les code reviews sur GitHub/GitLab
+- [ ] Documenter les règles de commit (type, format)
+- [ ] Mettre en place des tests automatisés (CI/CD)
+- [ ] Former l'équipe au workflow
+
+---
+
+## 📚 Ressources Complémentaires
+
+- [Git Flow Documentation](https://git-flow.readthedocs.io/)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+- [GitHub Flow Guide](https://guides.github.com/introduction/flow/)
+
+---
+
+**Dernière mise à jour** : 2 juin 2026  
+**Responsable** : Équipe Développement
+
+
+================================================================================
 PATH: DOCUMENTATION_LOCALISATION.md
 --------------------------------------------------------------------------------
 # Documentation Localisation Et Visibilite Map
@@ -11588,7 +11829,7 @@ migration:
 ================================================================================
 PATH: fiers_artisans_app/.flutter-plugins-dependencies
 --------------------------------------------------------------------------------
-{"info":"This is a generated file; do not edit or check into version control.","plugins":{"ios":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_messaging","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging-15.2.10/","native_build":true,"dependencies":["firebase_core"],"dev_dependency":false},{"name":"flutter_native_splash","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.7/","native_build":true,"dependencies":[],"dev_dependency":true},{"name":"flutter_secure_storage","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geocoding_ios","path":"/home/arthur/.pub-cache/hosted/pub.dev/geocoding_ios-3.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_apple","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_cropper","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_cropper-8.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_ios","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_ios-0.8.13+6/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"path_provider_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_foundation-2.6.0/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"permission_handler_apple","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.5.6/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"sqflite_darwin","path":"/home/arthur/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.2/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"url_launcher_ios","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_ios-6.4.1/","native_build":true,"dependencies":[],"dev_dependency":false}],"android":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_messaging","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging-15.2.10/","native_build":true,"dependencies":["firebase_core"],"dev_dependency":false},{"name":"flutter_native_splash","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.7/","native_build":true,"dependencies":[],"dev_dependency":true},{"name":"flutter_plugin_android_lifecycle","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.34/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"flutter_secure_storage","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geocoding_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/geocoding_android-3.3.1/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_android-4.6.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_cropper","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_cropper-8.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_android-0.8.13+15/","native_build":true,"dependencies":["flutter_plugin_android_lifecycle"],"dev_dependency":false},{"name":"path_provider_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_android-2.2.23/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"permission_handler_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_android-12.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_android-2.4.23/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"sqflite_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/sqflite_android-2.4.2+3/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"url_launcher_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_android-6.3.29/","native_build":true,"dependencies":[],"dev_dependency":false}],"macos":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"file_selector_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/file_selector_macos-0.9.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_messaging","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging-15.2.10/","native_build":true,"dependencies":["firebase_core"],"dev_dependency":false},{"name":"flutter_secure_storage_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_macos-3.1.3/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_apple","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_macos-0.2.2+1/","native_build":false,"dependencies":["file_selector_macos"],"dev_dependency":false},{"name":"path_provider_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_foundation-2.6.0/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.5.6/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"sqflite_darwin","path":"/home/arthur/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.2/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"url_launcher_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_macos-3.2.5/","native_build":true,"dependencies":[],"dev_dependency":false}],"linux":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"file_selector_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/file_selector_linux-0.9.4/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"flutter_secure_storage_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_linux-1.2.3/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_linux-0.2.2/","native_build":false,"dependencies":["file_selector_linux"],"dev_dependency":false},{"name":"path_provider_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_linux-2.2.1/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_linux-2.4.1/","native_build":false,"dependencies":["path_provider_linux"],"dev_dependency":false},{"name":"url_launcher_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_linux-3.2.2/","native_build":true,"dependencies":[],"dev_dependency":false}],"windows":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"file_selector_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/file_selector_windows-0.9.3+5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"flutter_secure_storage_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_windows-3.1.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_windows-0.2.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_windows-0.2.2/","native_build":false,"dependencies":["file_selector_windows"],"dev_dependency":false},{"name":"path_provider_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_windows-2.3.0/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"permission_handler_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_windows-0.2.1/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_windows-2.4.1/","native_build":false,"dependencies":["path_provider_windows"],"dev_dependency":false},{"name":"url_launcher_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_windows-3.1.5/","native_build":true,"dependencies":[],"dev_dependency":false}],"web":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","dependencies":[],"dev_dependency":false},{"name":"firebase_core_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core_web-2.24.1/","dependencies":[],"dev_dependency":false},{"name":"firebase_messaging_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging_web-3.10.10/","dependencies":["firebase_core_web"],"dev_dependency":false},{"name":"flutter_native_splash","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.7/","dependencies":[],"dev_dependency":true},{"name":"flutter_secure_storage_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_web-1.2.1/","dependencies":[],"dev_dependency":false},{"name":"geolocator_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_web-4.1.3/","dependencies":[],"dev_dependency":false},{"name":"image_cropper_for_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_cropper_for_web-6.1.0/","dependencies":[],"dev_dependency":false},{"name":"image_picker_for_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_for_web-3.1.1/","dependencies":[],"dev_dependency":false},{"name":"permission_handler_html","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_html-0.1.3+5/","dependencies":[],"dev_dependency":false},{"name":"shared_preferences_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_web-2.4.3/","dependencies":[],"dev_dependency":false},{"name":"url_launcher_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_web-2.4.2/","dependencies":[],"dev_dependency":false}]},"dependencyGraph":[{"name":"connectivity_plus","dependencies":[]},{"name":"file_selector_linux","dependencies":[]},{"name":"file_selector_macos","dependencies":[]},{"name":"file_selector_windows","dependencies":[]},{"name":"firebase_core","dependencies":["firebase_core_web"]},{"name":"firebase_core_web","dependencies":[]},{"name":"firebase_messaging","dependencies":["firebase_core","firebase_messaging_web"]},{"name":"firebase_messaging_web","dependencies":["firebase_core","firebase_core_web"]},{"name":"flutter_native_splash","dependencies":[]},{"name":"flutter_plugin_android_lifecycle","dependencies":[]},{"name":"flutter_secure_storage","dependencies":["flutter_secure_storage_linux","flutter_secure_storage_macos","flutter_secure_storage_web","flutter_secure_storage_windows"]},{"name":"flutter_secure_storage_linux","dependencies":[]},{"name":"flutter_secure_storage_macos","dependencies":[]},{"name":"flutter_secure_storage_web","dependencies":[]},{"name":"flutter_secure_storage_windows","dependencies":["path_provider"]},{"name":"geocoding","dependencies":["geocoding_android","geocoding_ios"]},{"name":"geocoding_android","dependencies":[]},{"name":"geocoding_ios","dependencies":[]},{"name":"geolocator","dependencies":["geolocator_android","geolocator_apple","geolocator_web","geolocator_windows"]},{"name":"geolocator_android","dependencies":[]},{"name":"geolocator_apple","dependencies":[]},{"name":"geolocator_web","dependencies":[]},{"name":"geolocator_windows","dependencies":[]},{"name":"image_cropper","dependencies":["image_cropper_for_web"]},{"name":"image_cropper_for_web","dependencies":[]},{"name":"image_picker","dependencies":["image_picker_android","image_picker_for_web","image_picker_ios","image_picker_linux","image_picker_macos","image_picker_windows"]},{"name":"image_picker_android","dependencies":["flutter_plugin_android_lifecycle"]},{"name":"image_picker_for_web","dependencies":[]},{"name":"image_picker_ios","dependencies":[]},{"name":"image_picker_linux","dependencies":["file_selector_linux"]},{"name":"image_picker_macos","dependencies":["file_selector_macos"]},{"name":"image_picker_windows","dependencies":["file_selector_windows"]},{"name":"path_provider","dependencies":["path_provider_android","path_provider_foundation","path_provider_linux","path_provider_windows"]},{"name":"path_provider_android","dependencies":[]},{"name":"path_provider_foundation","dependencies":[]},{"name":"path_provider_linux","dependencies":[]},{"name":"path_provider_windows","dependencies":[]},{"name":"permission_handler","dependencies":["permission_handler_android","permission_handler_apple","permission_handler_html","permission_handler_windows"]},{"name":"permission_handler_android","dependencies":[]},{"name":"permission_handler_apple","dependencies":[]},{"name":"permission_handler_html","dependencies":[]},{"name":"permission_handler_windows","dependencies":[]},{"name":"shared_preferences","dependencies":["shared_preferences_android","shared_preferences_foundation","shared_preferences_linux","shared_preferences_web","shared_preferences_windows"]},{"name":"shared_preferences_android","dependencies":[]},{"name":"shared_preferences_foundation","dependencies":[]},{"name":"shared_preferences_linux","dependencies":["path_provider_linux"]},{"name":"shared_preferences_web","dependencies":[]},{"name":"shared_preferences_windows","dependencies":["path_provider_windows"]},{"name":"sqflite","dependencies":["sqflite_android","sqflite_darwin"]},{"name":"sqflite_android","dependencies":[]},{"name":"sqflite_darwin","dependencies":[]},{"name":"url_launcher","dependencies":["url_launcher_android","url_launcher_ios","url_launcher_linux","url_launcher_macos","url_launcher_web","url_launcher_windows"]},{"name":"url_launcher_android","dependencies":[]},{"name":"url_launcher_ios","dependencies":[]},{"name":"url_launcher_linux","dependencies":[]},{"name":"url_launcher_macos","dependencies":[]},{"name":"url_launcher_web","dependencies":[]},{"name":"url_launcher_windows","dependencies":[]}],"date_created":"2026-05-16 02:46:32.787329","version":"3.41.7","swift_package_manager_enabled":{"ios":false,"macos":false}}
+{"info":"This is a generated file; do not edit or check into version control.","plugins":{"ios":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_messaging","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging-15.2.10/","native_build":true,"dependencies":["firebase_core"],"dev_dependency":false},{"name":"flutter_native_splash","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.7/","native_build":true,"dependencies":[],"dev_dependency":true},{"name":"flutter_secure_storage","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geocoding_ios","path":"/home/arthur/.pub-cache/hosted/pub.dev/geocoding_ios-3.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_apple","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_cropper","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_cropper-8.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_ios","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_ios-0.8.13+6/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"path_provider_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_foundation-2.6.0/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"permission_handler_apple","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.7/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.5.6/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"sqflite_darwin","path":"/home/arthur/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.2/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"url_launcher_ios","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_ios-6.4.1/","native_build":true,"dependencies":[],"dev_dependency":false}],"android":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_messaging","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging-15.2.10/","native_build":true,"dependencies":["firebase_core"],"dev_dependency":false},{"name":"flutter_native_splash","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.7/","native_build":true,"dependencies":[],"dev_dependency":true},{"name":"flutter_plugin_android_lifecycle","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.34/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"flutter_secure_storage","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage-9.2.4/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geocoding_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/geocoding_android-3.3.1/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_android-4.6.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_cropper","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_cropper-8.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_android-0.8.13+15/","native_build":true,"dependencies":["flutter_plugin_android_lifecycle"],"dev_dependency":false},{"name":"path_provider_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_android-2.2.23/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"permission_handler_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_android-12.1.0/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_android-2.4.23/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"sqflite_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/sqflite_android-2.4.2+3/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"url_launcher_android","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_android-6.3.29/","native_build":true,"dependencies":[],"dev_dependency":false}],"macos":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"file_selector_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/file_selector_macos-0.9.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_messaging","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging-15.2.10/","native_build":true,"dependencies":["firebase_core"],"dev_dependency":false},{"name":"flutter_secure_storage_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_macos-3.1.3/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_apple","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_macos-0.2.2+1/","native_build":false,"dependencies":["file_selector_macos"],"dev_dependency":false},{"name":"path_provider_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_foundation-2.6.0/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_foundation","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.5.6/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"sqflite_darwin","path":"/home/arthur/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.2/","shared_darwin_source":true,"native_build":true,"dependencies":[],"dev_dependency":false},{"name":"url_launcher_macos","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_macos-3.2.5/","native_build":true,"dependencies":[],"dev_dependency":false}],"linux":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"file_selector_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/file_selector_linux-0.9.4/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"flutter_secure_storage_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_linux-1.2.3/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_linux-0.2.2/","native_build":false,"dependencies":["file_selector_linux"],"dev_dependency":false},{"name":"path_provider_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_linux-2.2.1/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_linux-2.4.1/","native_build":false,"dependencies":["path_provider_linux"],"dev_dependency":false},{"name":"url_launcher_linux","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_linux-3.2.2/","native_build":true,"dependencies":[],"dev_dependency":false}],"windows":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"file_selector_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/file_selector_windows-0.9.3+5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"firebase_core","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core-3.15.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"flutter_secure_storage_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_windows-3.1.2/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"geolocator_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_windows-0.2.5/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"image_picker_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_windows-0.2.2/","native_build":false,"dependencies":["file_selector_windows"],"dev_dependency":false},{"name":"path_provider_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/path_provider_windows-2.3.0/","native_build":false,"dependencies":[],"dev_dependency":false},{"name":"permission_handler_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_windows-0.2.1/","native_build":true,"dependencies":[],"dev_dependency":false},{"name":"shared_preferences_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_windows-2.4.1/","native_build":false,"dependencies":["path_provider_windows"],"dev_dependency":false},{"name":"url_launcher_windows","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_windows-3.1.5/","native_build":true,"dependencies":[],"dev_dependency":false}],"web":[{"name":"connectivity_plus","path":"/home/arthur/.pub-cache/hosted/pub.dev/connectivity_plus-6.1.5/","dependencies":[],"dev_dependency":false},{"name":"firebase_core_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_core_web-2.24.1/","dependencies":[],"dev_dependency":false},{"name":"firebase_messaging_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/firebase_messaging_web-3.10.10/","dependencies":["firebase_core_web"],"dev_dependency":false},{"name":"flutter_native_splash","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.7/","dependencies":[],"dev_dependency":true},{"name":"flutter_secure_storage_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/flutter_secure_storage_web-1.2.1/","dependencies":[],"dev_dependency":false},{"name":"geolocator_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/geolocator_web-4.1.3/","dependencies":[],"dev_dependency":false},{"name":"image_cropper_for_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_cropper_for_web-6.1.0/","dependencies":[],"dev_dependency":false},{"name":"image_picker_for_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/image_picker_for_web-3.1.1/","dependencies":[],"dev_dependency":false},{"name":"permission_handler_html","path":"/home/arthur/.pub-cache/hosted/pub.dev/permission_handler_html-0.1.3+5/","dependencies":[],"dev_dependency":false},{"name":"shared_preferences_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/shared_preferences_web-2.4.3/","dependencies":[],"dev_dependency":false},{"name":"url_launcher_web","path":"/home/arthur/.pub-cache/hosted/pub.dev/url_launcher_web-2.4.2/","dependencies":[],"dev_dependency":false}]},"dependencyGraph":[{"name":"connectivity_plus","dependencies":[]},{"name":"file_selector_linux","dependencies":[]},{"name":"file_selector_macos","dependencies":[]},{"name":"file_selector_windows","dependencies":[]},{"name":"firebase_core","dependencies":["firebase_core_web"]},{"name":"firebase_core_web","dependencies":[]},{"name":"firebase_messaging","dependencies":["firebase_core","firebase_messaging_web"]},{"name":"firebase_messaging_web","dependencies":["firebase_core","firebase_core_web"]},{"name":"flutter_native_splash","dependencies":[]},{"name":"flutter_plugin_android_lifecycle","dependencies":[]},{"name":"flutter_secure_storage","dependencies":["flutter_secure_storage_linux","flutter_secure_storage_macos","flutter_secure_storage_web","flutter_secure_storage_windows"]},{"name":"flutter_secure_storage_linux","dependencies":[]},{"name":"flutter_secure_storage_macos","dependencies":[]},{"name":"flutter_secure_storage_web","dependencies":[]},{"name":"flutter_secure_storage_windows","dependencies":["path_provider"]},{"name":"geocoding","dependencies":["geocoding_android","geocoding_ios"]},{"name":"geocoding_android","dependencies":[]},{"name":"geocoding_ios","dependencies":[]},{"name":"geolocator","dependencies":["geolocator_android","geolocator_apple","geolocator_web","geolocator_windows"]},{"name":"geolocator_android","dependencies":[]},{"name":"geolocator_apple","dependencies":[]},{"name":"geolocator_web","dependencies":[]},{"name":"geolocator_windows","dependencies":[]},{"name":"image_cropper","dependencies":["image_cropper_for_web"]},{"name":"image_cropper_for_web","dependencies":[]},{"name":"image_picker","dependencies":["image_picker_android","image_picker_for_web","image_picker_ios","image_picker_linux","image_picker_macos","image_picker_windows"]},{"name":"image_picker_android","dependencies":["flutter_plugin_android_lifecycle"]},{"name":"image_picker_for_web","dependencies":[]},{"name":"image_picker_ios","dependencies":[]},{"name":"image_picker_linux","dependencies":["file_selector_linux"]},{"name":"image_picker_macos","dependencies":["file_selector_macos"]},{"name":"image_picker_windows","dependencies":["file_selector_windows"]},{"name":"path_provider","dependencies":["path_provider_android","path_provider_foundation","path_provider_linux","path_provider_windows"]},{"name":"path_provider_android","dependencies":[]},{"name":"path_provider_foundation","dependencies":[]},{"name":"path_provider_linux","dependencies":[]},{"name":"path_provider_windows","dependencies":[]},{"name":"permission_handler","dependencies":["permission_handler_android","permission_handler_apple","permission_handler_html","permission_handler_windows"]},{"name":"permission_handler_android","dependencies":[]},{"name":"permission_handler_apple","dependencies":[]},{"name":"permission_handler_html","dependencies":[]},{"name":"permission_handler_windows","dependencies":[]},{"name":"shared_preferences","dependencies":["shared_preferences_android","shared_preferences_foundation","shared_preferences_linux","shared_preferences_web","shared_preferences_windows"]},{"name":"shared_preferences_android","dependencies":[]},{"name":"shared_preferences_foundation","dependencies":[]},{"name":"shared_preferences_linux","dependencies":["path_provider_linux"]},{"name":"shared_preferences_web","dependencies":[]},{"name":"shared_preferences_windows","dependencies":["path_provider_windows"]},{"name":"sqflite","dependencies":["sqflite_android","sqflite_darwin"]},{"name":"sqflite_android","dependencies":[]},{"name":"sqflite_darwin","dependencies":[]},{"name":"url_launcher","dependencies":["url_launcher_android","url_launcher_ios","url_launcher_linux","url_launcher_macos","url_launcher_web","url_launcher_windows"]},{"name":"url_launcher_android","dependencies":[]},{"name":"url_launcher_ios","dependencies":[]},{"name":"url_launcher_linux","dependencies":[]},{"name":"url_launcher_macos","dependencies":[]},{"name":"url_launcher_web","dependencies":[]},{"name":"url_launcher_windows","dependencies":[]}],"date_created":"2026-05-29 23:41:39.417584","version":"3.41.7","swift_package_manager_enabled":{"ios":false,"macos":false}}
 
 ================================================================================
 PATH: fiers_artisans_app/ios/.gitignore
@@ -13253,7 +13494,7 @@ PATH: fiers_artisans_app/ios/Flutter/flutter_export_environment.sh
 --------------------------------------------------------------------------------
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
-export "FLUTTER_ROOT=/home/arthur/.local/flutter"
+export "FLUTTER_ROOT=/home/arthur/flutter"
 export "FLUTTER_APPLICATION_PATH=/home/arthur/mes_projets_dev/Fiers_Artisants/fiers_artisans_app"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_TARGET=lib/main.dart"
@@ -13311,7 +13552,7 @@ PATH: fiers_artisans_app/ios/Flutter/Release.xcconfig
 PATH: fiers_artisans_app/ios/Flutter/Generated.xcconfig
 --------------------------------------------------------------------------------
 // This is a generated file; do not edit or check into version control.
-FLUTTER_ROOT=/home/arthur/.local/flutter
+FLUTTER_ROOT=/home/arthur/flutter
 FLUTTER_APPLICATION_PATH=/home/arthur/mes_projets_dev/Fiers_Artisants/fiers_artisans_app
 COCOAPODS_PARALLEL_CODE_SIGN=true
 FLUTTER_TARGET=lib/main.dart
@@ -21948,7 +22189,9 @@ class SearchScreen extends ConsumerStatefulWidget {
 }
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
-  static const double _nearbyRadiusKm = 20;
+  static const double _nearbyRadiusKm = 10;
+  static const double _urgentRadiusKm = 20;
+  static const double _topRatedRadiusKm = 20;
   static const double _topRatedMinRating = 3;
 
   final _searchCtrl = TextEditingController();
@@ -22004,11 +22247,25 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         final subcat = params['subcategoryId'] as String?;
         if (subcat != null) _selectedSubcategoryId = subcat;
 
-        if (params['topRated'] == true) {
+        final preset = params['preset']?.toString();
+
+        if (preset == 'urgent') {
+          _radius = _urgentRadiusKm;
+        } else if (preset == 'nearby') {
+          _isNearbyPreset = true;
+          _radius = _nearbyRadiusKm;
+        } else if (preset == 'topRated') {
           _sortBy = 'rating';
           _minRating = _topRatedMinRating;
+          _radius = _topRatedRadiusKm;
         }
-        if (params['nearby'] == true) {
+
+        if (preset == null && params['topRated'] == true) {
+          _sortBy = 'rating';
+          _minRating = _topRatedMinRating;
+          _radius = _topRatedRadiusKm;
+        }
+        if (preset == null && params['nearby'] == true) {
           _isNearbyPreset = true;
           _radius = _nearbyRadiusKm;
         }
@@ -23072,7 +23329,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                     child: GestureDetector(
                       onTap: () => context.push(
                         '/client/search',
-                        extra: {'nearby': true},
+                        extra: {'nearby': true, 'preset': 'urgent'},
                       ),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -23200,7 +23457,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                             label: 'home.nearby'.tr(),
                             onTap: () => context.push(
                               '/client/search',
-                              extra: {'nearby': true},
+                              extra: {'nearby': true, 'preset': 'nearby'},
                             ),
                           ),
                         ),
@@ -23211,7 +23468,7 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                             label: 'home.top_rated'.tr(),
                             onTap: () => context.push(
                               '/client/search',
-                              extra: {'topRated': true},
+                              extra: {'topRated': true, 'preset': 'topRated'},
                             ),
                           ),
                         ),
@@ -23583,10 +23840,17 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
   void initState() {
     super.initState();
     Future.microtask(() async {
-      await ref.read(subscriptionProvider.notifier).loadStatus();
-      await ref
-          .read(paymentManualProvider.notifier)
-          .loadCurrentTransaction(refresh: true);
+      final subState = ref.read(subscriptionProvider);
+      final manualState = ref.read(paymentManualProvider);
+
+      if (!subState.hasLoaded && subState.subscription == null) {
+        await ref.read(subscriptionProvider.notifier).loadStatus();
+      }
+      if (manualState.currentTransaction == null) {
+        await ref
+            .read(paymentManualProvider.notifier)
+            .loadCurrentTransaction(refresh: true);
+      }
     });
   }
 
@@ -23717,7 +23981,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        if (subState.error != null)
+                        if (subState.error != null && subscription == null)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Text(
@@ -25334,6 +25598,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
   bool _isStatsBackgroundRefreshing = false;
   bool _isReviewMetricsBackgroundRefreshing = false;
   bool _isLocationMissing = false;
+  bool _isStatusCardsHydrating = true;
   double _avgRating = 0;
   int _totalReviews = 0;
   int _experienceYears = 0;
@@ -25358,20 +25623,26 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
 
-    _loadAvailability();
     Future.microtask(() {
-      ref.read(subscriptionProvider.notifier).loadStatus();
-      ref
-          .read(paymentManualProvider.notifier)
-          .loadCurrentTransaction(refresh: true);
-      ref.read(chatProvider.notifier).loadConversations();
-      ref.read(verificationProvider.notifier).refresh();
-      _syncAvailabilityFromBackend();
-      _syncLocationToBackend();
-      _loadArtisanStats();
-      _loadReviewMetrics();
+      _bootstrapDashboard();
     });
     _realtimeSub = _realtime.domainEvents.listen(_handleRealtimeEvent);
+  }
+
+  Future<void> _bootstrapDashboard() async {
+    await _loadAvailability();
+    await Future.wait([
+      ref.read(subscriptionProvider.notifier).loadStatus(),
+      ref.read(paymentManualProvider.notifier).loadCurrentTransaction(refresh: true),
+      ref.read(chatProvider.notifier).loadConversations(),
+      ref.read(verificationProvider.notifier).refresh(),
+      _syncAvailabilityFromBackend(),
+      _syncLocationToBackend(),
+      _loadArtisanStats(),
+    ]);
+    await _loadReviewMetrics();
+    if (!mounted) return;
+    setState(() => _isStatusCardsHydrating = false);
   }
 
   Future<void> _loadAvailability() async {
@@ -25611,14 +25882,18 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     final hasManualInProgress =
         manualTx != null && (manualTx.isPending || manualTx.isPendingAdmin);
     final hasManualRejected = manualTx?.isRejected == true;
-    final showLocationAlert = _isLocationMissing && (_isAvailable || isSubActive);
+    final showLocationAlert =
+        !_isStatusCardsHydrating &&
+        _isLocationMissing &&
+        (_isAvailable || isSubActive);
 
     final showSubscriptionAlert =
-        hasManualInProgress ||
-        hasManualRejected ||
-        (subState.hasLoaded &&
-            subState.error == null &&
-            (!isSubActive || subDaysRemaining <= 4));
+        !_isStatusCardsHydrating &&
+        (hasManualInProgress ||
+            hasManualRejected ||
+            (subState.hasLoaded &&
+                subState.error == null &&
+                (!isSubActive || subDaysRemaining <= 4)));
 
     final unreadMessages = chatState.conversations.fold<int>(
       0,
@@ -27413,11 +27688,12 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
       });
     });
 
-    Future.microtask(
-      () => ref
+    Future.microtask(() {
+      final state = ref.read(paymentManualProvider);
+      return ref
           .read(paymentManualProvider.notifier)
-          .loadCurrentTransaction(refresh: true),
-    );
+          .loadCurrentTransaction(refresh: state.currentTransaction == null);
+    });
   }
 
   @override
@@ -29230,6 +29506,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 ================================================================================
 PATH: fiers_artisans_app/lib/presentation/shared/settings_screen.dart
 --------------------------------------------------------------------------------
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29249,11 +29527,19 @@ import '../../services/push_notification_service.dart';
 import '../common/app_button.dart';
 import '../common/app_snackbar.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  bool _isLoggingOut = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final themeMode = ref.watch(themeProvider);
     final themeIcon = switch (themeMode) {
       ThemeMode.system => Icons.brightness_auto_rounded,
@@ -29266,79 +29552,101 @@ class SettingsScreen extends ConsumerWidget {
       ThemeMode.light => 'theme.light'.tr(),
     };
 
-    return Scaffold(
-      appBar: AppBar(title: Text('settings.title'.tr())),
-      body: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Theme
-          _SettingsTile(
-            icon: themeIcon,
-            title: 'settings.theme'.tr(),
-            subtitle: themeSubtitle,
-            onTap: () => _openThemeSelector(context, ref, themeMode),
+    return Stack(
+      children: [
+        Scaffold(
+          appBar: AppBar(title: Text('settings.title'.tr())),
+          body: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              _SettingsTile(
+                icon: themeIcon,
+                title: 'settings.theme'.tr(),
+                subtitle: themeSubtitle,
+                onTap: () => _openThemeSelector(context, ref, themeMode),
+              ),
+              _SettingsTile(
+                icon: Icons.language_rounded,
+                title: 'settings.language'.tr(),
+                subtitle: 'language.${context.locale.languageCode}'.tr(),
+                onTap: () => _openLanguageSelector(
+                  context,
+                  ref,
+                  context.locale.languageCode,
+                ),
+              ),
+              _SettingsTile(
+                icon: Icons.notifications_active_outlined,
+                title: 'settings.notifications_system'.tr(),
+                subtitle: 'settings.notifications_hint'.tr(),
+                onTap: () => _openNotificationsSystemSettings(context),
+              ),
+              const Divider(height: 32),
+              _SettingsTile(
+                icon: Icons.person_outline,
+                title: 'settings.profile'.tr(),
+                onTap: () {},
+              ),
+              _SettingsTile(
+                icon: Icons.my_location_rounded,
+                title: 'settings.location_update'.tr(),
+                subtitle: 'settings.location_update_hint'.tr(),
+                onTap: () => _openLocationUpdateSheet(context, ref),
+              ),
+              _SettingsTile(
+                icon: Icons.info_outline_rounded,
+                title: 'settings.about'.tr(),
+                subtitle: 'settings.version'.tr(
+                  namedArgs: {'version': AppConfig.appVersion},
+                ),
+                onTap: () {},
+              ),
+              const Divider(height: 32),
+              _SettingsTile(
+                icon: Icons.logout_rounded,
+                title: 'settings.logout'.tr(),
+                iconColor: AppTheme.error,
+                titleColor: AppTheme.error,
+                onTap: () => _confirmLogout(context, ref),
+              ),
+            ],
           ),
-
-          // Language
-          _SettingsTile(
-            icon: Icons.language_rounded,
-            title: 'settings.language'.tr(),
-            subtitle: 'language.${context.locale.languageCode}'.tr(),
-            onTap: () => _openLanguageSelector(
-              context,
-              ref,
-              context.locale.languageCode,
+        ),
+        IgnorePointer(
+          ignoring: !_isLoggingOut,
+          child: AnimatedOpacity(
+            opacity: _isLoggingOut ? 1 : 0,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.16),
+              alignment: Alignment.center,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                offset: _isLoggingOut ? Offset.zero : const Offset(0, 0.03),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardTheme.color,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                  ),
+                  child: const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2.8),
+                  ),
+                ),
+              ),
             ),
           ),
-
-          _SettingsTile(
-            icon: Icons.notifications_active_outlined,
-            title: 'settings.notifications_system'.tr(),
-            subtitle: 'settings.notifications_hint'.tr(),
-            onTap: () => _openNotificationsSystemSettings(context),
-          ),
-
-          const Divider(height: 32),
-
-          // Profile
-          _SettingsTile(
-            icon: Icons.person_outline,
-            title: 'settings.profile'.tr(),
-            onTap: () {
-              // TODO: Navigate to profile edit
-            },
-          ),
-
-          _SettingsTile(
-            icon: Icons.my_location_rounded,
-            title: 'settings.location_update'.tr(),
-            subtitle: 'settings.location_update_hint'.tr(),
-            onTap: () => _openLocationUpdateSheet(context, ref),
-          ),
-
-          // About
-          _SettingsTile(
-            icon: Icons.info_outline_rounded,
-            title: 'settings.about'.tr(),
-            subtitle: 'settings.version'.tr(
-              namedArgs: {'version': AppConfig.appVersion},
-            ),
-            onTap: () {},
-          ),
-
-          const Divider(height: 32),
-
-          // Logout
-          _SettingsTile(
-            icon: Icons.logout_rounded,
-            title: 'settings.logout'.tr(),
-            iconColor: AppTheme.error,
-            titleColor: AppTheme.error,
-            onTap: () => _confirmLogout(context, ref),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -29495,9 +29803,7 @@ class SettingsScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref.read(authProvider.notifier).logout();
-              if (!context.mounted) return;
-              context.go('/login');
+              await _runLogoutTransition(ref);
             },
             child: Text(
               'settings.logout'.tr(),
@@ -29507,6 +29813,19 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _runLogoutTransition(WidgetRef ref) async {
+    if (_isLoggingOut) return;
+
+    final router = GoRouter.of(context);
+    setState(() => _isLoggingOut = true);
+    unawaited(ref.read(authProvider.notifier).logout());
+
+    await Future.delayed(const Duration(milliseconds: 220));
+    if (!mounted) return;
+
+    router.go('/login');
   }
 }
 
@@ -29909,6 +30228,7 @@ enum AppErrorCode {
 
   // Validation
   validationError,
+  tooManyRequests,
 
   // Générique serveur
   serverError,
@@ -29992,6 +30312,8 @@ AppErrorCode _fallbackCodeFromStatus(int? status) {
       return AppErrorCode.notFound;
     case 409:
       return AppErrorCode.conflict;
+    case 429:
+      return AppErrorCode.tooManyRequests;
     case 500:
       return AppErrorCode.serverError;
     default:
@@ -30046,6 +30368,8 @@ String _defaultUserMessage(AppErrorCode code) {
     // Validation / serveur
     case AppErrorCode.validationError:
       return 'Données invalides. Vérifiez les champs.';
+    case AppErrorCode.tooManyRequests:
+      return 'Trop de requetes en peu de temps. Patientez un instant puis reessayez.';
     case AppErrorCode.serverError:
     case AppErrorCode.internalError:
       return 'Erreur interne du serveur. Réessayez plus tard.';
@@ -31656,7 +31980,9 @@ PATH: fiers_artisans_app/lib/providers/subscription_provider.dart
 --------------------------------------------------------------------------------
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/errors/error_mapper.dart';
 import '../data/models/subscription_model.dart';
 import '../data/repositories/subscription_repository.dart';
 import 'session_scope_provider.dart';
@@ -31706,6 +32032,7 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
   final PushNotificationService? _push;
   StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
   late final void Function() _onSubscriptionUpdate;
+  Future<void>? _inFlightLoadStatus;
 
   SubscriptionNotifier({
     SubscriptionRepositoryContract? repository,
@@ -31746,12 +32073,20 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
     super.dispose();
   }
 
-  Future<void> loadStatus() async {
-    state = state.copyWith(
-      isLoading: true,
-      clearSubscription: true,
-      error: null,
-    );
+  Future<void> loadStatus() {
+    if (_inFlightLoadStatus != null) {
+      return _inFlightLoadStatus!;
+    }
+
+    final future = _loadStatusInternal();
+    _inFlightLoadStatus = future;
+    return future.whenComplete(() {
+      _inFlightLoadStatus = null;
+    });
+  }
+
+  Future<void> _loadStatusInternal() async {
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final sub = await _repo.getStatus();
       state = state.copyWith(
@@ -31765,7 +32100,7 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
         clearSubscription: true,
         isLoading: false,
         hasLoaded: true,
-        error: e.toString(),
+        error: e is DioException ? mapException(e).userMessage : e.toString(),
       );
     }
   }
@@ -31777,7 +32112,10 @@ class SubscriptionNotifier extends StateNotifier<SubscriptionState> {
       state = state.copyWith(isLoading: false);
       return data;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(
+        isLoading: false,
+        error: e is DioException ? mapException(e).userMessage : e.toString(),
+      );
       return null;
     }
   }
@@ -33539,9 +33877,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _bootstrapFuture;
     ChatRealtimeService().disconnect();
-    await SecureStorage.clearAuthSession();
     _rotateSessionScope();
     state = const AuthState(status: AuthStatus.unauthenticated);
+    await SecureStorage.clearAuthSession();
   }
 
   void _connectRealtime(String userId) {
@@ -33735,6 +34073,7 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
 
   Timer? _pollingTimer;
   StreamSubscription<ChatRealtimeEvent>? _realtimeSub;
+  Future<void>? _inFlightCurrentLoad;
 
   PaymentManualNotifier({
     PaymentManualRepositoryContract? repository,
@@ -33759,11 +34098,22 @@ class PaymentManualNotifier extends StateNotifier<PaymentManualState> {
     super.dispose();
   }
 
-  Future<void> loadCurrentTransaction({bool refresh = false}) async {
+  Future<void> loadCurrentTransaction({bool refresh = false}) {
     if (!refresh && state.currentTransaction != null) {
-      return;
+      return Future.value();
+    }
+    if (_inFlightCurrentLoad != null) {
+      return _inFlightCurrentLoad!;
     }
 
+    final future = _loadCurrentTransactionInternal();
+    _inFlightCurrentLoad = future;
+    return future.whenComplete(() {
+      _inFlightCurrentLoad = null;
+    });
+  }
+
+  Future<void> _loadCurrentTransactionInternal() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final tx = await _repository.fetchCurrentTransaction();
@@ -37033,7 +37383,7 @@ endforeach(ffi_plugin)
 PATH: fiers_artisans_app/linux/flutter/ephemeral/generated_config.cmake
 --------------------------------------------------------------------------------
 # Generated code do not commit.
-file(TO_CMAKE_PATH "/home/arthur/.local/flutter" FLUTTER_ROOT)
+file(TO_CMAKE_PATH "/home/arthur/flutter" FLUTTER_ROOT)
 file(TO_CMAKE_PATH "/home/arthur/mes_projets_dev/Fiers_Artisants/fiers_artisans_app" PROJECT_DIR)
 
 set(FLUTTER_VERSION "1.0.0+1" PARENT_SCOPE)
@@ -37044,7 +37394,7 @@ set(FLUTTER_VERSION_BUILD 1 PARENT_SCOPE)
 
 # Environment variables to pass to tool_backend.sh
 list(APPEND FLUTTER_TOOL_ENVIRONMENT
-  "FLUTTER_ROOT=/home/arthur/.local/flutter"
+  "FLUTTER_ROOT=/home/arthur/flutter"
   "PROJECT_DIR=/home/arthur/mes_projets_dev/Fiers_Artisants/fiers_artisans_app"
   "DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuNDEuNw==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049Y2MwNzM0YWM3MQ==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049NTlhYTU4NGZkZg==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMS41"
   "DART_OBFUSCATION=false"
@@ -81698,7 +82048,11 @@ PATH: admin-web/src/messages/fr.json
     "no_proof_submitted": "Aucune preuve soumise pour le moment",
     "pending_without_proof_hint": "Cette demande est seulement initiee par l'artisan. Les actions de validation/rejet seront disponibles apres soumission d'une preuve.",
     "fraud_alert": "Suspicion de fraude",
-    "no_data": "Aucun paiement manuel trouvé"
+    "no_data": "Aucun paiement manuel trouvé",
+    "delete_confirm_title": "Supprimer définitivement ?",
+    "delete_confirm_description": "Cette transaction ({id}) sera supprimée de façon irréversible. Cette action ne peut pas être annulée.",
+    "delete_confirm_action": "Supprimer définitivement",
+    "delete_success": "Transaction supprimée"
   },
   "verifications": {
     "title": "Vérifications",
@@ -81937,7 +82291,11 @@ PATH: admin-web/src/messages/en.json
     "no_proof_submitted": "No proof submitted yet",
     "pending_without_proof_hint": "This request has only been initiated by the artisan. Validate/reject actions become available after a proof is submitted.",
     "fraud_alert": "Fraud suspicion",
-    "no_data": "No manual payments found"
+    "no_data": "No manual payments found",
+    "delete_confirm_title": "Permanently delete?",
+    "delete_confirm_description": "Transaction {id} will be permanently removed. This action cannot be undone.",
+    "delete_confirm_action": "Delete permanently",
+    "delete_success": "Transaction deleted"
   },
   "verifications": {
     "title": "Verifications",
@@ -83279,6 +83637,7 @@ export default function PaymentManualPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
   const [proofZoomOpen, setProofZoomOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -83385,10 +83744,13 @@ export default function PaymentManualPage() {
         );
       } else if (action === "delete") {
         await deleteManualPayment(selected.id);
+        toast.success(t("delete_success"));
       } else {
         await markManualPaymentRefunded(selected.id);
       }
-      toast.success(tApp("save"));
+      if (action !== "delete") {
+        toast.success(tApp("save"));
+      }
       closeDetails();
       await load(false);
     } catch {
@@ -83792,8 +84154,8 @@ export default function PaymentManualPage() {
               {t("reopen")}
             </Button>
             <Button
-              variant="secondary"
-              onClick={() => void applyAction("delete")}
+              variant="destructive"
+              onClick={() => setDeleteConfirmOpen(true)}
               disabled={
                 actionLoading ||
                 !selected ||
@@ -83805,6 +84167,39 @@ export default function PaymentManualPage() {
               }
             >
               {t("delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("delete_confirm_title")}</DialogTitle>
+            <DialogDescription>
+              {t("delete_confirm_description").replace(
+                "{id}",
+                selected?.transaction_id ?? "—",
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={actionLoading}
+            >
+              {tApp("cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={actionLoading}
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                void applyAction("delete");
+              }}
+            >
+              {t("delete_confirm_action")}
             </Button>
           </DialogFooter>
         </DialogContent>
