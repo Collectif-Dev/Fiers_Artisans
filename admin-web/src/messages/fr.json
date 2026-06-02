@@ -98,7 +98,11 @@
     "no_proof_submitted": "Aucune preuve soumise pour le moment",
     "pending_without_proof_hint": "Cette demande est seulement initiee par l'artisan. Les actions de validation/rejet seront disponibles apres soumission d'une preuve.",
     "fraud_alert": "Suspicion de fraude",
-    "no_data": "Aucun paiement manuel trouvé"
+    "no_data": "Aucun paiement manuel trouvé",
+    "delete_confirm_title": "Supprimer définitivement ?",
+    "delete_confirm_description": "Cette transaction ({id}) sera supprimée de façon irréversible. Cette action ne peut pas être annulée.",
+    "delete_confirm_action": "Supprimer définitivement",
+    "delete_success": "Transaction supprimée"
   },
   "verifications": {
     "title": "Vérifications",

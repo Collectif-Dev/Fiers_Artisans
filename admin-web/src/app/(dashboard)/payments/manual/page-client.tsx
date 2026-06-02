@@ -147,6 +147,7 @@ export default function PaymentManualPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
   const [proofZoomOpen, setProofZoomOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -253,10 +254,13 @@ export default function PaymentManualPage() {
         );
       } else if (action === "delete") {
         await deleteManualPayment(selected.id);
+        toast.success(t("delete_success"));
       } else {
         await markManualPaymentRefunded(selected.id);
       }
-      toast.success(tApp("save"));
+      if (action !== "delete") {
+        toast.success(tApp("save"));
+      }
       closeDetails();
       await load(false);
     } catch {
@@ -660,8 +664,8 @@ export default function PaymentManualPage() {
               {t("reopen")}
             </Button>
             <Button
-              variant="secondary"
-              onClick={() => void applyAction("delete")}
+              variant="destructive"
+              onClick={() => setDeleteConfirmOpen(true)}
               disabled={
                 actionLoading ||
                 !selected ||
@@ -673,6 +677,39 @@ export default function PaymentManualPage() {
               }
             >
               {t("delete")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("delete_confirm_title")}</DialogTitle>
+            <DialogDescription>
+              {t("delete_confirm_description").replace(
+                "{id}",
+                selected?.transaction_id ?? "—",
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={actionLoading}
+            >
+              {tApp("cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={actionLoading}
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                void applyAction("delete");
+              }}
+            >
+              {t("delete_confirm_action")}
             </Button>
           </DialogFooter>
         </DialogContent>

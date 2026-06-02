@@ -98,7 +98,11 @@
     "no_proof_submitted": "No proof submitted yet",
     "pending_without_proof_hint": "This request has only been initiated by the artisan. Validate/reject actions become available after a proof is submitted.",
     "fraud_alert": "Fraud suspicion",
-    "no_data": "No manual payments found"
+    "no_data": "No manual payments found",
+    "delete_confirm_title": "Permanently delete?",
+    "delete_confirm_description": "Transaction {id} will be permanently removed. This action cannot be undone.",
+    "delete_confirm_action": "Delete permanently",
+    "delete_success": "Transaction deleted"
   },
   "verifications": {
     "title": "Verifications",
