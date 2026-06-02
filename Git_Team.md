@@ -419,10 +419,7 @@ git log --oneline --grep="contracts" -10
 ### 2️⃣ Créer sa branche feature
 
 ```bash
-# Utiliser le script helper (recommandé)
-./infrastructure/scripts/create-feature-branch.sh payment-manual-lifecycle backend
-
-# Ou manuellement
+# Créer une branche depuis develop
 git checkout -b feature/backend/payment-manual-lifecycle
 ```
 
@@ -654,20 +651,18 @@ vers_production ────→ main (PR + tag + déploiement)
 - [ ] Protection de `develop` : PR obligatoire, 1 approval, build passé
 - [ ] Configuration des status checks (CI/CD)
 - [ ] Configuration des webhooks (Slack/Teams notifications)
-- [ ] Templates de PR (feature, fix, hotfix, release)
-- [ ] Templates d'issues (bug, feature, technical debt)
+- [ ] Template de PR unique si l'equipe en ressent le besoin
 
 ### Configuration Locale (chaque développeur)
 
 - [ ] Cloner le repo avec `develop` par défaut
 - [ ] Configurer git hooks (pre-commit lint)
-- [ ] Installer les scripts helpers (`create-feature-branch.sh`)
+- [ ] Utiliser `validate-pr.sh` avant d'ouvrir une PR
 - [ ] Configurer l'éditeur (ESLint, Prettier, Flutter analyze)
 - [ ] Tester le workflow : créer une branche test → PR → merge → supprimer
 
 ### Scripts et Outils
 
-- [ ] `infrastructure/scripts/create-feature-branch.sh` ✅
 - [ ] `infrastructure/scripts/check-contracts-sync.sh` ✅
 - [ ] `infrastructure/scripts/validate-pr.sh` (lint + test + build)
 - [ ] CI/CD pipeline (GitHub Actions / GitLab CI)
@@ -677,91 +672,34 @@ vers_production ────→ main (PR + tag + déploiement)
 
 ## 📚 Scripts Utilitaires
 
-### `create-feature-branch.sh`
-
-```bash
-#!/bin/bash
-# Usage: ./infrastructure/scripts/create-feature-branch.sh <feature-name> <domain>
-# Example: ./infrastructure/scripts/create-feature-branch.sh payment-manual-lifecycle backend
-
-set -euo pipefail
-
-DOMAINS=("backend" "flutter" "admin-web" "infra" "contracts")
-FEATURE_NAME="${1:-}"
-DOMAIN="${2:-}"
-
-if [[ -z "$FEATURE_NAME" || -z "$DOMAIN" ]]; then
-  echo "Usage: $0 <feature-name> <domain>"
-  echo "Domains: ${DOMAINS[*]}"
-  exit 1
-fi
-
-if [[ ! " ${DOMAINS[*]} " =~ " ${DOMAIN} " ]]; then
-  echo "❌ Domaine invalide. Choix: ${DOMAINS[*]}"
-  exit 1
-fi
-
-echo "🔄 Mise à jour de develop..."
-git checkout develop
-git pull origin develop
-
-echo "🌿 Création de la branche..."
-git checkout -b "feature/${DOMAIN}/${FEATURE_NAME}"
-
-echo "✅ Branche créée: feature/${DOMAIN}/${FEATURE_NAME}"
-echo ""
-echo "📋 Prochaines étapes:"
-echo "   1. Développer votre feature"
-echo "   2. Commits atomiques avec conventional commits"
-echo "   3. Tests locaux : npm run test / flutter analyze"
-echo "   4. Rebase sur develop avant PR : git fetch origin && git rebase origin/develop"
-echo "   5. Créer la PR vers develop avec le template"
-echo ""
-echo "⚠️  Si votre feature dépend d'un contrat:"
-echo "   - Vérifier que feature/contracts/* est mergée"
-echo "   - Rebase sur develop après merge de contracts"
-```
+Le script `create-feature-branch.sh` a ete supprime. Il etait oriente agent IA et branche `sauver_main_globale`, ce qui ne correspond pas au workflow GitHub base sur `develop`.
 
 ### `check-contracts-sync.sh`
 
+Controle simple de presence des fichiers lies aux contrats API :
+
 ```bash
-#!/bin/bash
-# Vérifie la synchronisation des contrats entre backend, Flutter et admin-web
+./infrastructure/scripts/check-contracts-sync.sh
+./infrastructure/scripts/check-contracts-sync.sh payment-manual
+```
 
-set -euo pipefail
+Ce script aide a reperer les oublis evidents entre backend, Flutter et admin-web. Il ne remplace pas une vraie generation OpenAPI typee.
 
-echo "🔍 Vérification des contrats..."
+### `validate-pr.sh`
 
-# Vérifier que les DTOs backend ont des équivalents Flutter et admin
-BACKEND_DTOS="backend/src/modules"
-FLUTTER_MODELS="fiers_artisans_app/lib/data/models"
-ADMIN_TYPES="admin-web/src/types"
+Validation locale avant d'ouvrir une PR vers `develop` :
 
-# Liste des modules critiques
-MODULES=("auth" "payment-manual" "users" "chat" "subscription")
+```bash
+./infrastructure/scripts/validate-pr.sh --backend
+./infrastructure/scripts/validate-pr.sh --admin
+./infrastructure/scripts/validate-pr.sh --contracts
+./infrastructure/scripts/validate-pr.sh --all
+```
 
-for module in "${MODULES[@]}"; do
-  echo ""
-  echo "📦 Module: $module"
+La branche de base peut etre changee ponctuellement :
 
-  # Compter les DTOs backend
-  backend_count=$(find "$BACKEND_DTOS/$module" -name "*.dto.ts" 2>/dev/null | wc -l)
-  echo "   Backend DTOs: $backend_count"
-
-  # Vérifier présence dans Flutter
-  flutter_file="$FLUTTER_MODELS/${module//-/_}_model.dart"
-  if [[ -f "$flutter_file" ]]; then
-    echo "   ✅ Flutter model: $(basename $flutter_file)"
-  else
-    echo "   ⚠️  Flutter model manquant: ${module//-/_}_model.dart"
-  fi
-
-  # Vérifier présence dans admin-web
-  # (simplifié — à adapter selon la structure réelle)
-done
-
-echo ""
-echo "✅ Vérification terminée"
+```bash
+BASE_BRANCH=main ./infrastructure/scripts/validate-pr.sh --backend
 ```
 
 ---
