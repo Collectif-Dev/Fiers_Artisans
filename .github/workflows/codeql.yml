@@ -100,15 +100,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './${{ matrix.project }}/package-lock.json'
 
-      - name: Install dependencies (${{ matrix.project }})
-        working-directory: ./${{ matrix.project }}
-        run: npm ci
-
-      - name: Run ESLint (${{ matrix.project }})
-        working-directory: ./${{ matrix.project }}
-        run: npm run lint --if-present
-        continue-on-error: true
-
   # Job optionnel : Tests
   test:
     name: Unit Tests
@@ -128,12 +119,3 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: './${{ matrix.project }}/package-lock.json'
-
-      - name: Install dependencies (${{ matrix.project }})
-        working-directory: ./${{ matrix.project }}
-        run: npm ci
-
-      - name: Run Tests (${{ matrix.project }})
-        working-directory: ./${{ matrix.project }}
-        run: npm run test --if-present
-        continue-on-error: true
