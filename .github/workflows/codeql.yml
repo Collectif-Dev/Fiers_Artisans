@@ -99,7 +99,6 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: './${{ matrix.project }}/package-lock.json'
-          cache: 'npm'
 
       - name: Install dependencies (${{ matrix.project }})
         working-directory: ./${{ matrix.project }}
@@ -129,7 +128,6 @@ jobs:
           node-version: '18'
           cache: 'npm'
           cache-dependency-path: './${{ matrix.project }}/package-lock.json'
-          cache: 'npm'
 
       - name: Install dependencies (${{ matrix.project }})
         working-directory: ./${{ matrix.project }}
