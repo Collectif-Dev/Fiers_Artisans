@@ -1,0 +1,22 @@
+name: "CodeQL Config"
+# Configuration CodeQL pour le projet Fiers Artisants
+
+# Schémas de fichiers à analyser
+paths:
+  - backend
+  - admin-web
+
+paths-ignore:
+  - node_modules
+  - dist
+  - build
+  - coverage
+  - fiers_artisans_app
+  - infrastructure
+
+# Requêtes de sécurité et qualité
+queries:
+  - uses: security-and-quality
+
+# Configuration spécifique pour TypeScript
+disable-default-queries: false
