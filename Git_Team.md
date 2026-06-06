@@ -1,321 +1,496 @@
-# 🚀 Workflow Git — Structure des Branches Équipe Fiers Artisans
+# 🚀 Guide Git — Développeurs Fiers Artisans (Version Opérationnelle)
 
-> 📋 **Version** : 2.0 — 2 juin 2026
-> **Responsable** : Équipe Développement — CTO
-> **Référence** : Ce document doit être lu conjointement avec `SECURITY_ARCHITECTURE.md` et `RÈGLES GLOBALES.md`
-
----
-
-## 📋 Vue d'ensemble
-
-Ce document définit la structure de branches, le workflow de merge et les règles de gouvernance pour une équipe de **4 développeurs** travaillant sur le projet **Fiers Artisans**.
-
-### Objectifs du workflow
-
-- **Zéro conflit** sur les fichiers partagés (DTOs, contrats API, types)
-- **Synchronisation multi-packages** : backend NestJS, Flutter mobile, Next.js admin, infrastructure Docker
-- **Validation en cascade** : feature → develop → merge → vers_production → main
-- **Traçabilité** : chaque modification est rattachée à une logique métier identifiable
-- **Rollback cohérent** : versions taguées sur `main` couvrant l'ensemble du monorepo
+> 📋 **Version** : 3.0 — 6 juin 2026  
+> **Pour** : Développeurs junior et confirmé  
+> **Objectif** : Workflow simple, pragmatique et sans casse-tête  
 
 ---
 
-## 🏗️ Architecture des Branches
-
-### Branches principales (protégées)
+## 🎯 Règle d'Or — À RETENIR EN PRIORITÉ
 
 ```
-main                    ← Production, tags versionnés (v1.2.3)
+1. ❌ JAMAIS coder directement sur develop, merge, vers_production ou main
+2. ✅ Toujours créer une branche feature/fix à partir de develop
+3. ✅ Toujours ouvrir une Pull Request (PR) pour fusionner
+4. ✅ Toujours se synchroniser avec develop avant la PR
+```
+
+**Une seule exception** : hotfix depuis main (urgence production seulement)
+
+---
+
+## 🏗️ Architecture des Branches — Vue Simplifiée
+
+```
+main                    ← Production (tags versionnés)
   ↑
-vers_production         ← Staging, tests E2E complets, validation sécurité
+vers_production         ← Staging (tests avant prod)
   ↑
-merge                   ← QA, tests d'intégration CI/CD, builds
+merge                   ← QA (tests et validations)
   ↑
-develop                 ← Intégration quotidienne, rebase obligatoire
+develop                 ← Votre base de travail
+  ↑
+feature/*  fix/*  chore/*  ← Vos branches de travail
 ```
 
-### Branches de travail (non protégées)
+### Branches que vous créez
+
+| Type | Format | Exemple | Quand |
+|------|--------|---------|-------|
+| **Feature** | `feature/backend/...` | `feature/backend/payment-manual-lifecycle` | Nouvelle fonctionnalité |
+| | `feature/flutter/...` | `feature/flutter/artisan-manual-payment` | |
+| | `feature/admin-web/...` | `feature/admin-web/payments-manual-validation` | |
+| **Fix** | `fix/backend/...` | `fix/backend/auth-jwt-expiration` | Correction de bug |
+| **Chore** | `chore/...` | `chore/update-dependencies` | Maintenance, docs |
+| **Hotfix** | `hotfix/...` | `hotfix/payment-double-spending` | 🚨 Urgence production |
+
+---
+
+## 1️⃣ PREMIÈRE INSTALLATION DU PROJET
+
+### Cloner le dépôt
+
+```bash
+git clone git@github.com:mellykelkun/Fiers_Artisants.git
+cd Fiers_Artisants
+```
+
+### Vérifier la branche courante
+
+```bash
+git status
+```
+
+Vous devriez voir :
+```
+On branch develop
+Your branch is up to date with 'mellykelkun/develop'.
+```
+
+### Voir toutes les branches disponibles
+
+```bash
+git branch -a
+```
+
+Vous verrez :
+```
+* develop
+  main
+  merge
+  sauver_main_globale
+  vers_production
+  ...
+```
+
+✅ **C'est bon** : Git connaît toutes les branches distantes.
+
+---
+
+## 2️⃣ DÉMARRER UNE NOUVELLE TÂCHE
+
+Supposons que vous devez implémenter la feature : **#101 OTP Backend Authentication**
+
+### Étape 1 : Mettre à jour develop
+
+```bash
+git checkout develop
+git pull mellykelkun develop
+```
+
+**Pourquoi** : Vous assurez que votre `develop` local est à jour avant de créer une branche.
+
+### Étape 2 : Créer votre branche de travail
+
+```bash
+git checkout -b feature/backend/auth-otp
+```
+
+**Résultat** :
+```
+Switched to a new branch 'feature/backend/auth-otp'
+```
+
+### Vérification rapide
+
+```bash
+git status
+```
+
+Vous verrez :
+```
+On branch feature/backend/auth-otp
+nothing to commit, working tree clean
+```
+
+✅ **Prêt à travailler !**
+
+---
+
+## 3️⃣ TRAVAILLER ET ENREGISTRER VOS CHANGEMENTS
+
+### Voir vos modifications
+
+```bash
+git status
+```
+
+Exemple :
+```
+On branch feature/backend/auth-otp
+Changes not staged for commit:
+  modified:   backend/src/modules/auth/auth.service.ts
+  modified:   backend/src/modules/auth/auth.module.ts
+
+Untracked files:
+  new file:   backend/src/modules/auth/otp.service.ts
+```
+
+### Ajouter les fichiers modifiés
+
+**Option 1** : Ajouter tous les fichiers
+```bash
+git add .
+```
+
+**Option 2** : Ajouter des fichiers spécifiques
+```bash
+git add backend/src/modules/auth/auth.service.ts
+git add backend/src/modules/auth/otp.service.ts
+```
+
+### Créer un commit clair
+
+```bash
+git commit -m "feat(auth): implement OTP generation and verification service"
+```
+
+**Conventions de commit** :
+
+| Type | Usage | Exemple |
+|------|-------|---------|
+| **feat** | Nouvelle fonctionnalité | `feat(payment): add Wave webhook validation` |
+| **fix** | Correction de bug | `fix(chat): prevent duplicate messages` |
+| **refactor** | Refactoring sans changement fonctionnel | `refactor(auth): extract token service` |
+| **test** | Ajout/modification de tests | `test(payment): add manual payment cooldown tests` |
+| **docs** | Documentation | `docs(readme): update setup instructions` |
+| **chore** | Maintenance, dépendances | `chore(deps): update NestJS packages` |
+
+### Pousser votre branche vers GitHub
+
+```bash
+git push origin feature/backend/auth-otp
+```
+
+**Ou après modification** :
+```bash
+git push origin
+```
+
+✅ Votre branche est maintenant sur GitHub !
+
+---
+
+## 4️⃣ METTRE À JOUR SA BRANCHE QUAND DEVELOP AVANCE
+
+**Scénario** : Vous travaillez sur `feature/backend/auth-otp`, et d'autres PRs sont fusionnées dans `develop`.
+
+### Ce qu'il faut faire AVANT d'ouvrir une PR
+
+```bash
+git fetch origin
+git rebase origin/develop
+```
+
+**Ce que Git fait** :
+1. Télécharge les derniers commits de `develop`
+2. Rejoue vos commits par-dessus les nouveaux
+
+### Si Git trouve des conflits
 
 ```
-feature/<domaine>/<description>     ← Nouvelles fonctionnalités
-fix/<domaine>/<description>         ← Corrections de bugs
-hotfix/<description>                ← Corrections urgentes production
-release/vX.Y.Z                      ← Préparation de versions
-chore/<description>                 ← Maintenance, docs, configuration
+CONFLICT (content): Merge conflict in backend/src/modules/auth/auth.service.ts
+error: could not apply 1234567... feat(auth): implement OTP
+hint: Resolve all conflicts manually, then run "git rebase --continue"
+```
+
+**Solution** :
+1. Ouvrez le fichier en conflit
+2. Résolvez les conflits (cherchez `<<<<<<<` et `>>>>>>>`)
+3. Sauvegardez et continuez
+
+```bash
+git add .
+git rebase --continue
+```
+
+**Si ça devient trop compliqué** :
+```bash
+git rebase --abort
+```
+(Revient à l'état avant le rebase)
+
+### Pousser après rebase
+
+```bash
+git push --force-with-lease origin feature/backend/auth-otp
+```
+
+⚠️ **Important** : Utilisez `--force-with-lease` (pas `--force` brut). Cela protège votre travail et celui des autres.
+
+---
+
+## 5️⃣ OUVRIR UNE PULL REQUEST (PR)
+
+### Sur GitHub
+
+1. Allez sur [github.com/mellykelkun/Fiers_Artisants](https://github.com/mellykelkun/Fiers_Artisants)
+2. Cliquez sur **Pull Requests** → **New Pull Request**
+3. Configurez :
+   - **Base (cible)** : `develop`
+   - **Compare (source)** : `feature/backend/auth-otp`
+
+### Remplissez le template
+
+```markdown
+## 📋 Description
+Implémentation du service OTP pour l'authentification des utilisateurs.
+- Génération de codes OTP 6 chiffres
+- Validation avec TTL (5 minutes)
+- Rate limiting : max 5 tentatives
+
+## 🔗 Issue liée
+Closes #101
+
+## ✅ Tests effectués
+- [x] Tests unitaires passés (`npm run test`)
+- [x] Build OK (`npm run build`)
+- [x] Lint OK (`npm run lint`)
+- [x] Docker compose up OK
+
+## 📦 Dépendances
+Dépend de : feature/contracts/api-dto-auth (MERGÉE ✅)
+
+## ⚠️ Points d'attention
+- OTP stocké en Redis avec TTL
+- Nécessite variable d'environnement : OTP_TTL_SECONDS
+```
+
+4. Cliquez sur **Create Pull Request**
+
+### Après ouverture de la PR
+
+- La CI/CD se lance automatiquement
+- Les reviewers sont notifiés
+- Si la CI échoue → Corrigez et poussez des commits (la PR se met à jour seule)
+
+---
+
+## 6️⃣ APRÈS FUSION DE VOTRE PR
+
+Une fois que votre PR est fusionnée dans `develop` :
+
+### Nettoyer sa branche locale
+
+```bash
+git checkout develop
+git pull origin develop
+git branch -d feature/backend/auth-otp
+```
+
+✅ C'est fait ! Prêt pour la prochaine tâche.
+
+---
+
+## 7️⃣ SCÉNARIOS FRÉQUENTS
+
+### Scénario A — Je commence une nouvelle feature
+
+```bash
+git checkout develop
+git pull origin develop
+git checkout -b feature/backend/mon-feature
+# Développez...
+git add .
+git commit -m "feat(backend): ma nouvelle feature"
+git push origin
+# Ouvrez une PR sur GitHub
+```
+
+### Scénario B — Ma branche est en retard sur develop
+
+```bash
+git fetch origin
+git rebase origin/develop
+git push --force-with-lease origin
+```
+
+### Scénario C — Je dois corriger la PR après review
+
+```bash
+git add .
+git commit -m "fix: address review comments"
+git push origin
+# La PR se met à jour automatiquement
+```
+
+### Scénario D — J'ai modifié des fichiers que je veux abandonner
+
+**Abandonner tous les changements** :
+```bash
+git checkout .
+```
+
+**Abandonner un fichier spécifique** :
+```bash
+git checkout -- backend/src/modules/auth/wrong-file.ts
+```
+
+### Scénario E — Mon rebase est devenu ingérable
+
+```bash
+git rebase --abort
+```
+
+Demandez de l'aide à l'équipe avant de recommencer.
+
+### Scénario F — Je veux juste récupérer les derniers changements de develop
+
+```bash
+git checkout develop
+git pull origin develop
 ```
 
 ---
 
-## 📦 Structure Complète des Branches par Domaine
+## ❌ CE QU'IL NE FAUT JAMAIS FAIRE
 
-### 🔐 AUTHENTIFICATION & AUTORISATION
+| ❌ À NE JAMAIS FAIRE | ❌ Pourquoi | ✅ À LA PLACE |
+|---------------------|-----------|-------------|
+| Coder directement sur `develop` ou `main` | Bypass des reviews, casse l'intégration | Créer une branche `feature/*` |
+| `git push origin develop` depuis votre PC | Injecte du code non revu | Ouvrir une PR (fusion depuis GitHub) |
+| `git merge develop` dans votre feature | Historique sale, incohérent | `git rebase origin/develop` |
+| `git push --force` (sans lease) | Écrase le travail d'un autre | `git push --force-with-lease` |
+| Créer une branche `feature/otp` (sans domaine) | Non respecte la convention | `feature/backend/auth-otp` |
+| Laisser une feature oubliée des mois | Polluent la liste des branches | Supprimer après fusion : `git branch -d` |
 
-```
-feature/backend/auth-otp
-feature/backend/auth-jwt-refresh
-feature/backend/auth-register-flow
-feature/backend/auth-pin-login
-feature/backend/auth-guards-roles
-feature/backend/auth-phone-verification
+---
 
-feature/flutter/auth-onboarding-ui
-feature/flutter/auth-otp-screen
-feature/flutter/auth-pin-setup
-feature/flutter/auth-biometric
-feature/flutter/auth-session-persistence
+## 🎯 ROUTINE QUOTIDIENNE
 
-feature/admin-web/auth-login
-feature/admin-web/auth-admin-guards
-```
+### Chaque matin
 
-### 💳 PAIEMENT & ABONNEMENT
+```bash
+# Allez sur develop
+git checkout develop
 
-```
-feature/backend/payment-wave-integration
-feature/backend/payment-wave-webhook
-feature/backend/payment-manual-lifecycle
-feature/backend/payment-manual-admin-workflow
-feature/backend/payment-manual-fraud-detection
-feature/backend/payment-manual-exif-validation
-feature/backend/payment-manual-cooldown-expiration
-feature/backend/subscription-wave-activation
-feature/backend/subscription-manual-sync
-feature/backend/subscription-expiration-cron
+# Mettez-la à jour
+git pull origin develop
 
-feature/flutter/artisan-subscription-payment
-feature/flutter/artisan-manual-payment
-feature/flutter/artisan-payment-status-widget
-feature/flutter/artisan-payment-proof-upload
-
-feature/admin-web/payments-manual-validation
-feature/admin-web/payments-manual-history
-feature/admin-web/payments-manual-refund
-feature/admin-web/payments-wave-monitoring
+# Créez ou continuez votre branche
+git checkout feature/backend/ma-feature
 ```
 
-### 🎨 ARTISAN — PROFIL & PORTFOLIO
+### Avant chaque push important
 
-```
-feature/backend/artisan-verification
-feature/backend/artisan-verification-documents
-feature/backend/artisan-verification-admin-moderation
-feature/backend/artisan-portfolio-crud
-feature/backend/artisan-portfolio-media
-feature/backend/artisan-availability-geo
-feature/backend/artisan-location-update
-feature/backend/artisan-search-index
+```bash
+# Vérifiez vos changements
+git status
 
-feature/flutter/artisan-dashboard
-feature/flutter/artisan-portfolio-management
-feature/flutter/artisan-verification-flow
-feature/flutter/artisan-availability-toggle
-feature/flutter/artisan-location-update
-feature/flutter/artisan-profile-edit
+# Exécutez les tests
+npm run test          # (backend)
+flutter test          # (Flutter)
+npm run lint          # (admin-web)
+npm run build         # (vérifier la build)
 
-feature/admin-web/artisans-list
-feature/admin-web/artisans-verification-moderation
-feature/admin-web/artisans-subscriptions
-feature/admin-web/artisans-portfolio-review
+# Si tout est OK, poussez
+git push origin
 ```
 
-### 🔍 CLIENT — RECHERCHE & FAVORIS
+### Avant chaque Pull Request
 
-```
-feature/backend/client-search-geospatial
-feature/backend/client-search-filters
-feature/backend/client-favorites
-feature/backend/client-reviews
-feature/backend/client-reviews-reply
+```bash
+# Mettez à jour votre branche
+git fetch origin
+git rebase origin/develop
 
-feature/flutter/client-search-map
-feature/flutter/client-search-list
-feature/flutter/client-artisan-profile
-feature/flutter/client-favorites
-feature/flutter/client-reviews
+# Poussez
+git push --force-with-lease origin
 
-feature/admin-web/clients-list
-feature/admin-web/clients-reviews-moderation
-```
-
-### 💬 CHAT & NOTIFICATIONS TEMPS RÉEL
-
-```
-feature/backend/chat-realtime-socket
-feature/backend/chat-conversations
-feature/backend/chat-messages-history
-feature/backend/chat-read-receipts
-feature/backend/notifications-push-fcm
-feature/backend/notifications-realtime-bridge
-
-feature/flutter/chat-conversations-list
-feature/flutter/chat-messaging-screen
-feature/flutter/chat-realtime-sync
-feature/flutter/shared-notifications
-
-feature/admin-web/notifications-admin-panel
-```
-
-### 🗺️ LOCALISATION & VISIBILITÉ MAP
-
-```
-feature/backend/location-gps-verification
-feature/backend/location-reverse-geocoding
-feature/backend/location-map-visibility-gateway
-feature/backend/location-search-radius
-
-feature/flutter/location-gps-capture
-feature/flutter/location-permission-handling
-feature/flutter/location-map-display
-feature/flutter/location-artisan-visibility
-```
-
-### 📊 ADMINISTRATION & ANALYTICS
-
-```
-feature/backend/admin-moderation
-feature/backend/admin-analytics
-feature/backend/admin-sse-dashboard
-feature/backend/admin-payment-events
-feature/backend/admin-logs-audit
-
-feature/admin-web/dashboard-overview
-feature/admin-web/dashboard-analytics
-feature/admin-web/dashboard-kpi
-feature/admin-web/admin-settings-roles
-feature/admin-web/admin-logs-viewer
-```
-
-### 📁 MÉDIA & STOCKAGE
-
-```
-feature/backend/media-upload-minio
-feature/backend/media-signed-urls
-feature/backend/media-compression
-feature/backend/media-mime-validation
-feature/backend/media-bucket-management
-
-feature/flutter/media-image-picker
-feature/flutter/media-image-cropper
-feature/flutter/media-cached-display
-
-feature/admin-web/media-admin-viewer
-```
-
-### 🔧 INFRASTRUCTURE & DEVOPS
-
-```
-feature/infra/docker-compose-optimization
-feature/infra/docker-compose-dev-overrides
-feature/infra/nginx-ssl-config
-feature/infra/nginx-rate-limiting
-feature/infra/monitoring-grafana-dashboards
-feature/infra/monitoring-prometheus-metrics
-feature/infra/monitoring-alerts
-feature/infra/backup-automation
-feature/infra/ci-cd-pipeline
-feature/infra/env-secrets-management
-feature/infra/scaling-api-horizontal
-feature/infra/healthchecks-probes
-```
-
-### 🔗 CONTRATS & TRANSVERSES (CRITIQUES)
-
-```
-feature/contracts/api-dto-auth              ← JWT, OTP, DTOs auth partagés
-feature/contracts/api-dto-payment           ← Wave, manual payment DTOs
-feature/contracts/api-dto-users             ← Profiles, location DTOs
-feature/contracts/api-dto-chat              ← Messages, conversations DTOs
-feature/contracts/websocket-events          ← Chat, map visibility events
-feature/contracts/websocket-namespaces      ← /ws/chat, /ws/map-visibility
-feature/contracts/database-migrations       ← TypeORM, PostgreSQL
-feature/contracts/database-mongo-schemas    ← Mongoose schemas
-feature/contracts/shared-types               ← Types partagés backend/admin
-feature/contracts/env-variables              ← .env.example, variables critiques
-```
-
-### 🔥 HOTFIXES (production uniquement)
-
-```
-hotfix/auth-bypass-critical
-hotfix/payment-double-spending
-hotfix/chat-security-leak
-hotfix/docker-volume-loss
-hotfix/env-secret-exposure
-```
-
-### 🏷️ RELEASES (coordination versions)
-
-```
-release/v1.0.0
-release/v1.1.0
-release/v1.2.0
+# Vérifiez que la CI passe sur GitHub
+# → Puis ouvrez la PR
 ```
 
 ---
 
-## 🔄 Workflow Pyramidal — Flux des Merges
+## 🆘 COMMANDES DE SECOURS (Copier/Coller)
+
+| But | Commande |
+|-----|----------|
+| Voir la branche courante | `git status` ou `git branch` |
+| Voir toutes les branches | `git branch -a` |
+| Mettre à jour develop | `git checkout develop && git pull origin develop` |
+| Créer une feature | `git checkout -b feature/backend/nom-feature` |
+| Voir vos modifications | `git status` |
+| Ajouter tous les fichiers | `git add .` |
+| Créer un commit | `git commit -m "feat(scope): description"` |
+| Pousser une branche | `git push origin` |
+| Synchroniser avec develop | `git fetch origin && git rebase origin/develop` |
+| Continuer après conflit | `git add . && git rebase --continue` |
+| Annuler un rebase | `git rebase --abort` |
+| Pousser après rebase | `git push --force-with-lease origin` |
+| Supprimer branche locale | `git branch -d feature/backend/nom` |
+| Annuler tous les changements | `git checkout .` |
+| Annuler un fichier spécifique | `git checkout -- chemin/fichier.ts` |
+
+---
+
+## 📝 RÉSUMÉ EN UNE PHRASE
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           PRODUCTION (main)                                  │
-│  • Tags versionnés : v1.2.3                                                │
-│  • Hotfixes uniquement (branches hotfix/*)                                   │
-│  • Déploiement automatique via CI/CD                                         │
-│  • Signed commits obligatoires                                               │
-│  • 2 approbations requises + QA lead + CTO                                   │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    ↑
-                                    │ merge PR (squash + tag)
-                                    │
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        STAGING (vers_production)                             │
-│  • Tests E2E complets (backend + Flutter + admin-web)                        │
-│  • Tests de charge (k6 / Artillery)                                        │
-│  • Vérification des contrats API (backend ↔ Flutter ↔ admin)                 │
-│  • Scan sécurité (Snyk, Trivy)                                               │
-│  • Validation manuelle QA lead                                               │
-│  • Durée minimale : 2 jours ouvrés                                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    ↑
-                                    │ merge PR (rebase + merge commit)
-                                    │
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           QA (merge)                                         │
-│  • CI/CD complet : build + test + lint + type-check + docker-compose up      │
-│  • Tests unitaires backend (npm run test)                                    │
-│  • Tests unitaires Flutter (flutter test)                                    │
-│  • Tests E2E backend critiques (npm run test:e2e)                           │
-│  • Lint admin-web (npm run lint)                                            │
-│  • Build admin-web (npm run build)                                          │
-│  • Validation Docker compose config                                         │
-│  • Durée minimale : 1 jour ouvré                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    ↑
-                                    │ merge PR (rebase + fast-forward)
-                                    │
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        DÉVELOPPEMENT (develop)                               │
-│  • Intégration quotidienne des features                                       │
-│  • Rebase obligatoire avant merge de feature                                  │
-│  • Builds doivent passer (npm run build, flutter analyze)                    │
-│  • 1 approbation requise par peer du même domaine                             │
-│  • Pas de merge direct — PR obligatoire                                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                    ↑
-              ┌─────────────────────┼─────────────────────┐
-              │                     │                     │
-              ↓                     ↓                     ↓
-        ┌─────────┐           ┌─────────┐           ┌─────────┐
-        │feature/*│           │  fix/*  │           │ chore/* │
-        └─────────┘           └─────────┘           └─────────┘
-              ↑                     ↑                     ↑
-              │                     │                     │
-        ┌─────────┐           ┌─────────┐           ┌─────────┐
-        │ hotfix/*│           │release/*│           │contracts│
-        │(depuis   │           │(depuis  │           │(depuis  │
-        │ main)   │           │develop) │           │develop) │
-        └─────────┘           └─────────┘           └─────────┘
+Clone → develop à jour → feature branche → commit/push régulier 
+→ rebase sur origin/develop → ouvrir PR → supprime après merge
 ```
+
+---
+
+## 🚨 URGENCE PRODUCTION ? (Hotfix)
+
+**SEULEMENT si** : Bug critique en production (sécurité, paiement, auth)
+
+```bash
+# 1. Créer depuis main
+git checkout main
+git pull origin main
+git checkout -b hotfix/payment-double-spending
+
+# 2. Corriger (patch minimal !)
+git commit -m "fix(payment): prevent double spending"
+
+# 3. Tester
+npm run test
+
+# 4. PR vers main + ouvrir URGENCE
+# 5. Après merge → backport vers develop (même jour)
+git checkout develop
+git pull origin develop
+git cherry-pick <commit-hash>
+git push origin
+```
+
+---
+
+## 📞 BESOIN D'AIDE ?
+
+- **Conflit Git** → Demandez à un senior
+- **Rebase cassé** → `git rebase --abort` + demandez de l'aide
+- **Branche supprimée par erreur** → Reflex : `git reflog`
+- **Pas sûr(e)** → Ouvrez une PR en draft et demandez review
+
+---
+
+**Dernière mise à jour** : 6 juin 2026  
+**Pour les juniors** : Ce guide est votre bible quotidienne. Gardez-le à portée de main ! 🚀
 
 ---
 
