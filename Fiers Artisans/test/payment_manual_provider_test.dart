@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:fiers_artisans_app/data/models/manual_payment_model.dart';
-import 'package:fiers_artisans_app/data/repositories/payment_manual_repository.dart';
-import 'package:fiers_artisans_app/providers/payment_manual_provider.dart';
-import 'package:fiers_artisans_app/services/chat_realtime_service.dart';
+import 'package:fiers_artisans/data/models/manual_payment_model.dart';
+import 'package:fiers_artisans/data/repositories/payment_manual_repository.dart';
+import 'package:fiers_artisans/providers/payment_manual_provider.dart';
+import 'package:fiers_artisans/services/chat_realtime_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakePaymentManualRepository implements PaymentManualRepositoryContract {

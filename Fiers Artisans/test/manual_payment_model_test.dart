@@ -1,4 +1,4 @@
-import 'package:fiers_artisans_app/data/models/manual_payment_model.dart';
+import 'package:fiers_artisans/data/models/manual_payment_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

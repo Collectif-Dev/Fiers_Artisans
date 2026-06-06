@@ -4,7 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 /// Configuration centralisée — les valeurs réseau sont lues depuis .env
 ///
 /// Pour changer l'IP du backend :
-///   1. Ouvrir fiers_artisans_app/.env
+///   1. Ouvrir `Fiers Artisans/.env`
 ///   2. Modifier API_HOST=votre_nouvelle_ip
 ///   3. Hot restart (R) ou relancer l'app
 ///

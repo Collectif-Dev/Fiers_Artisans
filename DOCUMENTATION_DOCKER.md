@@ -43,7 +43,7 @@ Important :
 
 5. Commandes manuelles utiles pour inspecter l'etat actuel :
 
-Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
+Depuis la racine `/home/arthur/mes_projets_dev/Fiers_Artisants/` :
 
 ```bash
 docker image ls --filter dangling=true
@@ -56,7 +56,7 @@ docker system df -v
 
 6. Si tu veux nettoyer plus loin sans modifier le script :
 
-Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
+Depuis la racine `/home/arthur/mes_projets_dev/Fiers_Artisants/` :
 
 ```bash
 # Supprimer toutes les images dangling (<none>)
@@ -89,7 +89,7 @@ Ces deux commandes peuvent supprimer des volumes de donnees que tu veux conserve
 
 ### Sequence de verification recommandee
 
-Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
+Depuis la racine `/home/arthur/mes_projets_dev/Fiers_Artisants/` :
 
 ```bash
 # 1. Nettoyage standard
@@ -251,7 +251,7 @@ Volumes non critiques mais frequents en dev :
 
 ## 3. Commandes essentielles par chemin d'execution
 
-### Depuis la racine `~/mes_projets_dev/Fiers_Artisants/`
+### Depuis la racine `/home/arthur/mes_projets_dev/Fiers_Artisants/`
 
 | Action | Commande exacte |
 |---|---|
@@ -267,7 +267,7 @@ Volumes non critiques mais frequents en dev :
 | Nettoyage standard | `./infrastructure/scripts/clean-docker.sh` |
 | Nettoyage agressif | `./infrastructure/scripts/clean-docker.sh --all` |
 
-### Depuis le dossier `~/mes_projets_dev/Fiers_Artisants/infrastructure/`
+### Depuis le dossier `/home/arthur/mes_projets_dev/Fiers_Artisants/infrastructure/`
 
 | Action | Commande exacte |
 |---|---|
@@ -422,7 +422,7 @@ Dans ce projet, il faut distinguer deux familles :
 
 ## 6. Verifications post-nettoyage
 
-Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
+Depuis la racine `/home/arthur/mes_projets_dev/Fiers_Artisants/` :
 
 ```bash
 docker system df
@@ -470,7 +470,7 @@ Tu interviens sur le monorepo Fiers Artisans.
 Contexte :
 - backend/ = NestJS
 - admin-web/ = Next.js
-- fiers_artisans_app/ = Flutter
+- Fiers Artisans/ = Flutter
 - infrastructure/ = Docker Compose, Nginx, monitoring, scripts
 
 Contraintes absolues :
@@ -518,7 +518,7 @@ Ta mission :
 
 ### Comment identifier precisement
 
-Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
+Depuis la racine `/home/arthur/mes_projets_dev/Fiers_Artisants/` :
 
 ```bash
 docker ps -a --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}'

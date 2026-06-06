@@ -183,11 +183,11 @@ Backend :
 
 Mobile Flutter :
 
-- `fiers_artisans_app/lib/presentation/auth/register_artisan_screen.dart`
-- `fiers_artisans_app/lib/presentation/auth/register_client_screen.dart`
-- `fiers_artisans_app/lib/presentation/artisan/artisan_dashboard.dart`
-- `fiers_artisans_app/lib/presentation/shared/settings_screen.dart`
-- `fiers_artisans_app/lib/presentation/common/app_text_field.dart`
+- `Fiers Artisans/lib/presentation/auth/register_artisan_screen.dart`
+- `Fiers Artisans/lib/presentation/auth/register_client_screen.dart`
+- `Fiers Artisans/lib/presentation/artisan/artisan_dashboard.dart`
+- `Fiers Artisans/lib/presentation/shared/settings_screen.dart`
+- `Fiers Artisans/lib/presentation/common/app_text_field.dart`
 
 ## Checklist de verification manuelle
 

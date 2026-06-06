@@ -7,7 +7,7 @@
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>Fiers Artisans App</string>
+		<string>Fiers Artisans</string>
 		<key>CFBundleIcons</key>
 		<dict>
 			<key>CFBundlePrimaryIcon</key>
@@ -55,7 +55,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>fiers_artisans_app</string>
+		<string>Fiers Artisans</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

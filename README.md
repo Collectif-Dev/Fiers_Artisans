@@ -41,7 +41,7 @@ Fiers Artisans est une marketplace multi-clients centree sur la mise en relation
 | Dossier | Role principal | Stack |
 |---|---|---|
 | `backend/` | API metier, auth, realtime, paiements, admin API | NestJS 11, TypeORM, Mongoose |
-| `fiers_artisans_app/` | Application mobile client + artisan | Flutter, Riverpod, Dio, GoRouter |
+| `Fiers Artisans/` | Application mobile client + artisan | Flutter, Riverpod, Dio, GoRouter |
 | `admin-web/` | Back-office d'administration | Next.js 16.2.6, React 19.2.6 |
 | `infrastructure/` | Compose, Nginx, monitoring, scripts | Docker Compose, Prometheus, Grafana, Portainer |
 | `globaliste/` | Exports documentaires consolides | `global_fusion.txt` genere |
@@ -50,7 +50,7 @@ Fiers Artisans est une marketplace multi-clients centree sur la mise en relation
 
 ### Mode recommande : stack dev Docker complete
 
-Depuis la racine `~/mes_projets_dev/Fiers_Artisants/` :
+Depuis la racine `/home/arthur/mes_projets_dev/Fiers_Artisants/` :
 
 ```bash
 docker compose --env-file .env \
@@ -108,7 +108,7 @@ docker compose --env-file .env \
 # 2. Lancer les apps localement selon le besoin
 cd backend && npm ci && npm run start:dev
 cd admin-web && npm ci && npm run dev
-cd fiers_artisans_app && flutter pub get && flutter run
+cd "Fiers Artisans" && flutter pub get && flutter run
 ```
 
 ## Stack technique actuelle
@@ -370,7 +370,7 @@ Variables utilisees :
 ### Commandes Flutter
 
 ```bash
-cd fiers_artisans_app
+cd "Fiers Artisans"
 flutter pub get
 flutter analyze
 flutter test
@@ -380,7 +380,7 @@ flutter run
 Build debug :
 
 ```bash
-cd fiers_artisans_app
+cd "Fiers Artisans"
 flutter build apk --debug
 ```
 
@@ -551,7 +551,7 @@ npm run build
 Flutter :
 
 ```bash
-cd fiers_artisans_app
+cd "Fiers Artisans"
 flutter analyze
 flutter test
 ```

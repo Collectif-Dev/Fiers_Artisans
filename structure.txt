@@ -297,7 +297,7 @@
 │   ├── package.json
 │   ├── tsconfig.build.json
 │   └── tsconfig.json
-├── fiers_artisans_app
+├── Fiers Artisans
 │   ├── android
 │   │   ├── app
 │   │   │   ├── src

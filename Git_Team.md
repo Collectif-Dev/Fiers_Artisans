@@ -589,7 +589,7 @@ vers_production ────→ main (PR + tag + déploiement)
 **Fichiers à risque élevé** :
 - `backend/src/common/dto/*`
 - `backend/src/modules/*/dto/*`
-- `fiers_artisans_app/lib/data/models/*`
+- `Fiers Artisans/lib/data/models/*`
 - `admin-web/src/types/index.ts`
 - `.env.example`
 - `infrastructure/docker-compose*.yml`
@@ -734,7 +734,7 @@ echo "🔍 Vérification des contrats..."
 
 # Vérifier que les DTOs backend ont des équivalents Flutter et admin
 BACKEND_DTOS="backend/src/modules"
-FLUTTER_MODELS="fiers_artisans_app/lib/data/models"
+FLUTTER_MODELS="Fiers Artisans/lib/data/models"
 ADMIN_TYPES="admin-web/src/types"
 
 # Liste des modules critiques

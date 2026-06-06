@@ -66,7 +66,7 @@ class ApiClient {
   }) async {
     final formData = FormData.fromMap({
       field: await MultipartFile.fromFile(filePath),
-      if (extraFields != null) ...extraFields,
+      ...?extraFields,
     });
     return _dio.post(ApiEndpoints.upload, data: formData);
   }

@@ -1,5 +1,5 @@
-import 'package:fiers_artisans_app/data/models/portfolio_model.dart';
-import 'package:fiers_artisans_app/presentation/common/portfolio_item_card.dart';
+import 'package:fiers_artisans/data/models/portfolio_model.dart';
+import 'package:fiers_artisans/presentation/common/portfolio_item_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:visibility_detector/visibility_detector.dart';

@@ -1,4 +1,4 @@
-package com.fiersartisans.fiers_artisans_app
+package com.fiersartisans.fiers_artisans
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

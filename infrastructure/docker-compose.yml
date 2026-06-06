@@ -155,7 +155,7 @@ services:
 
   # ── MinIO (S3-compatible) — Réseau interne uniquement en prod ──────
   minio:
-    image: minio/minio
+    image: minio/minio:latest
     container_name: fiers-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"

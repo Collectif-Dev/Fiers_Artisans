@@ -34,7 +34,7 @@ Cette politique s'applique a l'ensemble du depot et a toutes ses briques :
   API NestJS, modules metier, auth, OTP, verification, abonnement, paiements, chat, notifications, analytics, media, admin
 - `admin-web/`
   Frontend Next.js d'administration, pages dashboard, workflows de moderation, analytics, logs, auth admin
-- `fiers_artisans_app/`
+- `Fiers Artisans/`
   Application Flutter mobile client/artisan, routing, state management, UX, chat, verification, subscription, notifications
 - `infrastructure/`
   Docker Compose, Nginx, scripts, monitoring, base de donnees, reseau, reverse proxy

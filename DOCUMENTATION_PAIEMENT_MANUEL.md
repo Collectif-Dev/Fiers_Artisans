@@ -56,10 +56,10 @@ La difference majeure aujourd'hui est la suivante :
 
 | Fichier | Role |
 |---|---|
-| `fiers_artisans_app/lib/data/models/manual_payment_model.dart` | modele de transaction et etats derives |
-| `fiers_artisans_app/lib/providers/payment_manual_provider.dart` | orchestration client, auto-remplacement, erreurs |
-| `fiers_artisans_app/lib/presentation/artisan/manual_payment_page.dart` | ecran principal |
-| `fiers_artisans_app/lib/presentation/artisan/payment_status_widget.dart` | affichage statut, demande, cooldown |
+| `Fiers Artisans/lib/data/models/manual_payment_model.dart` | modele de transaction et etats derives |
+| `Fiers Artisans/lib/providers/payment_manual_provider.dart` | orchestration client, auto-remplacement, erreurs |
+| `Fiers Artisans/lib/presentation/artisan/manual_payment_page.dart` | ecran principal |
+| `Fiers Artisans/lib/presentation/artisan/payment_status_widget.dart` | affichage statut, demande, cooldown |
 
 ## 2.3. Couche admin web
 
@@ -619,7 +619,7 @@ npm run test
 npm run test:e2e
 ```
 
-Depuis `fiers_artisans_app/` :
+Depuis `Fiers Artisans/` :
 
 ```bash
 flutter analyze

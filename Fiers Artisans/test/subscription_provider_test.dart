@@ -1,6 +1,6 @@
-import 'package:fiers_artisans_app/data/models/subscription_model.dart';
-import 'package:fiers_artisans_app/data/repositories/subscription_repository.dart';
-import 'package:fiers_artisans_app/providers/subscription_provider.dart';
+import 'package:fiers_artisans/data/models/subscription_model.dart';
+import 'package:fiers_artisans/data/repositories/subscription_repository.dart';
+import 'package:fiers_artisans/providers/subscription_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class FakeSubscriptionRepository implements SubscriptionRepositoryContract {
