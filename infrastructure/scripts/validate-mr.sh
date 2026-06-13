@@ -8,10 +8,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-cd "$ROOT_DIR"
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "${ROOT_DIR}"
 
 failures=0
 
@@ -37,7 +35,7 @@ require_node_modules() {
   fi
 }
 
-run_check "Contrats multi-couches" "$SCRIPT_DIR/check-contracts-sync.sh"
+run_check "Contrats multi-couches" ./infrastructure/scripts/check-contracts-sync.sh
 
 if require_node_modules "backend"; then
   run_check "Backend tests unitaires" bash -lc "cd backend && npm run test -- --runInBand"
@@ -69,4 +67,3 @@ if [[ "${failures}" -gt 0 ]]; then
 fi
 
 echo "Validation MR terminee sans probleme detecte."
-

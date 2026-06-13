@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# Genere une stack Compose aplatie pour Portainer.
+#
+# Entree:
+#   - .env a la racine du repo
+#   - infrastructure/docker-compose.yml
+#   - infrastructure/docker-compose.dev.yml
+#
+# Sortie ignoree par Git:
+#   - infrastructure/stack.portainer-managed.yml
+#
+# Le fichier genere peut contenir des valeurs resolues depuis `.env`. Il ne doit
+# pas etre commite.
+
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -6,6 +19,11 @@ RAW_FILE="${ROOT_DIR}/tmp.stack.portainer.raw.yml"
 OUT_FILE="${ROOT_DIR}/infrastructure/stack.portainer-managed.yml"
 
 cd "${ROOT_DIR}"
+
+if [[ ! -f ".env" ]]; then
+  echo "Fichier .env introuvable. Copiez .env.example vers .env, puis renseignez les secrets reels."
+  exit 1
+fi
 
 docker compose \
   --env-file .env \

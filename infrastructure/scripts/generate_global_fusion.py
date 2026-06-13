@@ -15,6 +15,7 @@ Output:
 
 import datetime
 import os
+import subprocess
 from pathlib import Path
 
 EXCLUDE_DIRS = {
@@ -102,6 +103,31 @@ def should_skip_file(path: Path, output_path: Path) -> bool:
     return False
 
 
+def iter_repo_files(repo_root: Path) -> list[Path]:
+    """Return tracked files plus new non-ignored files, never ignored artifacts."""
+    command = [
+        "git",
+        "-C",
+        str(repo_root),
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+    ]
+    result = subprocess.run(
+        command,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    files: list[Path] = []
+    for line in result.stdout.splitlines():
+        rel_path = line.strip()
+        if rel_path:
+            files.append(repo_root / rel_path)
+    return sorted(files, key=lambda path: path.relative_to(repo_root).as_posix())
+
+
 def main() -> None:
     script_path = Path(__file__).resolve()
     repo_root = find_repo_root(script_path.parent)
@@ -116,23 +142,24 @@ def main() -> None:
     content.append("# Files merged: {count}")
     content.append("")
 
-    for root, dirs, files in os.walk(repo_root):
-        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-        for file in files:
-            file_path = Path(root) / file
-            if should_skip_file(file_path.resolve(), output_path):
-                continue
-            try:
-                file_text = file_path.read_text(encoding="utf-8")
-            except Exception:
-                continue
-            rel_path = file_path.relative_to(repo_root).as_posix()
-            merged_count += 1
-            content.append("=" * 80)
-            content.append(f"PATH: {rel_path}")
-            content.append("-" * 80)
-            content.append(file_text)
-            content.append("")
+    for file_path in iter_repo_files(repo_root):
+        resolved_path = file_path.resolve()
+        if should_skip_file(resolved_path, output_path):
+            continue
+        if any(part in EXCLUDE_DIRS for part in file_path.relative_to(repo_root).parts):
+            continue
+        try:
+            file_text = file_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        file_text = "\n".join(line.rstrip() for line in file_text.splitlines())
+        rel_path = file_path.relative_to(repo_root).as_posix()
+        merged_count += 1
+        content.append("=" * 80)
+        content.append(f"PATH: {rel_path}")
+        content.append("-" * 80)
+        content.append(file_text)
+        content.append("")
 
     content[2] = f"# Files merged: {merged_count}"
     output_path.parent.mkdir(parents=True, exist_ok=True)
