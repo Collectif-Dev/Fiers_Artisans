@@ -79,7 +79,8 @@ services:
       - NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT:-3000}
       - NEXT_PUBLIC_API_BASE_PATH=${NEXT_PUBLIC_API_BASE_PATH:-/api/v1}
       - NEXT_PUBLIC_DEFAULT_LOCALE=${NEXT_PUBLIC_DEFAULT_LOCALE:-fr}
-    command: npm run start
+      - PORT=3002
+      - HOSTNAME=0.0.0.0
     networks:
       - fiers-network
     healthcheck:
@@ -96,7 +97,7 @@ services:
 
   # ── PostgreSQL 16 + PostGIS ────────────────────────────────────────
   postgres:
-    image: postgis/postgis:16-3.4
+    image: postgis/postgis:16-3.4@sha256:44126d872ac91993766c341e369c539e8196614321765d36a6f1bab0419a5fa5
     container_name: fiers-postgres
     restart: unless-stopped
     volumes:
@@ -116,7 +117,7 @@ services:
 
   # ── MongoDB 7 ──────────────────────────────────────────────────────
   mongodb:
-    image: mongo:7
+    image: mongo:7@sha256:8ecb514b00bdcc0bde67ef4e6c330385377a9dc68e24ee94e28c07c891647348
     container_name: fiers-mongodb
     restart: unless-stopped
     volumes:
@@ -137,7 +138,7 @@ services:
 
   # ── Redis 7 ────────────────────────────────────────────────────────
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
     container_name: fiers-redis
     restart: unless-stopped
     volumes:
@@ -155,7 +156,7 @@ services:
 
   # ── MinIO (S3-compatible) — Réseau interne uniquement en prod ──────
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
     container_name: fiers-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -166,12 +167,18 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY est requis — vérifiez votre .env}
     networks:
       - fiers-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     # Pas de ports exposés en production — accès uniquement via le réseau Docker interne
     # Utiliser docker-compose.dev.yml pour exposer les ports en développement local
 
   # ── Nginx — Reverse Proxy ──────────────────────────────────────────
   nginx:
-    image: nginx:alpine
+    image: nginx:1.28.0-alpine
     container_name: fiers-nginx
     restart: unless-stopped
     ports:
@@ -187,6 +194,12 @@ services:
         condition: service_healthy
     networks:
       - fiers-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     logging:
       driver: json-file
       options:
@@ -195,7 +208,7 @@ services:
 
   # ── Prometheus — Monitoring ────────────────────────────────────────
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:v3.2.1@sha256:69f5241418838263316593f7274a304b095c40bcf22e57272865da91bd60a8ac
     container_name: fiers-prometheus
     restart: unless-stopped
     volumes:
@@ -203,10 +216,16 @@ services:
       - prometheus_data:/prometheus
     networks:
       - fiers-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ── Grafana — Dashboards ───────────────────────────────────────────
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:11.6.4@sha256:5dad0df181cb644a14e13617b913b261a54f7d4fd4510721dba420929f35bea2
     container_name: fiers-grafana
     restart: unless-stopped
     environment:
@@ -216,9 +235,16 @@ services:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
     networks:
       - fiers-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 networks:
   fiers-network:

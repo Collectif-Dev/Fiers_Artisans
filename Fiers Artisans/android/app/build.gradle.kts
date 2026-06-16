@@ -11,6 +11,24 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    val releaseKeystorePath = System.getenv("FIERS_RELEASE_KEYSTORE")
+    val releaseKeystorePassword = System.getenv("FIERS_RELEASE_KEYSTORE_PASSWORD")
+    val releaseKeyAlias = System.getenv("FIERS_RELEASE_KEY_ALIAS")
+    val releaseKeyPassword = System.getenv("FIERS_RELEASE_KEY_PASSWORD")
+    val releaseSigningReady = listOf(
+        releaseKeystorePath,
+        releaseKeystorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword,
+    ).all { !it.isNullOrBlank() }
+    val releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+        taskName.contains("Release", ignoreCase = true) ||
+            taskName == "assemble" ||
+            taskName.endsWith(":assemble") ||
+            taskName == "build" ||
+            taskName.endsWith(":build")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -31,11 +49,34 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (releaseSigningReady) {
+                signingConfig = signingConfigs.getByName("release")
+            } else if (releaseTaskRequested) {
+                throw org.gradle.api.GradleException(
+                    "Release signing requires FIERS_RELEASE_KEYSTORE, " +
+                        "FIERS_RELEASE_KEYSTORE_PASSWORD, FIERS_RELEASE_KEY_ALIAS, " +
+                        "and FIERS_RELEASE_KEY_PASSWORD. Debug signing is never used for release.",
+                )
+            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }

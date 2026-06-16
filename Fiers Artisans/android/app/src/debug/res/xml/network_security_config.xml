@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fiers Artisans — Network Security Config (debug)
+  Autorise le trafic HTTP cleartext pour le développement local uniquement.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

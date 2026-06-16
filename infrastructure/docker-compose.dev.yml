@@ -11,7 +11,6 @@ services:
       - "3000:3000"
     volumes:
       - ../backend/src:/app/src
-      - ../:/workspace
     environment:
       - NODE_ENV=development
       - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-localhost}
@@ -44,7 +43,7 @@ services:
       - /app/.next
     environment:
       - NODE_ENV=development
-      - ADMIN_WEB_STABLE_MODE=${ADMIN_WEB_STABLE_MODE:-true}
+      - ADMIN_WEB_STABLE_MODE=${ADMIN_WEB_STABLE_MODE:-false}
       # Vide en dev pour conserver la resolution automatique selon l'hote courant.
       - NEXT_PUBLIC_API_URL=
       - NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT:-3000}

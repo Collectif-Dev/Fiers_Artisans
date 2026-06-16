@@ -54,7 +54,7 @@ class ChatRealtimeService {
       '${AppConfig.wsBaseUrl}/ws/chat',
       io.OptionBuilder()
           .setTransports(['websocket'])
-          .setExtraHeaders(<String, dynamic>{
+          .setExtraHeaders(<String, String>{
             'Authorization': 'Bearer $token',
           })
           .enableAutoConnect()

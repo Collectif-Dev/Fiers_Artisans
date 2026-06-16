@@ -1,4 +1,39 @@
+# Git & VCS
+.git
+.github
+.githooks
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+.venv
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Dependencies & build outputs
+node_modules
+dist
+build
+.next
+*.log
+
+# Documentation
+*.md
+!README.md
+
 # Local fusion exports
 globaliste/
 Globaliste/
 Globalist/
+
+# Mobile app (not part of web/backend images)
+Fiers Artisans/
+
+# Other
+.codex
+.DS_Store

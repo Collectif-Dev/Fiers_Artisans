@@ -41,7 +41,7 @@ class MapVisibilityRealtimeService {
       '${AppConfig.wsBaseUrl}/ws/map-visibility',
       io.OptionBuilder()
           .setTransports(['websocket'])
-          .setExtraHeaders(<String, dynamic>{
+          .setExtraHeaders(<String, String>{
             'Authorization': 'Bearer $token',
           })
           .enableAutoConnect()
