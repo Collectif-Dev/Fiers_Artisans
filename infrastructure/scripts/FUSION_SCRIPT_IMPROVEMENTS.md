@@ -108,8 +108,13 @@ python3 infrastructure/scripts/generate_global_fusion.py --strict
 
 ### Regular Sync (Recommended)
 ```bash
+# From project root:
 cd /home/arthur/mes_projets_dev/Fiers_Artisans.github
 python3 infrastructure/scripts/generate_global_fusion.py --report
+
+# Or from infrastructure/scripts/ directory:
+cd infrastructure/scripts
+python3 generate_global_fusion.py --report
 ```
 
 **Output:**
@@ -129,11 +134,15 @@ grep "ENCODING ISSUES" -A 10 globaliste/fusion_report.log
 ### CI/CD Integration (Strict Mode)
 ```bash
 # In your CI pipeline - fails if anything goes wrong
+# From project root:
 python3 infrastructure/scripts/generate_global_fusion.py --strict
 if [ $? -ne 0 ]; then
   echo "Fusion generation failed!"
   exit 1
 fi
+
+# Or from infrastructure/scripts/ directory:
+cd infrastructure/scripts && python3 generate_global_fusion.py --strict
 ```
 
 ## 🛡️ Prevention of Synchronization Issues
@@ -156,8 +165,13 @@ fi
 
 1. **After major merges:**
    ```bash
+   # From project root:
    python3 infrastructure/scripts/generate_global_fusion.py --report
    cat globaliste/fusion_report.log  # Check for issues
+   
+   # Or from infrastructure/scripts/ directory:
+   cd infrastructure/scripts && python3 generate_global_fusion.py --report
+   cd ../../ && cat globaliste/fusion_report.log
    ```
 
 2. **Check report regularly:**
@@ -190,13 +204,14 @@ fi
 
 1. **Before committing large changes:**
    ```bash
+   # From project root:
    python3 infrastructure/scripts/generate_global_fusion.py --report
    git diff globaliste/fusion_report.log  # Review changes
    ```
 
 2. **After security patches:**
    ```bash
-   # Ensure all security patches are captured
+   # From project root:
    python3 infrastructure/scripts/generate_global_fusion.py
    grep -E "requireEnv|WS_ALLOWED_ORIGINS|@Throttle" globaliste/global_fusion.txt
    ```
