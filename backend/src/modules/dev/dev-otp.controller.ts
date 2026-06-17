@@ -46,6 +46,14 @@ export class DevOtpController {
     @Query('phone_number') phoneNumber: string,
     @Query('key') key: string,
   ) {
+    // ── HARDENING: Dev endpoint locked to development only ───────────
+    if (process.env.NODE_ENV !== 'development') {
+      throw new ForbiddenException(
+        'Dev OTP inspector is only available in development environment.'
+      );
+    }
+    // ── FIN HARDENING ──────────────────────────────────────────────
+
     // Vérifier la clé d'accès dev
     if (!key || key !== this.devKey) {
       throw new ForbiddenException('Clé dev invalide.');

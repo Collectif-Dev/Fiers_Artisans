@@ -51,6 +51,31 @@ function isLanOriginAllowed(origin: string, allowedPorts: number[]): boolean {
 }
 
 async function bootstrap() {
+  // ── HARDENING: Environment validation ──────────────────────────────
+  const processNodeEnv = process.env.NODE_ENV;
+  if (!processNodeEnv) {
+    Logger.error(
+      'FATAL: NODE_ENV is not set. ' +
+      'The application cannot start without an explicit environment. ' +
+      'Set NODE_ENV=production or NODE_ENV=development.',
+      'Bootstrap',
+    );
+    process.exit(1);
+  }
+
+  if (processNodeEnv === 'production') {
+    if (process.env.OTP_DEV_INSPECTOR === 'true') {
+      Logger.error(
+        'FATAL: OTP_DEV_INSPECTOR=true is strictly forbidden in production. ' +
+        'This would expose OTP codes to potential attackers. ' +
+        'Set OTP_DEV_INSPECTOR=false or unset it.',
+        'Bootstrap',
+      );
+      process.exit(1);
+    }
+  }
+  // ── FIN HARDENING ─────────────────────────────────────────────────
+
   // ── Fail-fast: vérifier les secrets obligatoires ────────────────
   const requiredSecrets = [
     'POSTGRES_PASSWORD',

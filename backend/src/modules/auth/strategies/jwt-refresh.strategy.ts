@@ -12,7 +12,17 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         ExtractJwt.fromBodyField('refresh_token'),
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('jwt.refreshSecret') || 'fallback-refresh-secret',
+      secretOrKey: (() => {
+        const secret = configService.get<string>('jwt.refreshSecret');
+        if (!secret || secret.length < 32) {
+          throw new Error(
+            'FATAL: JWT_REFRESH_SECRET is not configured or is too short. ' +
+            'The JWT refresh strategy cannot initialize without a secure secret. ' +
+            'Application startup aborted.'
+          );
+        }
+        return secret;
+      })(),
     });
   }
 

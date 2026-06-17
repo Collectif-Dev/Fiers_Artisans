@@ -37,7 +37,7 @@ services:
     env_file:
       - ../.env
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=${NODE_ENV:?ERROR: NODE_ENV is required. Set explicitly to 'production' or 'development'.}
       # Overrides pour Docker — les services sont accessibles via leur nom de service
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
