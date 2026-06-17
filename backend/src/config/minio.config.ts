@@ -5,7 +5,9 @@ export default registerAs('minio', () => ({
   port: parseInt(process.env.MINIO_PORT || '9000', 10),
   useSSL: process.env.MINIO_USE_SSL === 'true',
   publicEndpoint:
-    process.env.MINIO_PUBLIC_ENDPOINT || process.env.MINIO_ENDPOINT || 'localhost',
+    process.env.MINIO_PUBLIC_ENDPOINT ||
+    process.env.MINIO_ENDPOINT ||
+    'localhost',
   publicPort: parseInt(
     process.env.MINIO_PUBLIC_PORT || process.env.MINIO_PORT || '9000',
     10,

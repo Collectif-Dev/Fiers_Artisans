@@ -34,13 +34,21 @@ export class Subscription {
   @Column()
   artisan_profile_id: string;
 
-  @Column({ type: 'enum', enum: SubscriptionPlan, default: SubscriptionPlan.MONTHLY })
+  @Column({
+    type: 'enum',
+    enum: SubscriptionPlan,
+    default: SubscriptionPlan.MONTHLY,
+  })
   plan: SubscriptionPlan;
 
   @Column({ type: 'int', default: 5000 })
   amount_fcfa: number;
 
-  @Column({ type: 'enum', enum: SubscriptionStatus, default: SubscriptionStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: SubscriptionStatus,
+    default: SubscriptionStatus.PENDING,
+  })
   status: SubscriptionStatus;
 
   @Column({ nullable: true })

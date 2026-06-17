@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  Registry,
-  collectDefaultMetrics,
-} from 'prom-client';
+import { Registry, collectDefaultMetrics } from 'prom-client';
 
 let defaultMetricsInitialized = false;
 const metricsRegistry = new Registry();

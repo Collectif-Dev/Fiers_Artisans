@@ -13,8 +13,10 @@ export class WhatsappOtpProvider {
   constructor(private readonly configService: ConfigService) {
     this.apiUrl = this.configService.get<string>('whatsapp.apiUrl') || '';
     this.apiToken = this.configService.get<string>('whatsapp.apiToken') || '';
-    this.phoneNumberId = this.configService.get<string>('whatsapp.phoneNumberId') || '';
-    this.templateName = this.configService.get<string>('whatsapp.otpTemplateName') || '';
+    this.phoneNumberId =
+      this.configService.get<string>('whatsapp.phoneNumberId') || '';
+    this.templateName =
+      this.configService.get<string>('whatsapp.otpTemplateName') || '';
   }
 
   async sendOtp(phoneNumber: string, code: string): Promise<boolean> {

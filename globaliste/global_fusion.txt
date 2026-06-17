@@ -1,5 +1,5 @@
 # GLOBAL FUSION - FIERS ARTISANS
-# Generated at: 2026-06-17 05:20:28
+# Generated at: 2026-06-17 05:57:32
 # Files merged: 415
 
 ================================================================================
@@ -64939,7 +64939,8 @@ import { PaymentManualModule } from './modules/payment-manual/payment-manual.mod
 
     // ── Dev Tools (uniquement en développement) ───────────────────
     // Conditionnel : chargé seulement si NODE_ENV=development + OTP_DEV_INSPECTOR=true
-    ...(process.env.NODE_ENV === 'development' && process.env.OTP_DEV_INSPECTOR === 'true'
+    ...(process.env.NODE_ENV === 'development' &&
+    process.env.OTP_DEV_INSPECTOR === 'true'
       ? [DevModule]
       : []),
   ],
@@ -65150,7 +65151,11 @@ export class PhoneVerifiedGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const userId = request.user?.id;
     if (!userId) {
-      throw new BusinessException('AUTH_OTP_REQUIRED', 'Vérification du téléphone requise.', HttpStatus.FORBIDDEN);
+      throw new BusinessException(
+        'AUTH_OTP_REQUIRED',
+        'Vérification du téléphone requise.',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     const user = await this.userRepository.findOne({
@@ -65159,7 +65164,11 @@ export class PhoneVerifiedGuard implements CanActivate {
     });
 
     if (!user || !user.is_phone_verified) {
-      throw new BusinessException('AUTH_OTP_REQUIRED', 'Vérification du téléphone requise.', HttpStatus.FORBIDDEN);
+      throw new BusinessException(
+        'AUTH_OTP_REQUIRED',
+        'Vérification du téléphone requise.',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     return true;
@@ -65220,7 +65229,9 @@ export class LoggingInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap(() => {
         const response = context.switchToHttp().getResponse();
-        this.logger.log(`${method} ${url} ${response.statusCode} — ${Date.now() - now}ms`);
+        this.logger.log(
+          `${method} ${url} ${response.statusCode} — ${Date.now() - now}ms`,
+        );
       }),
     );
   }
@@ -65244,9 +65255,10 @@ export interface ApiResponse<T> {
 }
 
 @Injectable()
-export class TransformInterceptor<T>
-  implements NestInterceptor<T, ApiResponse<T>>
-{
+export class TransformInterceptor<T> implements NestInterceptor<
+  T,
+  ApiResponse<T>
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler,
@@ -65329,9 +65341,9 @@ export class AdminRealtimeService {
   }
 
   asSseStream(): Observable<MessageEvent> {
-    return this.eventsSubject.asObservable().pipe(
-      map((event) => ({ data: event }) as MessageEvent),
-    );
+    return this.eventsSubject
+      .asObservable()
+      .pipe(map((event) => ({ data: event }) as MessageEvent));
   }
 }
 
@@ -65350,7 +65362,9 @@ export default registerAs('app', () => {
   const parsePortCsv = (value?: string): number[] =>
     parseCsv(value)
       .map((entry) => parseInt(entry, 10))
-      .filter((entry) => Number.isInteger(entry) && entry > 0 && entry <= 65535);
+      .filter(
+        (entry) => Number.isInteger(entry) && entry > 0 && entry <= 65535,
+      );
 
   const defaultCorsOrigins = [
     'http://localhost:3000',
@@ -65374,7 +65388,9 @@ export default registerAs('app', () => {
     port: parseInt(process.env.APP_PORT || '3000', 10),
     host: process.env.APP_HOST || '0.0.0.0',
     appUrl: process.env.APP_URL || 'http://localhost:3000',
-    corsOrigins: Array.from(new Set([...envCorsOrigins, ...defaultCorsOrigins])),
+    corsOrigins: Array.from(
+      new Set([...envCorsOrigins, ...defaultCorsOrigins]),
+    ),
     corsAllowLan,
     corsLanPorts: envLanPorts.length > 0 ? envLanPorts : defaultLanPorts,
   };
@@ -65431,14 +65447,14 @@ function requireEnv(name: string, minLength: number = 32): string {
   if (!value) {
     throw new Error(
       `FATAL: ${name} is required. ` +
-      `Authentication cannot operate with a fallback secret. ` +
-      `Set a strong secret of at least ${minLength} characters in your environment.`
+        `Authentication cannot operate with a fallback secret. ` +
+        `Set a strong secret of at least ${minLength} characters in your environment.`,
     );
   }
   if (value.length < minLength) {
     throw new Error(
       `FATAL: ${name} is too short (${value.length} chars). ` +
-      `Minimum required: ${minLength} characters for cryptographic security.`
+        `Minimum required: ${minLength} characters for cryptographic security.`,
     );
   }
   return value;
@@ -65461,7 +65477,9 @@ export default registerAs('minio', () => ({
   port: parseInt(process.env.MINIO_PORT || '9000', 10),
   useSSL: process.env.MINIO_USE_SSL === 'true',
   publicEndpoint:
-    process.env.MINIO_PUBLIC_ENDPOINT || process.env.MINIO_ENDPOINT || 'localhost',
+    process.env.MINIO_PUBLIC_ENDPOINT ||
+    process.env.MINIO_ENDPOINT ||
+    'localhost',
   publicPort: parseInt(
     process.env.MINIO_PUBLIC_PORT || process.env.MINIO_PORT || '9000',
     10,
@@ -65547,7 +65565,8 @@ export default registerAs('whatsapp', () => ({
   apiUrl: process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0',
   apiToken: process.env.WHATSAPP_API_TOKEN || '',
   phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-  otpTemplateName: process.env.WHATSAPP_OTP_TEMPLATE_NAME || 'fiers_artisans_otp',
+  otpTemplateName:
+    process.env.WHATSAPP_OTP_TEMPLATE_NAME || 'fiers_artisans_otp',
 }));
 
 ================================================================================
@@ -65555,9 +65574,7 @@ PATH: backend/src/database/migrations/AddPaymentManualReplacement1710000000002.t
 --------------------------------------------------------------------------------
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddPaymentManualReplacement1710000000002
-  implements MigrationInterface
-{
+export class AddPaymentManualReplacement1710000000002 implements MigrationInterface {
   name = 'AddPaymentManualReplacement1710000000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -65599,9 +65616,7 @@ PATH: backend/src/database/migrations/AddPaymentManualRequestNumberAndCooldown17
 --------------------------------------------------------------------------------
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddPaymentManualRequestNumberAndCooldown1710000000000
-  implements MigrationInterface
-{
+export class AddPaymentManualRequestNumberAndCooldown1710000000000 implements MigrationInterface {
   name = 'AddPaymentManualRequestNumberAndCooldown1710000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -65669,9 +65684,7 @@ PATH: backend/src/database/migrations/AddPaymentManualSubscriptionRequestIndex17
 --------------------------------------------------------------------------------
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddPaymentManualSubscriptionRequestIndex1710000000001
-  implements MigrationInterface
-{
+export class AddPaymentManualSubscriptionRequestIndex1710000000001 implements MigrationInterface {
   name = 'AddPaymentManualSubscriptionRequestIndex1710000000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -65786,11 +65799,21 @@ export class CreatePaymentManual1699999999999 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_proof_suspected_fraud`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_proof_payment_submitted`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_manual_refund_required`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_manual_status_expires`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_manual_sub_created`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_proof_suspected_fraud`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_proof_payment_submitted`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_manual_refund_required`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_manual_status_expires`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_manual_sub_created`,
+    );
 
     await queryRunner.query(`DROP TABLE IF EXISTS payment_proof`);
     await queryRunner.query(`DROP TABLE IF EXISTS payment_manual`);
@@ -65919,7 +65942,7 @@ const categories = [
     subcategories: [
       'Soudeur arc',
       'Soudeur inox',
-      'Ferronnier d\'art',
+      "Ferronnier d'art",
       'Chaudronnier',
       'Forgeron',
       'Fabricant portail métallique',
@@ -65973,7 +65996,7 @@ const categories = [
     icon_url: '🧹',
     display_order: 12,
     subcategories: [
-      'Agent d\'entretien',
+      "Agent d'entretien",
       'Femme/Homme de ménage',
       'Repassage à domicile',
       'Nounou',
@@ -66055,7 +66078,9 @@ export async function seedCategories(dataSource: DataSource): Promise<void> {
   const subcategoryRepo = dataSource.getRepository('subcategories');
 
   for (const cat of categories) {
-    const existingCat = await categoryRepo.findOne({ where: { slug: cat.slug } });
+    const existingCat = await categoryRepo.findOne({
+      where: { slug: cat.slug },
+    });
     const categoryId = existingCat?.id ?? randomUUID();
 
     await categoryRepo.save({
@@ -66218,7 +66243,10 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters';
-import { LoggingInterceptor, TransformInterceptor } from './common/interceptors';
+import {
+  LoggingInterceptor,
+  TransformInterceptor,
+} from './common/interceptors';
 
 const PRIVATE_LAN_HOST_PATTERN =
   /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})$/;
@@ -66265,8 +66293,8 @@ async function bootstrap() {
   if (!processNodeEnv) {
     Logger.error(
       'FATAL: NODE_ENV is not set. ' +
-      'The application cannot start without an explicit environment. ' +
-      'Set NODE_ENV=production or NODE_ENV=development.',
+        'The application cannot start without an explicit environment. ' +
+        'Set NODE_ENV=production or NODE_ENV=development.',
       'Bootstrap',
     );
     process.exit(1);
@@ -66276,8 +66304,8 @@ async function bootstrap() {
     if (process.env.OTP_DEV_INSPECTOR === 'true') {
       Logger.error(
         'FATAL: OTP_DEV_INSPECTOR=true is strictly forbidden in production. ' +
-        'This would expose OTP codes to potential attackers. ' +
-        'Set OTP_DEV_INSPECTOR=false or unset it.',
+          'This would expose OTP codes to potential attackers. ' +
+          'Set OTP_DEV_INSPECTOR=false or unset it.',
         'Bootstrap',
       );
       process.exit(1);
@@ -66292,7 +66320,9 @@ async function bootstrap() {
     'JWT_SECRET',
     'JWT_REFRESH_SECRET',
   ];
-  const missing = requiredSecrets.filter((k) => !process.env[k] || process.env[k]?.startsWith('change_me'));
+  const missing = requiredSecrets.filter(
+    (k) => !process.env[k] || process.env[k]?.startsWith('change_me'),
+  );
   if (missing.length > 0 && process.env.NODE_ENV === 'production') {
     Logger.error(
       `Missing or insecure required secrets: ${missing.join(', ')}. Refusing to start in production.`,
@@ -66312,7 +66342,9 @@ async function bootstrap() {
   });
   // Required behind reverse proxies (Nginx) so rate limiting sees real client IP.
   const httpAdapter = app.getHttpAdapter();
-  const httpServer = httpAdapter.getInstance() as { set?: (key: string, value: unknown) => void };
+  const httpServer = httpAdapter.getInstance() as {
+    set?: (key: string, value: unknown) => void;
+  };
   httpServer.set?.('trust proxy', 1);
 
   const configService = app.get(ConfigService);
@@ -66339,10 +66371,7 @@ async function bootstrap() {
         return;
       }
 
-      if (
-        nodeEnv !== 'production' &&
-        isLoopbackOriginAllowed(origin)
-      ) {
+      if (nodeEnv !== 'production' && isLoopbackOriginAllowed(origin)) {
         callback(null, true);
         return;
       }
@@ -66382,7 +66411,9 @@ async function bootstrap() {
   if (configService.get<string>('app.nodeEnv') !== 'production') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Fiers Artisans API')
-      .setDescription('API pour la plateforme Fiers Artisans — Marketplace artisans ivoiriens')
+      .setDescription(
+        'API pour la plateforme Fiers Artisans — Marketplace artisans ivoiriens',
+      )
       .setVersion('1.0')
       .addBearerAuth()
       .build();
@@ -66396,15 +66427,9 @@ async function bootstrap() {
     'Bootstrap',
   );
   if (host !== 'localhost') {
-    Logger.log(
-      `🔁 Loopback access: http://localhost:${port}`,
-      'Bootstrap',
-    );
+    Logger.log(`🔁 Loopback access: http://localhost:${port}`, 'Bootstrap');
   }
-  Logger.log(
-    `📖 Swagger docs: http://localhost:${port}/api/docs`,
-    'Bootstrap',
-  );
+  Logger.log(`📖 Swagger docs: http://localhost:${port}/api/docs`, 'Bootstrap');
 }
 bootstrap();
 
@@ -66668,7 +66693,9 @@ export class AdminService {
         .createQueryBuilder('pm')
         .select('COALESCE(SUM(pm.amount_fcfa), 0)', 'total')
         .where('pm.status = :status', { status: PaymentManualStatus.COMPLETED })
-        .andWhere('DATE_TRUNC(\'month\', pm.validated_at) = DATE_TRUNC(\'month\', NOW())')
+        .andWhere(
+          "DATE_TRUNC('month', pm.validated_at) = DATE_TRUNC('month', NOW())",
+        )
         .getRawOne()
         .then((r) => parseInt(r.total, 10)),
       this.paymentManualRepository
@@ -66681,7 +66708,10 @@ export class AdminService {
           'rate',
         )
         .where('pm.status IN (:...statuses)', {
-          statuses: [PaymentManualStatus.COMPLETED, PaymentManualStatus.REJECTED],
+          statuses: [
+            PaymentManualStatus.COMPLETED,
+            PaymentManualStatus.REJECTED,
+          ],
           completed: PaymentManualStatus.COMPLETED,
         })
         .getRawOne()
@@ -67030,7 +67060,9 @@ export class AnalyticsService {
           });
         })
         .catch((error) => {
-          this.logger.warn(`Analytics write failed for action ${data.action}: ${error}`);
+          this.logger.warn(
+            `Analytics write failed for action ${data.action}: ${error}`,
+          );
         });
     });
   }
@@ -67117,8 +67149,8 @@ export class AnalyticsService {
         indexFound: Boolean(ttlIndex),
         actualTtlSeconds:
           typeof ttlIndex?.expireAfterSeconds === 'number'
-              ? ttlIndex.expireAfterSeconds
-              : undefined,
+            ? ttlIndex.expireAfterSeconds
+            : undefined,
       };
     } catch (error) {
       this.logger.warn(`Unable to inspect activity log TTL index: ${error}`);
@@ -67190,6 +67222,7 @@ PATH: backend/src/modules/auth/auth.controller.ts
 --------------------------------------------------------------------------------
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
   RegisterArtisanDto,
@@ -67217,16 +67250,19 @@ export class AuthController {
   }
 
   @Post('send-otp')
+  @Throttle({ default: { limit: 3, ttl: 3600000 } })
   sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto.phone_number);
   }
 
   @Post('verify-otp')
+  @Throttle({ default: { limit: 5, ttl: 300000 } })
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto.phone_number, dto.code);
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 10, ttl: 900000 } })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
@@ -67281,11 +67317,17 @@ import { PinLoginGuardService } from './pin-login-guard.service';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret') || 'fallback-secret',
         signOptions: {
-          expiresIn: (configService.get<string>('jwt.accessExpiration') || '15m') as any,
+          expiresIn: (configService.get<string>('jwt.accessExpiration') ||
+            '15m') as any,
         },
       }),
     }),
-    TypeOrmModule.forFeature([User, ArtisanProfile, ClientProfile, Subcategory]),
+    TypeOrmModule.forFeature([
+      User,
+      ArtisanProfile,
+      ClientProfile,
+      Subcategory,
+    ]),
     AnalyticsModule,
   ],
   controllers: [AuthController],
@@ -67304,11 +67346,7 @@ export class AuthModule {}
 ================================================================================
 PATH: backend/src/modules/auth/auth.service.ts
 --------------------------------------------------------------------------------
-import {
-  Injectable,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, HttpStatus, Logger } from '@nestjs/common';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -67402,18 +67440,18 @@ export class AuthService {
   }
 
   async registerArtisan(dto: RegisterArtisanDto) {
-    this.ensureCoordinatesPresent(
-      dto.latitude,
-      dto.longitude,
-      'artisan',
-    );
+    this.ensureCoordinatesPresent(dto.latitude, dto.longitude, 'artisan');
 
     // Vérifier l'unicité du numéro
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
     });
     if (existing) {
-      throw new BusinessException('AUTH_PHONE_ALREADY_USED', 'Ce numéro de téléphone est déjà utilisé.', HttpStatus.CONFLICT);
+      throw new BusinessException(
+        'AUTH_PHONE_ALREADY_USED',
+        'Ce numéro de téléphone est déjà utilisé.',
+        HttpStatus.CONFLICT,
+      );
     }
 
     // Créer l'utilisateur
@@ -67474,7 +67512,11 @@ export class AuthService {
     await this.artisanProfileRepository.save(profile);
 
     this.logger.log(`Artisan registered: ${savedUser.id}`);
-    this.analyticsService.logActivity({ actorId: savedUser.id, action: 'REGISTRATION', metadata: { role: 'ARTISAN' } });
+    this.analyticsService.logActivity({
+      actorId: savedUser.id,
+      action: 'REGISTRATION',
+      metadata: { role: 'ARTISAN' },
+    });
     this.adminRealtimeService.emit('ARTISAN_REGISTERED', {
       userId: savedUser.id,
       artisanProfileId: profile.id,
@@ -67485,17 +67527,17 @@ export class AuthService {
   }
 
   async registerClient(dto: RegisterClientDto) {
-    this.ensureCoordinatesPresent(
-      dto.latitude,
-      dto.longitude,
-      'client',
-    );
+    this.ensureCoordinatesPresent(dto.latitude, dto.longitude, 'client');
 
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
     });
     if (existing) {
-      throw new BusinessException('AUTH_PHONE_ALREADY_USED', 'Ce numéro de téléphone est déjà utilisé.', HttpStatus.CONFLICT);
+      throw new BusinessException(
+        'AUTH_PHONE_ALREADY_USED',
+        'Ce numéro de téléphone est déjà utilisé.',
+        HttpStatus.CONFLICT,
+      );
     }
 
     const pin_hash = await bcrypt.hash(dto.pin_code, 12);
@@ -67524,7 +67566,11 @@ export class AuthService {
     await this.clientProfileRepository.save(profile);
 
     this.logger.log(`Client registered: ${savedUser.id}`);
-    this.analyticsService.logActivity({ actorId: savedUser.id, action: 'REGISTRATION', metadata: { role: 'CLIENT' } });
+    this.analyticsService.logActivity({
+      actorId: savedUser.id,
+      action: 'REGISTRATION',
+      metadata: { role: 'CLIENT' },
+    });
     this.adminRealtimeService.emit('CLIENT_REGISTERED', {
       userId: savedUser.id,
       clientProfileId: profile.id,
@@ -67550,7 +67596,9 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     if (await this.pinLoginGuardService.isBlocked(dto.phone_number)) {
-      const ttl = await this.pinLoginGuardService.blockTtlSeconds(dto.phone_number);
+      const ttl = await this.pinLoginGuardService.blockTtlSeconds(
+        dto.phone_number,
+      );
       throw new BusinessException(
         'AUTH_PIN_BLOCKED',
         `Trop de tentatives. Réessayez dans ${ttl || 1} secondes.`,
@@ -67591,7 +67639,11 @@ export class AuthService {
     await this.pinLoginGuardService.clearFailures(dto.phone_number);
 
     if (!user.is_active) {
-      throw new BusinessException('AUTH_ACCOUNT_DISABLED', 'Compte désactivé.', HttpStatus.UNAUTHORIZED);
+      throw new BusinessException(
+        'AUTH_ACCOUNT_DISABLED',
+        'Compte désactivé.',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     // Si téléphone non vérifié → envoyer OTP et bloquer
@@ -67599,12 +67651,22 @@ export class AuthService {
       try {
         await this.otpService.sendOtp(user.phone_number);
       } catch (e) {
-        this.logger.warn(`OTP send failed during login for ${user.phone_number}: ${e.message}`);
+        this.logger.warn(
+          `OTP send failed during login for ${user.phone_number}: ${e.message}`,
+        );
       }
-      throw new BusinessException('AUTH_OTP_REQUIRED', 'Vérification du téléphone requise.', HttpStatus.FORBIDDEN);
+      throw new BusinessException(
+        'AUTH_OTP_REQUIRED',
+        'Vérification du téléphone requise.',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
-    this.analyticsService.logActivity({ actorId: user.id, action: 'LOGIN', metadata: { role: user.role } });
+    this.analyticsService.logActivity({
+      actorId: user.id,
+      action: 'LOGIN',
+      metadata: { role: user.role },
+    });
     return this.generateTokens(user);
   }
 
@@ -67629,7 +67691,10 @@ export class AuthService {
     const saved = await this.userRepository.save(user);
 
     await this.pinLoginGuardService.clearFailures(dto.phone_number);
-    this.analyticsService.logActivity({ actorId: saved.id, action: 'PIN_SETUP' });
+    this.analyticsService.logActivity({
+      actorId: saved.id,
+      action: 'PIN_SETUP',
+    });
 
     return {
       pin_set: true,
@@ -67640,7 +67705,11 @@ export class AuthService {
   async refreshToken(userId: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user || !user.is_active) {
-      throw new BusinessException('AUTH_INVALID_TOKEN', 'Token invalide.', HttpStatus.UNAUTHORIZED);
+      throw new BusinessException(
+        'AUTH_INVALID_TOKEN',
+        'Token invalide.',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
     return this.generateTokens(user);
   }
@@ -67654,12 +67723,14 @@ export class AuthService {
 
     const access_token = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.secret') || 'fallback',
-      expiresIn: (this.configService.get<string>('jwt.accessExpiration') || '15m') as any,
+      expiresIn: (this.configService.get<string>('jwt.accessExpiration') ||
+        '15m') as any,
     });
 
     const refresh_token = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.refreshSecret') || 'fallback',
-      expiresIn: (this.configService.get<string>('jwt.refreshExpiration') || '30d') as any,
+      expiresIn: (this.configService.get<string>('jwt.refreshExpiration') ||
+        '30d') as any,
     });
 
     // Resolve first_name / last_name from profile
@@ -67726,7 +67797,9 @@ export class RegisterArtisanDto {
   phone_number: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 
   @IsString()
@@ -67791,7 +67864,9 @@ export class RegisterClientDto {
   phone_number: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 
   @IsString()
@@ -67845,7 +67920,9 @@ export class LoginDto {
   phone_number: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 }
 
@@ -67857,7 +67934,9 @@ export class SetupPinDto {
   code: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 }
 
@@ -67907,11 +67986,19 @@ export class OtpService {
     });
     this.OTP_TTL = parseInt(process.env.OTP_TTL_SECONDS || '300', 10);
     this.MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || '5', 10);
-    this.MAX_SENDS_PER_HOUR = parseInt(process.env.OTP_MAX_SENDS_PER_HOUR || '3', 10);
-    this.BLOCK_DURATION = parseInt(process.env.OTP_BLOCK_DURATION_SECONDS || '900', 10);
+    this.MAX_SENDS_PER_HOUR = parseInt(
+      process.env.OTP_MAX_SENDS_PER_HOUR || '3',
+      10,
+    );
+    this.BLOCK_DURATION = parseInt(
+      process.env.OTP_BLOCK_DURATION_SECONDS || '900',
+      10,
+    );
   }
 
-  async sendOtp(phoneNumber: string): Promise<{ sent: boolean; message: string }> {
+  async sendOtp(
+    phoneNumber: string,
+  ): Promise<{ sent: boolean; message: string }> {
     // Vérifier le blocage anti-brute-force
     const blockKey = `otp:block:${phoneNumber}`;
     const isBlocked = await this.redis.exists(blockKey);
@@ -67923,10 +68010,11 @@ export class OtpService {
 
     // Vérifier le nombre d'envois par heure
     const sendCountKey = `otp:sends:${phoneNumber}`;
-    const sendCount = parseInt(await this.redis.get(sendCountKey) || '0') || 0;
+    const sendCount =
+      parseInt((await this.redis.get(sendCountKey)) || '0') || 0;
     if (sendCount >= this.MAX_SENDS_PER_HOUR) {
       throw new BadRequestException(
-        'Nombre maximum d\'envois atteint. Veuillez réessayer dans 1 heure.',
+        "Nombre maximum d'envois atteint. Veuillez réessayer dans 1 heure.",
       );
     }
 
@@ -67951,7 +68039,8 @@ export class OtpService {
 
     if (!sent) {
       // Fallback SMS (si configuré)
-      const smsEnabled = this.configService.get<string>('SMS_PROVIDER_ENABLED') === 'true';
+      const smsEnabled =
+        this.configService.get<string>('SMS_PROVIDER_ENABLED') === 'true';
       if (smsEnabled) {
         this.logger.log('WhatsApp failed, trying SMS fallback...');
         // TODO: Implémenter SMS Twilio provider
@@ -67968,14 +68057,15 @@ export class OtpService {
         this.logger.debug(`[DEV] OTP code for ${phoneNumber}: ${code}`);
         return {
           sent: true,
-          message: 'Code envoyé. Consultez l\'inspecteur OTP dev pour obtenir le code.',
+          message:
+            "Code envoyé. Consultez l'inspecteur OTP dev pour obtenir le code.",
         };
       }
 
       return {
         sent: false,
         message:
-          'Service d\'envoi de code actuellement indisponible. Veuillez réessayer dans quelques instants.',
+          "Service d'envoi de code actuellement indisponible. Veuillez réessayer dans quelques instants.",
       };
     }
 
@@ -67985,10 +68075,7 @@ export class OtpService {
     };
   }
 
-  async verifyOtp(
-    phoneNumber: string,
-    code: string,
-  ): Promise<boolean> {
+  async verifyOtp(phoneNumber: string, code: string): Promise<boolean> {
     const otpKey = `otp:${phoneNumber}`;
     const blockKey = `otp:block:${phoneNumber}`;
 
@@ -68040,8 +68127,10 @@ export class WhatsappOtpProvider {
   constructor(private readonly configService: ConfigService) {
     this.apiUrl = this.configService.get<string>('whatsapp.apiUrl') || '';
     this.apiToken = this.configService.get<string>('whatsapp.apiToken') || '';
-    this.phoneNumberId = this.configService.get<string>('whatsapp.phoneNumberId') || '';
-    this.templateName = this.configService.get<string>('whatsapp.otpTemplateName') || '';
+    this.phoneNumberId =
+      this.configService.get<string>('whatsapp.phoneNumberId') || '';
+    this.templateName =
+      this.configService.get<string>('whatsapp.otpTemplateName') || '';
   }
 
   async sendOtp(phoneNumber: string, code: string): Promise<boolean> {
@@ -68144,7 +68233,12 @@ export class PinLoginGuardService {
     }
 
     if (attempts >= this.maxAttempts) {
-      await this.redis.set(this.blockKey(phoneNumber), '1', 'EX', this.blockDurationSeconds);
+      await this.redis.set(
+        this.blockKey(phoneNumber),
+        '1',
+        'EX',
+        this.blockDurationSeconds,
+      );
       await this.redis.del(key);
     }
   }
@@ -68163,7 +68257,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
+export class JwtRefreshStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-refresh',
+) {
   constructor(private readonly configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -68176,8 +68273,8 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         if (!secret || secret.length < 32) {
           throw new Error(
             'FATAL: JWT_REFRESH_SECRET is not configured or is too short. ' +
-            'The JWT refresh strategy cannot initialize without a secure secret. ' +
-            'Application startup aborted.'
+              'The JWT refresh strategy cannot initialize without a secure secret. ' +
+              'Application startup aborted.',
           );
         }
         return secret;
@@ -68213,8 +68310,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         if (!secret || secret.length < 32) {
           throw new Error(
             'FATAL: JWT_SECRET is not configured or is too short. ' +
-            'The JWT strategy cannot initialize without a secure secret. ' +
-            'Application startup aborted.'
+              'The JWT strategy cannot initialize without a secure secret. ' +
+              'Application startup aborted.',
           );
         }
         return secret;
@@ -68347,12 +68444,7 @@ export class CategoriesService implements OnModuleInit {
 ================================================================================
 PATH: backend/src/modules/categories/entities/category.entity.ts
 --------------------------------------------------------------------------------
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToMany,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Subcategory } from './subcategory.entity';
 
 @Entity('categories')
@@ -68413,7 +68505,12 @@ export class Subcategory {
 ================================================================================
 PATH: backend/src/modules/chat/chat-events.bridge.ts
 --------------------------------------------------------------------------------
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
@@ -68461,7 +68558,8 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>('redis.host') || 'localhost';
     const port = this.configService.get<number>('redis.port') || 6379;
-    const password = this.configService.get<string>('redis.password') || undefined;
+    const password =
+      this.configService.get<string>('redis.password') || undefined;
 
     const connectionOptions = {
       host,
@@ -68489,7 +68587,9 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
       this.subscriber.on('message', this.handleRedisMessage);
       await this.subscriber.subscribe(this.channel);
       this.enabled = true;
-      this.logger.log(`Distributed chat bridge enabled on channel "${this.channel}"`);
+      this.logger.log(
+        `Distributed chat bridge enabled on channel "${this.channel}"`,
+      );
     } catch (error) {
       this.enabled = false;
       this.logger.warn(`Distributed chat bridge disabled: ${error}`);
@@ -68498,10 +68598,7 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     this.subscriber.off('message', this.handleRedisMessage);
-    await Promise.allSettled([
-      this.subscriber.quit(),
-      this.publisher.quit(),
-    ]);
+    await Promise.allSettled([this.subscriber.quit(), this.publisher.quit()]);
   }
 
   async publishConversationEvent(
@@ -68564,7 +68661,11 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      if (event.kind === 'conversation' && event.conversationId && event.event) {
+      if (
+        event.kind === 'conversation' &&
+        event.conversationId &&
+        event.event
+      ) {
         this.server
           .to(`conversation:${event.conversationId}`)
           .emit(event.event, event.payload);
@@ -68572,9 +68673,7 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
       }
 
       if (event.kind === 'user' && event.userId && event.event) {
-        this.server
-          .to(`user:${event.userId}`)
-          .emit(event.event, event.payload);
+        this.server.to(`user:${event.userId}`).emit(event.event, event.payload);
         return;
       }
 
@@ -68683,20 +68782,31 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ChatEventsBridge } from './chat-events.bridge';
 
+const WS_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'https://fiers-artisans.ci',
+];
+
 @WebSocketGateway({
   namespace: '/ws/chat',
-  cors: { origin: '*' },
+  cors: {
+    origin: WS_ALLOWED_ORIGINS,
+    credentials: true,
+    methods: ['GET', 'POST'],
+  },
 })
-export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
   private userSockets = new Map<string, Set<string>>(); // userId -> socketIds
 
   private toClientMessage(message: any) {
     if (!message) return message;
-    const plain = typeof message.toObject === 'function' ? message.toObject() : message;
+    const plain =
+      typeof message.toObject === 'function' ? message.toObject() : message;
     return {
       ...plain,
       id: plain?._id?.toString?.() ?? plain?.id?.toString?.() ?? '',
@@ -68793,7 +68903,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     this.chatEventsBridge
       .publishConversationEvent('newMessage', data.conversationId, payload)
       .catch((error) => {
-        this.logger.warn(`Failed to fan-out newMessage across instances: ${error}`);
+        this.logger.warn(
+          `Failed to fan-out newMessage across instances: ${error}`,
+        );
       });
 
     return payload;
@@ -68816,7 +68928,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         userId,
       })
       .catch((error) => {
-        this.logger.warn(`Failed to fan-out messagesRead across instances: ${error}`);
+        this.logger.warn(
+          `Failed to fan-out messagesRead across instances: ${error}`,
+        );
       });
   }
 
@@ -68824,9 +68938,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     participantId: string,
     isAvailable: boolean,
   ) {
-    const targetUserIds = await this.chatService.findConversationParticipantIds(
-      participantId,
-    );
+    const targetUserIds =
+      await this.chatService.findConversationParticipantIds(participantId);
 
     const payload = {
       participantId,
@@ -68835,11 +68948,15 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     };
 
     for (const userId of targetUserIds) {
-      this.server.to(`user:${userId}`).emit('participantAvailabilityUpdated', payload);
+      this.server
+        .to(`user:${userId}`)
+        .emit('participantAvailabilityUpdated', payload);
       this.chatEventsBridge
         .publishUserEvent('participantAvailabilityUpdated', userId, payload)
         .catch((error) => {
-          this.logger.warn(`Failed to fan-out participant availability across instances: ${error}`);
+          this.logger.warn(
+            `Failed to fan-out participant availability across instances: ${error}`,
+          );
         });
     }
   }
@@ -68850,9 +68967,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     payload: Record<string, unknown>,
   ): Promise<void> {
     this.server.to(`user:${userId}`).emit(event, payload);
-    this.chatEventsBridge.publishUserEvent(event, userId, payload).catch((error) => {
-      this.logger.warn(`Failed to fan-out ${event} for user ${userId}: ${error}`);
-    });
+    this.chatEventsBridge
+      .publishUserEvent(event, userId, payload)
+      .catch((error) => {
+        this.logger.warn(
+          `Failed to fan-out ${event} for user ${userId}: ${error}`,
+        );
+      });
   }
 
   async emitGlobalSyncEvent(
@@ -68941,7 +69062,11 @@ export class ChatModule {}
 ================================================================================
 PATH: backend/src/modules/chat/chat.service.ts
 --------------------------------------------------------------------------------
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Model } from 'mongoose';
@@ -68973,17 +69098,22 @@ export class ChatService {
     private readonly clientProfileRepository: Repository<ClientProfile>,
   ) {}
 
-  async createConversation(
-    participantIds: string[],
-  ): Promise<Conversation> {
-    const uniqueParticipants = Array.from(new Set(participantIds.filter(Boolean)));
+  async createConversation(participantIds: string[]): Promise<Conversation> {
+    const uniqueParticipants = Array.from(
+      new Set(participantIds.filter(Boolean)),
+    );
     if (uniqueParticipants.length < 2) {
-      throw new ForbiddenException('Une conversation nécessite deux participants.');
+      throw new ForbiddenException(
+        'Une conversation nécessite deux participants.',
+      );
     }
 
     // Vérifier si la conversation existe déjà
     const existing = await this.conversationModel.findOne({
-      participants: { $all: uniqueParticipants, $size: uniqueParticipants.length },
+      participants: {
+        $all: uniqueParticipants,
+        $size: uniqueParticipants.length,
+      },
     });
     if (existing) return existing;
 
@@ -69061,9 +69191,7 @@ export class ChatService {
     const artisanIds = users
       .filter((u) => u.role === 'ARTISAN')
       .map((u) => u.id);
-    const clientIds = users
-      .filter((u) => u.role === 'CLIENT')
-      .map((u) => u.id);
+    const clientIds = users.filter((u) => u.role === 'CLIENT').map((u) => u.id);
 
     if (artisanIds.length > 0) {
       const profiles = await this.artisanProfileRepository.find({
@@ -69201,7 +69329,10 @@ export class ChatService {
     return Array.from(participantIds);
   }
 
-  async ensureParticipant(conversationId: string, userId: string): Promise<void> {
+  async ensureParticipant(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
     await this.getConversationForParticipant(conversationId, userId);
   }
 
@@ -69215,7 +69346,9 @@ export class ChatService {
     });
 
     if (!conversation) {
-      const exists = await this.conversationModel.exists({ _id: conversationId });
+      const exists = await this.conversationModel.exists({
+        _id: conversationId,
+      });
       if (!exists) {
         throw new NotFoundException('Conversation non trouvée.');
       }
@@ -69331,7 +69464,9 @@ export class DevOtpController {
     });
     const key = this.configService.get<string>('OTP_DEV_KEY');
     if (!key) {
-      this.logger.error('OTP_DEV_KEY is not set in .env — dev inspector will reject all requests');
+      this.logger.error(
+        'OTP_DEV_KEY is not set in .env — dev inspector will reject all requests',
+      );
     }
     this.devKey = key || '';
   }
@@ -69344,7 +69479,7 @@ export class DevOtpController {
     // ── HARDENING: Dev endpoint locked to development only ───────────
     if (process.env.NODE_ENV !== 'development') {
       throw new ForbiddenException(
-        'Dev OTP inspector is only available in development environment.'
+        'Dev OTP inspector is only available in development environment.',
       );
     }
     // ── FIN HARDENING ──────────────────────────────────────────────
@@ -69416,8 +69551,11 @@ export class DevModule {
    * Appelé par AppModule pour conditionner l'import.
    */
   static isEnabled(configService: ConfigService): boolean {
-    const nodeEnv = configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
-    const inspectorFlag = configService.get<string>('OTP_DEV_INSPECTOR') || process.env.OTP_DEV_INSPECTOR;
+    const nodeEnv =
+      configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
+    const inspectorFlag =
+      configService.get<string>('OTP_DEV_INSPECTOR') ||
+      process.env.OTP_DEV_INSPECTOR;
     return nodeEnv === 'development' && inspectorFlag === 'true';
   }
 }
@@ -69517,7 +69655,9 @@ export class MetricsController {
 
   @Get()
   @SkipThrottle()
-  async getMetrics(@Res({ passthrough: true }) response: Response): Promise<string> {
+  async getMetrics(
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<string> {
     response.setHeader('Content-Type', this.metricsService.getContentType());
     response.setHeader('Cache-Control', 'no-store');
     return this.metricsService.getMetricsSnapshot();
@@ -69528,10 +69668,7 @@ export class MetricsController {
 PATH: backend/src/modules/health/metrics.service.ts
 --------------------------------------------------------------------------------
 import { Injectable } from '@nestjs/common';
-import {
-  Registry,
-  collectDefaultMetrics,
-} from 'prom-client';
+import { Registry, collectDefaultMetrics } from 'prom-client';
 
 let defaultMetricsInitialized = false;
 const metricsRegistry = new Registry();
@@ -69624,7 +69761,9 @@ export class MediaController {
   private getBucket(
     bucketKey: 'portfolio' | 'documents' | 'media' | 'profiles',
   ): string {
-    return this.configService.get<string>(`minio.buckets.${bucketKey}`) || bucketKey;
+    return (
+      this.configService.get<string>(`minio.buckets.${bucketKey}`) || bucketKey
+    );
   }
 
   private getAllowedUploadBuckets(): string[] {
@@ -69728,7 +69867,7 @@ export class MediaController {
         'Cache-Control': 'private, max-age=3600',
         'Content-Disposition': 'inline',
       });
-      (stream as NodeJS.ReadableStream).pipe(res);
+      stream.pipe(res);
     } catch {
       throw new NotFoundException('Fichier introuvable.');
     }
@@ -69741,7 +69880,9 @@ export class MediaController {
     @Res() res: Response,
   ) {
     if (!this.isPublicBucket(bucket)) {
-      throw new ForbiddenException('AccĂ¨s public non autorisĂ© pour ce bucket.');
+      throw new ForbiddenException(
+        'AccĂ¨s public non autorisĂ© pour ce bucket.',
+      );
     }
 
     try {
@@ -69755,7 +69896,7 @@ export class MediaController {
         'Cache-Control': 'public, max-age=3600',
         'Content-Disposition': 'inline',
       });
-      (stream as NodeJS.ReadableStream).pipe(res);
+      stream.pipe(res);
     } catch {
       throw new NotFoundException('Fichier introuvable.');
     }
@@ -69845,7 +69986,8 @@ export class MediaService {
 
   async onModuleInit() {
     // Créer les buckets s'ils n'existent pas
-    const buckets = this.configService.get<Record<string, string>>('minio.buckets') || {};
+    const buckets =
+      this.configService.get<Record<string, string>>('minio.buckets') || {};
     for (const bucket of Object.values(buckets)) {
       const exists = await this.minioClient.bucketExists(bucket);
       if (!exists) {
@@ -69867,7 +70009,9 @@ export class MediaService {
       );
     }
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('Le fichier dépasse la taille maximale de 10 MB.');
+      throw new BadRequestException(
+        'Le fichier dépasse la taille maximale de 10 MB.',
+      );
     }
 
     const fileId = randomUUID();
@@ -69911,9 +70055,15 @@ export class MediaService {
         ),
       ]);
     } else {
-      await this.minioClient.putObject(bucket, objectKey, file.buffer, file.size, {
-        'Content-Type': file.mimetype,
-      });
+      await this.minioClient.putObject(
+        bucket,
+        objectKey,
+        file.buffer,
+        file.size,
+        {
+          'Content-Type': file.mimetype,
+        },
+      );
     }
 
     // Sauvegarder les métadonnées dans MongoDB
@@ -69967,16 +70117,24 @@ export class MediaService {
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('Le fichier depasse la taille maximale de 10 MB.');
+      throw new BadRequestException(
+        'Le fichier depasse la taille maximale de 10 MB.',
+      );
     }
 
     const ext = file.originalname.split('.').pop() || 'bin';
     const fileId = randomUUID();
     const objectKey = forcedObjectKey || `${fileId}.${ext}`;
 
-    await this.minioClient.putObject(bucket, objectKey, file.buffer, file.size, {
-      'Content-Type': file.mimetype || 'application/octet-stream',
-    });
+    await this.minioClient.putObject(
+      bucket,
+      objectKey,
+      file.buffer,
+      file.size,
+      {
+        'Content-Type': file.mimetype || 'application/octet-stream',
+      },
+    );
 
     const media = (await this.mediaFileModel.create({
       userId,
@@ -70001,12 +70159,15 @@ export class MediaService {
   async streamFile(
     bucket: string,
     objectKey: string,
-  ): Promise<{ stream: NodeJS.ReadableStream; contentType: string; size: number }> {
+  ): Promise<{
+    stream: NodeJS.ReadableStream;
+    contentType: string;
+    size: number;
+  }> {
     const stat = await this.minioClient.statObject(bucket, objectKey);
     const stream = await this.minioClient.getObject(bucket, objectKey);
     const contentType =
-      stat.metaData?.['content-type'] ||
-      this.guessMimeType(objectKey);
+      stat.metaData?.['content-type'] || this.guessMimeType(objectKey);
     return { stream, contentType, size: stat.size };
   }
 
@@ -70067,14 +70228,7 @@ export const MediaFileSchema = SchemaFactory.createForClass(MediaFile);
 ================================================================================
 PATH: backend/src/modules/notifications/notifications.controller.ts
 --------------------------------------------------------------------------------
-import {
-  Controller,
-  Get,
-  Put,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Put, Param, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { NotificationsService } from './notifications.service';
 import { CurrentUser } from '../../common/decorators';
@@ -70281,7 +70435,9 @@ export class NotificationsService {
     });
   }
 
-  private toClientNotification(notification: Notification): Record<string, unknown> {
+  private toClientNotification(
+    notification: Notification,
+  ): Record<string, unknown> {
     const asAny = notification as any;
     const plain =
       typeof asAny.toObject === 'function' ? asAny.toObject() : asAny;
@@ -70440,8 +70596,7 @@ export class Notification extends Document {
   expireAt: Date;
 }
 
-export const NotificationSchema =
-  SchemaFactory.createForClass(Notification);
+export const NotificationSchema = SchemaFactory.createForClass(Notification);
 
 ================================================================================
 PATH: backend/src/modules/payment-manual/controllers/payment-manual-admin.controller.ts
@@ -70770,9 +70925,7 @@ export class AdminFilterDto {
     PaymentManualStatus.EXPIRED,
     'REFUND_REQUIRED',
   ])
-  status?:
-    | PaymentManualStatus
-    | 'REFUND_REQUIRED';
+  status?: PaymentManualStatus | 'REFUND_REQUIRED';
 
   @IsOptional()
   @Type(() => Number)
@@ -70837,7 +70990,8 @@ const IVOIRIAN_MOBILE_PHONE = /^(07|05|01)\d{8}$/;
 export class SubmitProofDto {
   @IsString()
   @Matches(IVOIRIAN_MOBILE_PHONE, {
-    message: 'Le numero expediteur doit etre un mobile ivoirien valide (07, 05 ou 01 + 8 chiffres).',
+    message:
+      'Le numero expediteur doit etre un mobile ivoirien valide (07, 05 ou 01 + 8 chiffres).',
   })
   sender_number: string;
 
@@ -70995,7 +71149,10 @@ import {
 } from 'typeorm';
 import { PaymentManual } from './payment-manual.entity';
 
-@Index('IDX_PAYMENT_PROOF_PAYMENT_SUBMITTED', ['payment_manual_id', 'submitted_at'])
+@Index('IDX_PAYMENT_PROOF_PAYMENT_SUBMITTED', [
+  'payment_manual_id',
+  'submitted_at',
+])
 @Entity('payment_proof')
 export class PaymentProof {
   @PrimaryGeneratedColumn('uuid')
@@ -71096,15 +71253,19 @@ export class PaymentRealtimeService {
     this.adminRealtimeService.emit(PAYMENT_MANUAL_UPDATED, payload);
 
     if (payload.userId) {
-      await this.chatGateway.emitUserSyncEvent(payload.userId, 'manualPaymentUpdated', {
-        paymentId: payload.paymentId,
-        transactionId: payload.transactionId,
-        status: payload.status,
-        rejectionReason: payload.rejectionReason ?? null,
-        refundRequired: payload.refundRequired ?? false,
-        refundDone: payload.refundDone ?? false,
-        updatedAt: payload.updatedAt,
-      });
+      await this.chatGateway.emitUserSyncEvent(
+        payload.userId,
+        'manualPaymentUpdated',
+        {
+          paymentId: payload.paymentId,
+          transactionId: payload.transactionId,
+          status: payload.status,
+          rejectionReason: payload.rejectionReason ?? null,
+          refundRequired: payload.refundRequired ?? false,
+          refundDone: payload.refundDone ?? false,
+          updatedAt: payload.updatedAt,
+        },
+      );
     }
   }
 
@@ -71242,9 +71403,9 @@ describe('ExifExtractorService', () => {
     expect(exif.device).toContain('Apple');
     expect(exif.device).toContain('iPhone 14');
     expect(exif.software).toContain('Photoshop');
-    expect(
-      exif.captureDate === null || exif.captureDate instanceof Date,
-    ).toBe(true);
+    expect(exif.captureDate === null || exif.captureDate instanceof Date).toBe(
+      true,
+    );
     expect(
       exif.modifiedDate === null || exif.modifiedDate instanceof Date,
     ).toBe(true);
@@ -71279,20 +71440,23 @@ export class ExifExtractorService {
     const exifTags = this.parseExifTags(metadata.exif);
 
     const captureDate = this.parseExifDate(
-      exifTags.DateTimeOriginal || exifTags.CreateDate || exifTags.DateTimeDigitized || null,
+      exifTags.DateTimeOriginal ||
+        exifTags.CreateDate ||
+        exifTags.DateTimeDigitized ||
+        null,
     );
     const modifiedDate = this.parseExifDate(
       exifTags.ModifyDate || exifTags.DateTime || null,
     );
 
-    const deviceParts = [exifTags.Make || metadataAny.make, exifTags.Model || metadataAny.model]
+    const deviceParts = [
+      exifTags.Make || metadataAny.make,
+      exifTags.Model || metadataAny.model,
+    ]
       .filter((v) => typeof v === 'string' && v.trim().length > 0)
       .map((v) => (v as string).trim());
 
-    const software =
-      exifTags.Software ||
-      metadataAny.software ||
-      null;
+    const software = exifTags.Software || metadataAny.software || null;
 
     return {
       captureDate,
@@ -71353,7 +71517,9 @@ export class ExifExtractorService {
       return {};
     }
 
-    const endian = exifBuffer.subarray(exifStart, exifStart + 2).toString('ascii');
+    const endian = exifBuffer
+      .subarray(exifStart, exifStart + 2)
+      .toString('ascii');
     const littleEndian = endian === 'II';
     if (!littleEndian && endian !== 'MM') {
       return {};
@@ -71396,7 +71562,11 @@ export class ExifExtractorService {
     const values: Record<string, string> = {};
     const visitedIfdOffsets = new Set<number>();
 
-    const readAsciiValue = (entryOffset: number, type: number, count: number): string | null => {
+    const readAsciiValue = (
+      entryOffset: number,
+      type: number,
+      count: number,
+    ): string | null => {
       if (type !== 2 || count <= 0) {
         return null;
       }
@@ -71405,7 +71575,10 @@ export class ExifExtractorService {
       let valueBytes: Buffer | null = null;
       if (valueLength <= 4) {
         if (entryOffset + 12 > exifBuffer.length) return null;
-        valueBytes = exifBuffer.subarray(entryOffset + 8, entryOffset + 8 + valueLength);
+        valueBytes = exifBuffer.subarray(
+          entryOffset + 8,
+          entryOffset + 8 + valueLength,
+        );
       } else {
         const rel = readU32(entryOffset + 8);
         if (rel === null) return null;
@@ -71414,7 +71587,10 @@ export class ExifExtractorService {
         valueBytes = exifBuffer.subarray(abs, abs + valueLength);
       }
 
-      const raw = valueBytes.toString('utf8').replace(/\u0000/g, '').trim();
+      const raw = valueBytes
+        .toString('utf8')
+        .replace(/\u0000/g, '')
+        .trim();
       return raw.length > 0 ? raw : null;
     };
 
@@ -71485,7 +71661,11 @@ import { ExifData } from './exif-extractor.service';
 
 @Injectable()
 export class FraudDetectionService {
-  scoreImage(_hash: string, _exif: ExifData, _metadata: Record<string, unknown>): number {
+  scoreImage(
+    _hash: string,
+    _exif: ExifData,
+    _metadata: Record<string, unknown>,
+  ): number {
     // Phase 1: stub kept intentionally deterministic.
     return 0.0;
   }
@@ -71570,14 +71750,14 @@ describe('PaymentManualService', () => {
       } as any,
       {
         validateImage: jest.fn(),
-      } as any,
+      },
       {
         extract: jest.fn(),
         detectSuspiciousSoftware: jest.fn(),
       } as any,
       {
         scoreImage: jest.fn(),
-      } as any,
+      },
       {
         emitNewProof: jest.fn(),
         emitPaymentUpdated: jest.fn(),
@@ -71621,14 +71801,12 @@ describe('PaymentManualService', () => {
       amount_fcfa: 5000,
     });
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
-    paymentManualRepository.findOne = jest
-      .fn()
-      .mockResolvedValue({
-        id: 'pm-1',
-        transaction_id: 'TX-1',
-        status: PaymentManualStatus.PENDING,
-        proofs: [],
-      });
+    paymentManualRepository.findOne = jest.fn().mockResolvedValue({
+      id: 'pm-1',
+      transaction_id: 'TX-1',
+      status: PaymentManualStatus.PENDING,
+      proofs: [],
+    });
 
     const result = await service.initiatePayment(
       'user-1',
@@ -71654,16 +71832,14 @@ describe('PaymentManualService', () => {
       amount_fcfa: 5000,
     });
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
-    paymentManualRepository.findOne = jest
-      .fn()
-      .mockResolvedValueOnce({
-        id: 'pm-exp-1',
-        transaction_id: 'TX-EXP-1',
-        status: PaymentManualStatus.EXPIRED,
-        refund_required: true,
-        refund_done_at: null,
-        proofs: [],
-      });
+    paymentManualRepository.findOne = jest.fn().mockResolvedValueOnce({
+      id: 'pm-exp-1',
+      transaction_id: 'TX-EXP-1',
+      status: PaymentManualStatus.EXPIRED,
+      refund_required: true,
+      refund_done_at: null,
+      proofs: [],
+    });
 
     await expect(
       service.initiatePayment('user-1', PaymentProviderManual.ORANGE_MONEY),
@@ -71689,10 +71865,12 @@ describe('PaymentManualService', () => {
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
     paymentManualRepository.findOne = jest.fn().mockResolvedValue(null);
     paymentManualRepository.count = jest.fn().mockResolvedValue(1);
-    paymentManualRepository.save = jest.fn().mockImplementation(async (payload) => ({
-      id: 'pm-new-1',
-      ...payload,
-    }));
+    paymentManualRepository.save = jest
+      .fn()
+      .mockImplementation(async (payload) => ({
+        id: 'pm-new-1',
+        ...payload,
+      }));
 
     const payment = await service.initiatePayment(
       'user-1',
@@ -71743,21 +71921,19 @@ describe('PaymentManualService', () => {
       amount_fcfa: 5000,
     });
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
-    paymentManualRepository.findOne = jest
-      .fn()
-      .mockResolvedValueOnce({
-        id: 'pm-old-1',
-        subscription_id: 'sub-1',
-        transaction_id: 'TX-OLD-1',
-        provider: PaymentProviderManual.MTN_MOMO,
-        amount_fcfa: 5000,
-        status: PaymentManualStatus.REJECTED,
-        validated_at: new Date('2026-05-01T08:00:00.000Z'),
-        refund_required: false,
-        refund_done_at: null,
-        proofs: [],
-        timeline: [],
-      });
+    paymentManualRepository.findOne = jest.fn().mockResolvedValueOnce({
+      id: 'pm-old-1',
+      subscription_id: 'sub-1',
+      transaction_id: 'TX-OLD-1',
+      provider: PaymentProviderManual.MTN_MOMO,
+      amount_fcfa: 5000,
+      status: PaymentManualStatus.REJECTED,
+      validated_at: new Date('2026-05-01T08:00:00.000Z'),
+      refund_required: false,
+      refund_done_at: null,
+      proofs: [],
+      timeline: [],
+    });
     paymentManualRepository.count = jest.fn().mockResolvedValue(1);
     paymentManualRepository.save = jest
       .fn()
@@ -72076,10 +72252,9 @@ export class PaymentManualService implements OnModuleDestroy {
 
     if (
       latestPayment &&
-      [
-        PaymentManualStatus.PENDING,
-        PaymentManualStatus.PENDING_ADMIN,
-      ].includes(latestPayment.status)
+      [PaymentManualStatus.PENDING, PaymentManualStatus.PENDING_ADMIN].includes(
+        latestPayment.status,
+      )
     ) {
       return latestPayment;
     }
@@ -72680,9 +72855,7 @@ export class PaymentManualService implements OnModuleDestroy {
         const shouldDeactivateSubscription =
           !this.hasPendingRefund(payment) &&
           payment.subscription?.status === SubscriptionStatus.ACTIVE;
-        if (
-          shouldDeactivateSubscription
-        ) {
+        if (shouldDeactivateSubscription) {
           await this.subscriptionService.deactivateSubscriptionFromManualPayment(
             {
               subscriptionId: payment.subscription_id,
@@ -72857,7 +73030,7 @@ export class PaymentManualService implements OnModuleDestroy {
     }
 
     const [data, total] = await qb
-      .orderBy('pm.created_at', sortDirection as 'ASC' | 'DESC')
+      .orderBy('pm.created_at', sortDirection)
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
@@ -72904,7 +73077,9 @@ export class PaymentManualService implements OnModuleDestroy {
 
     const [latestPayment] = await this.paymentManualRepository.find({
       where: {
-        subscription_id: In(subscriptions.map((subscription) => subscription.id)),
+        subscription_id: In(
+          subscriptions.map((subscription) => subscription.id),
+        ),
         deleted_at: IsNull(),
       },
       relations: ['proofs', 'subscription', 'subscription.artisan_profile'],
@@ -73195,7 +73370,9 @@ export class PaymentManualService implements OnModuleDestroy {
     );
   }
 
-  private hasActiveCooldown(payment: Pick<PaymentManual, 'cooldown_until'>): boolean {
+  private hasActiveCooldown(
+    payment: Pick<PaymentManual, 'cooldown_until'>,
+  ): boolean {
     if (!payment.cooldown_until) {
       return false;
     }
@@ -73358,8 +73535,9 @@ export class PaymentManualService implements OnModuleDestroy {
     ];
     await this.paymentManualRepository.save(params.previousPayment);
 
-    const artisanProfile =
-      await this.resolvePreferredArtisanProfileForUser(params.userId);
+    const artisanProfile = await this.resolvePreferredArtisanProfileForUser(
+      params.userId,
+    );
     const artisanUserId = artisanProfile.user_id;
 
     if (artisanUserId) {
@@ -73560,7 +73738,12 @@ PATH: backend/src/modules/payment-manual/services/proof-validation.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+];
 const ALLOWED_FORMATS = ['jpeg', 'jpg', 'png', 'webp'];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const MIN_WIDTH = 480;
@@ -73578,7 +73761,9 @@ export interface ProofValidationResult {
 
 @Injectable()
 export class ProofValidationService {
-  async validateImage(file: Express.Multer.File): Promise<ProofValidationResult> {
+  async validateImage(
+    file: Express.Multer.File,
+  ): Promise<ProofValidationResult> {
     if (!file?.buffer || file.buffer.length === 0) {
       throw new BadRequestException('Aucun fichier image fourni.');
     }
@@ -73618,10 +73803,9 @@ export class ProofValidationService {
     const suspiciousCompression = bytesPerPixel < 0.05;
 
     return {
-      mimeType:
-        ALLOWED_MIME_TYPES.includes((file.mimetype || '').toLowerCase())
-          ? file.mimetype.toLowerCase()
-          : `image/${format === 'jpg' ? 'jpeg' : format}`,
+      mimeType: ALLOWED_MIME_TYPES.includes((file.mimetype || '').toLowerCase())
+        ? file.mimetype.toLowerCase()
+        : `image/${format === 'jpg' ? 'jpeg' : format}`,
       sizeBytes: file.size,
       width,
       height,
@@ -73686,7 +73870,11 @@ export class PortfolioController {
     @Body() dto: any,
     @Req() req: Request,
   ) {
-    return this.portfolioService.create(userId, dto, this.getRequestBaseUrl(req));
+    return this.portfolioService.create(
+      userId,
+      dto,
+      this.getRequestBaseUrl(req),
+    );
   }
 
   @Put(':id')
@@ -73916,7 +74104,10 @@ export class PortfolioService {
       artisanProfileId,
       updatedAt: new Date().toISOString(),
     };
-    await this.chatGateway.emitGlobalSyncEvent('artisanPortfolioUpdated', payload);
+    await this.chatGateway.emitGlobalSyncEvent(
+      'artisanPortfolioUpdated',
+      payload,
+    );
     await this.chatGateway.emitUserSyncEvent(
       artisanUserId,
       'artisanPortfolioUpdated',
@@ -73942,7 +74133,9 @@ export class PortfolioService {
           {
             $set: {
               imageObjects,
-              imageUrls: imageObjects.map((img) => this.toStorageMediaValue(img)),
+              imageUrls: imageObjects.map((img) =>
+                this.toStorageMediaValue(img),
+              ),
             },
           },
         )
@@ -73958,7 +74151,9 @@ export class PortfolioService {
   }
 
   private resolveImageObjects(source: any): PortfolioImageObject[] {
-    const fromObjects = this.parseImageObjects(source?.imageObjects ?? source?.images);
+    const fromObjects = this.parseImageObjects(
+      source?.imageObjects ?? source?.images,
+    );
     if (fromObjects.length > 0) {
       return fromObjects;
     }
@@ -73973,8 +74168,8 @@ export class PortfolioService {
     const normalized: PortfolioImageObject[] = [];
     for (const value of values) {
       if (!value || typeof value !== 'object') continue;
-      const bucket = String((value as any).bucket ?? '').trim();
-      const objectKey = String((value as any).objectKey ?? '').trim();
+      const bucket = String(value.bucket ?? '').trim();
+      const objectKey = String(value.objectKey ?? '').trim();
       if (!bucket || !objectKey) continue;
       normalized.push({ bucket, objectKey });
     }
@@ -73995,7 +74190,9 @@ export class PortfolioService {
     return this.dedupeImageObjects(parsed);
   }
 
-  private dedupeImageObjects(values: PortfolioImageObject[]): PortfolioImageObject[] {
+  private dedupeImageObjects(
+    values: PortfolioImageObject[],
+  ): PortfolioImageObject[] {
     const seen = new Set<string>();
     return values.filter((value) => {
       const key = `${value.bucket}/${value.objectKey}`;
@@ -74005,7 +74202,9 @@ export class PortfolioService {
     });
   }
 
-  private extractBucketAndObjectKey(value: string): PortfolioImageObject | null {
+  private extractBucketAndObjectKey(
+    value: string,
+  ): PortfolioImageObject | null {
     if (!value) {
       return null;
     }
@@ -74034,7 +74233,9 @@ export class PortfolioService {
     }
   }
 
-  private extractFromPathParts(pathParts: string[]): PortfolioImageObject | null {
+  private extractFromPathParts(
+    pathParts: string[],
+  ): PortfolioImageObject | null {
     if (pathParts.length < 2) {
       return null;
     }
@@ -74044,7 +74245,9 @@ export class PortfolioService {
       const routeType = pathParts[mediaIndex + 1];
       if (routeType === 'file' || routeType === 'public') {
         const bucket = pathParts[mediaIndex + 2];
-        const objectKey = decodeURIComponent(pathParts.slice(mediaIndex + 3).join('/'));
+        const objectKey = decodeURIComponent(
+          pathParts.slice(mediaIndex + 3).join('/'),
+        );
         if (bucket && objectKey) {
           return { bucket, objectKey };
         }
@@ -74064,11 +74267,15 @@ export class PortfolioService {
       return requestBaseUrl.replace(/\/+$/, '');
     }
 
-    const appUrl = this.configService.get<string>('app.appUrl') || 'http://localhost:3000';
+    const appUrl =
+      this.configService.get<string>('app.appUrl') || 'http://localhost:3000';
     return appUrl.replace(/\/+$/, '');
   }
 
-  private buildPublicMediaUrl(baseUrl: string, image: PortfolioImageObject): string {
+  private buildPublicMediaUrl(
+    baseUrl: string,
+    image: PortfolioImageObject,
+  ): string {
     const bucket = encodeURIComponent(image.bucket);
     const objectKey = encodeURIComponent(image.objectKey);
     return `${baseUrl}/api/v1/media/public/${bucket}/${objectKey}`;
@@ -74235,10 +74442,7 @@ export class ReviewsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('CLIENT')
-  create(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CreateReviewDto,
-  ) {
+  create(@CurrentUser('id') userId: string, @Body() dto: CreateReviewDto) {
     return this.reviewsService.create(userId, dto);
   }
 
@@ -74270,7 +74474,10 @@ PATH: backend/src/modules/reviews/reviews.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReviewsService } from './reviews.service';
-import { ReviewsController, ArtisanReviewsController } from './reviews.controller';
+import {
+  ReviewsController,
+  ArtisanReviewsController,
+} from './reviews.controller';
 import { Review } from './entities/review.entity';
 import { ArtisanProfile } from '../users/entities/artisan-profile.entity';
 import { ClientProfile } from '../users/entities/client-profile.entity';
@@ -74510,7 +74717,15 @@ export class ReviewsService {
 ================================================================================
 PATH: backend/src/modules/search/dto/search-artisans.dto.ts
 --------------------------------------------------------------------------------
-import { IsOptional, IsNumber, IsString, IsIn, IsBoolean, Min, Max } from 'class-validator';
+import {
+  IsOptional,
+  IsNumber,
+  IsString,
+  IsIn,
+  IsBoolean,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 export class SearchArtisansDto {
@@ -74633,8 +74848,10 @@ export class SearchService {
       category,
       subcategory,
       query,
-      sort_by = 'distance', available_only = false,
-      page = 1, limit = 20,
+      sort_by = 'distance',
+      available_only = false,
+      page = 1,
+      limit = 20,
     } = dto;
     const offset = (page - 1) * limit;
 
@@ -74680,7 +74897,10 @@ export class SearchService {
 
     if (category) {
       // Accept both category slug and UUID id from mobile
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(category);
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          category,
+        );
       if (isUuid) {
         qb = qb.andWhere('c.id = :category', { category });
       } else {
@@ -74690,7 +74910,10 @@ export class SearchService {
 
     if (subcategory) {
       // Accept both subcategory slug and UUID id from mobile
-      const isSubcategoryUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subcategory);
+      const isSubcategoryUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          subcategory,
+        );
       if (isSubcategoryUuid) {
         qb = qb.andWhere('sc.id = :subcategory', { subcategory });
       } else {
@@ -74706,7 +74929,9 @@ export class SearchService {
     }
 
     if (sort_by === 'rating') {
-      qb = qb.orderBy('ap.rating_avg', 'DESC').addOrderBy('distance_meters', 'ASC');
+      qb = qb
+        .orderBy('ap.rating_avg', 'DESC')
+        .addOrderBy('distance_meters', 'ASC');
     } else {
       qb = qb.orderBy('distance_meters', 'ASC');
     }
@@ -74733,24 +74958,42 @@ export class SearchService {
         rawLongitude != null ? Number(rawLongitude) : null;
       (entity as any).location_updated_at =
         raw[index]?.user_location_updated_at ?? null;
+
+      // ── SECURITY: Strip sensitive user fields from search results ──
+      if ((entity as any).user) {
+        const user = (entity as any).user;
+        (entity as any).user = {
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          phone_number: user.phone_number,
+          email: user.email,
+          verification_status: user.verification_status,
+          created_at: user.created_at,
+        };
+      }
+      // ── FIN SECURITY ──
+
       return entity;
     });
 
     // Fire-and-forget analytics
-    this.analyticsService.logActivity({
-      actorId: 'anonymous',
-      action: 'SEARCH',
-      metadata: {
-        category,
-        subcategory,
-        query,
-        lat,
-        lng,
-        min_rating,
-        available_only,
-        results: total,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: 'anonymous',
+        action: 'SEARCH',
+        metadata: {
+          category,
+          subcategory,
+          query,
+          lat,
+          lng,
+          min_rating,
+          available_only,
+          results: total,
+        },
+      })
+      .catch(() => {});
 
     return {
       data: results,
@@ -74789,7 +75032,11 @@ export enum PaymentStatus {
 }
 
 @Index('IDX_PAYMENTS_STATUS_PAID_AT', ['status', 'paid_at'])
-@Index('IDX_PAYMENTS_SUB_STATUS_CREATED', ['subscription_id', 'status', 'created_at'])
+@Index('IDX_PAYMENTS_SUB_STATUS_CREATED', [
+  'subscription_id',
+  'status',
+  'created_at',
+])
 @Entity('payments')
 export class Payment {
   @PrimaryGeneratedColumn('uuid')
@@ -74805,7 +75052,11 @@ export class Payment {
   @Column({ type: 'int' })
   amount_fcfa: number;
 
-  @Column({ type: 'enum', enum: PaymentProvider, default: PaymentProvider.WAVE })
+  @Column({
+    type: 'enum',
+    enum: PaymentProvider,
+    default: PaymentProvider.WAVE,
+  })
   provider: PaymentProvider;
 
   @Column({ type: 'enum', enum: PaymentStatus, default: PaymentStatus.PENDING })
@@ -74863,13 +75114,21 @@ export class Subscription {
   @Column()
   artisan_profile_id: string;
 
-  @Column({ type: 'enum', enum: SubscriptionPlan, default: SubscriptionPlan.MONTHLY })
+  @Column({
+    type: 'enum',
+    enum: SubscriptionPlan,
+    default: SubscriptionPlan.MONTHLY,
+  })
   plan: SubscriptionPlan;
 
   @Column({ type: 'int', default: 5000 })
   amount_fcfa: number;
 
-  @Column({ type: 'enum', enum: SubscriptionStatus, default: SubscriptionStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: SubscriptionStatus,
+    default: SubscriptionStatus.PENDING,
+  })
   status: SubscriptionStatus;
 
   @Column({ nullable: true })
@@ -75130,7 +75389,9 @@ describe('SubscriptionService', () => {
               if (entity === ArtisanProfile) {
                 return transactionArtisanProfileRepository;
               }
-              throw new Error(`Unexpected repository lookup: ${String(entity)}`);
+              throw new Error(
+                `Unexpected repository lookup: ${String(entity)}`,
+              );
             },
           }),
       ),
@@ -76222,7 +76483,9 @@ export class ArtisanProfile {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @OneToOne(() => Subscription, (sub) => sub.artisan_profile, { nullable: true })
+  @OneToOne(() => Subscription, (sub) => sub.artisan_profile, {
+    nullable: true,
+  })
   subscription: Subscription;
 
   @OneToMany(() => Review, (review) => review.artisan)
@@ -76296,7 +76559,10 @@ import { ClientProfile } from './client-profile.entity';
 import { ArtisanProfile } from './artisan-profile.entity';
 
 @Entity('favorite_artisans')
-@Unique('UQ_favorite_client_artisan', ['client_profile_id', 'artisan_profile_id'])
+@Unique('UQ_favorite_client_artisan', [
+  'client_profile_id',
+  'artisan_profile_id',
+])
 export class FavoriteArtisan {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -76450,18 +76716,23 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
+const WS_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'https://fiers-artisans.ci',
+];
+
 @WebSocketGateway({
   namespace: '/ws/map-visibility',
   cors: {
-    origin: '*',
+    origin: WS_ALLOWED_ORIGINS,
     credentials: true,
+    methods: ['GET', 'POST'],
   },
 })
 export class MapVisibilityGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(MapVisibilityGateway.name);
 
@@ -76880,7 +77151,9 @@ export class UsersService {
     return snapshot.latitude != null && snapshot.longitude != null;
   }
 
-  private async ensureArtisanLocationForVisibility(userId: string): Promise<void> {
+  private async ensureArtisanLocationForVisibility(
+    userId: string,
+  ): Promise<void> {
     if (await this.userHasStoredLocation(userId)) {
       return;
     }
@@ -76978,11 +77251,13 @@ export class UsersService {
       throw new NotFoundException('Artisan non trouvé ou non actif.');
     }
 
-    this.analyticsService.logActivity({
-      actorId: 'anonymous',
-      action: 'PROFILE_VIEW',
-      targetId: profile.id,
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: 'anonymous',
+        action: 'PROFILE_VIEW',
+        targetId: profile.id,
+      })
+      .catch(() => {});
 
     return this.attachLocationSnapshot(profile);
   }
@@ -77048,11 +77323,15 @@ export class UsersService {
         )
         .catch(() => {});
 
-      this.emitMapVisibilityUpdate(savedProfile.user_id, savedProfile.is_available, {
-        category_id: savedProfile.category_id,
-        subcategory_id: savedProfile.subcategory_id,
-        is_subscription_active: savedProfile.is_subscription_active,
-      }).catch(() => {});
+      this.emitMapVisibilityUpdate(
+        savedProfile.user_id,
+        savedProfile.is_available,
+        {
+          category_id: savedProfile.category_id,
+          subcategory_id: savedProfile.subcategory_id,
+          is_subscription_active: savedProfile.is_subscription_active,
+        },
+      ).catch(() => {});
     }
 
     this.adminRealtimeService.emit('ARTISAN_UPDATED', {
@@ -77089,10 +77368,8 @@ export class UsersService {
     window_hours: number;
   }> {
     const profile = await this.getArtisanProfile(userId);
-    const profileViews48h = await this.analyticsService.countProfileViewsInLastHours(
-      profile.id,
-      48,
-    );
+    const profileViews48h =
+      await this.analyticsService.countProfileViewsInLastHours(profile.id, 48);
     return {
       profile_views_48h: profileViews48h,
       window_hours: 48,
@@ -77137,7 +77414,9 @@ export class UsersService {
     return this.attachLocationSnapshot(saved);
   }
 
-  async listFavoriteArtisans(clientUserId: string): Promise<Record<string, any>[]> {
+  async listFavoriteArtisans(
+    clientUserId: string,
+  ): Promise<Record<string, any>[]> {
     const clientProfile = await this.getClientProfile(clientUserId);
     const favorites = await this.favoriteArtisanRepository.find({
       where: { client_profile_id: clientProfile.id },
@@ -77197,9 +77476,8 @@ export class UsersService {
     isFavorite: boolean,
   ): Promise<{ is_favorite: boolean }> {
     const clientProfile = await this.getClientProfile(clientUserId);
-    const artisanProfile = await this.findArtisanProfileByIdentifier(
-      artisanIdentifier,
-    );
+    const artisanProfile =
+      await this.findArtisanProfileByIdentifier(artisanIdentifier);
 
     const existing = await this.favoriteArtisanRepository.findOne({
       where: {
@@ -77245,9 +77523,8 @@ export class UsersService {
     artisanIdentifier: string,
   ): Promise<boolean> {
     const clientProfile = await this.getClientProfile(clientUserId);
-    const artisanProfile = await this.findArtisanProfileByIdentifier(
-      artisanIdentifier,
-    );
+    const artisanProfile =
+      await this.findArtisanProfileByIdentifier(artisanIdentifier);
     const favorite = await this.favoriteArtisanRepository.findOne({
       where: {
         client_profile_id: clientProfile.id,
@@ -77435,7 +77712,13 @@ export class UsersService {
 ================================================================================
 PATH: backend/src/modules/verification/dto/review-document.dto.ts
 --------------------------------------------------------------------------------
-import { IsEnum, IsNotEmpty, IsOptional, IsString, ValidateIf } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  ValidateIf,
+} from 'class-validator';
 import { DocumentStatus } from '../entities/verification-document.entity';
 
 export class ReviewDocumentDto {
@@ -77607,7 +77890,11 @@ export class VerificationDocument {
   })
   pages: VerificationDocumentPage[];
 
-  @Column({ type: 'enum', enum: DocumentStatus, default: DocumentStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: DocumentStatus,
+    default: DocumentStatus.PENDING,
+  })
   status: DocumentStatus;
 
   @Column({ nullable: true })
@@ -77680,7 +77967,11 @@ import { ChatModule } from '../chat/chat.module';
 @Module({
   imports: [
     ChatModule,
-    TypeOrmModule.forFeature([VerificationDocument, VerificationDocumentPage, User]),
+    TypeOrmModule.forFeature([
+      VerificationDocument,
+      VerificationDocumentPage,
+      User,
+    ]),
     NotificationsModule,
   ],
   controllers: [VerificationController],
@@ -77740,15 +78031,15 @@ export class VerificationService {
   ) {}
 
   /** Emits on new submissions and reviews — admin SSE subscribes to this. */
-  private readonly _docEvents$ = new Subject<{ type: string; documentId: string }>();
+  private readonly _docEvents$ = new Subject<{
+    type: string;
+    documentId: string;
+  }>();
 
   /** SSE stream for admin: emits MessageEvents on document changes. */
   get docEvents$(): Observable<MessageEvent> {
     return this._docEvents$.pipe(
-      map(
-        (payload) =>
-          ({ data: payload }) as MessageEvent,
-      ),
+      map((payload) => ({ data: payload }) as MessageEvent),
     );
   }
 
@@ -77814,7 +78105,10 @@ export class VerificationService {
         page_order: 0,
       });
       await this.pageRepository.save(page);
-      this._docEvents$.next({ type: 'DOCUMENT_SUBMITTED', documentId: saved.id });
+      this._docEvents$.next({
+        type: 'DOCUMENT_SUBMITTED',
+        documentId: saved.id,
+      });
       this.adminRealtimeService.emit('VERIFICATION_SUBMITTED', {
         documentId: saved.id,
         userId,
@@ -77835,9 +78129,7 @@ export class VerificationService {
     }
 
     if (!files?.length) {
-      throw new BadRequestException(
-        'Au moins un fichier est requis.',
-      );
+      throw new BadRequestException('Au moins un fichier est requis.');
     }
 
     // Business validation per document type
@@ -78033,7 +78325,7 @@ export class VerificationService {
         !pageRoles.includes(PageRole.BACK)
       ) {
         throw new BadRequestException(
-          'Impossible d\'approuver une CNI incomplète (recto et verso requis).',
+          "Impossible d'approuver une CNI incomplète (recto et verso requis).",
         );
       }
     }
@@ -78043,9 +78335,7 @@ export class VerificationService {
     doc.reviewed_at = new Date();
     if (dto.status === DocumentStatus.REJECTED) {
       if (!dto.rejection_reason?.trim()) {
-        throw new BadRequestException(
-          'Le motif de rejet est obligatoire.',
-        );
+        throw new BadRequestException('Le motif de rejet est obligatoire.');
       }
       doc.rejection_reason = dto.rejection_reason.trim();
     }
@@ -78417,10 +78707,11 @@ function createHarness() {
               enriched.subscription &&
               relations?.includes('subscription.artisan_profile')
             ) {
-              enriched.subscription.artisan_profile = state.artisanProfiles.find(
-                (artisan) =>
-                  artisan.id === enriched.subscription.artisan_profile_id,
-              );
+              enriched.subscription.artisan_profile =
+                state.artisanProfiles.find(
+                  (artisan) =>
+                    artisan.id === enriched.subscription.artisan_profile_id,
+                );
             }
           }
           return enriched;
@@ -78517,7 +78808,11 @@ function createHarness() {
     }),
     save: jest.fn(async (payload: AnyRecord) => {
       if (!payload.id) {
-        const created = { id: randomUUID(), created_at: new Date(), ...payload };
+        const created = {
+          id: randomUUID(),
+          created_at: new Date(),
+          ...payload,
+        };
         state.subscriptions.push(created);
         return created;
       }
@@ -78642,7 +78937,7 @@ function createHarness() {
         bytesPerPixel: 0.08,
         suspiciousCompression: false,
       })),
-    } as any,
+    },
     {
       extract: jest.fn(async () => ({
         captureDate: null,
@@ -78655,7 +78950,7 @@ function createHarness() {
     } as any,
     {
       scoreImage: jest.fn(() => 0.12),
-    } as any,
+    },
     paymentRealtimeService,
     {
       get: jest.fn((key: string) => {
@@ -79070,8 +79365,13 @@ describe('Payment Manual (e2e scenarios)', () => {
   });
 
   it('Scenario 9: a rejected payment after prior validation deactivates the subscription and auto-replaces with a new transaction', async () => {
-    const { service, state, notificationsService, mockFile, subscriptionService } =
-      createHarness();
+    const {
+      service,
+      state,
+      notificationsService,
+      mockFile,
+      subscriptionService,
+    } = createHarness();
     const initiated = await service.initiatePayment(
       'user-1',
       PaymentProviderManual.ORANGE_MONEY,
@@ -79092,7 +79392,9 @@ describe('Payment Manual (e2e scenarios)', () => {
     await service.reopenProof(initiated.id, 'admin-1', 're-review');
     await service.rejectProof(initiated.id, 'admin-2', 'proof invalidated');
 
-    const rejected = state.payments.find((payment) => payment.id === initiated.id)!;
+    const rejected = state.payments.find(
+      (payment) => payment.id === initiated.id,
+    )!;
     const subscription = state.subscriptions.find(
       (row) => row.id === initiated.subscription_id,
     );

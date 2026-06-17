@@ -1,7 +1,12 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+];
 const ALLOWED_FORMATS = ['jpeg', 'jpg', 'png', 'webp'];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const MIN_WIDTH = 480;
@@ -19,7 +24,9 @@ export interface ProofValidationResult {
 
 @Injectable()
 export class ProofValidationService {
-  async validateImage(file: Express.Multer.File): Promise<ProofValidationResult> {
+  async validateImage(
+    file: Express.Multer.File,
+  ): Promise<ProofValidationResult> {
     if (!file?.buffer || file.buffer.length === 0) {
       throw new BadRequestException('Aucun fichier image fourni.');
     }
@@ -59,10 +66,9 @@ export class ProofValidationService {
     const suspiciousCompression = bytesPerPixel < 0.05;
 
     return {
-      mimeType:
-        ALLOWED_MIME_TYPES.includes((file.mimetype || '').toLowerCase())
-          ? file.mimetype.toLowerCase()
-          : `image/${format === 'jpg' ? 'jpeg' : format}`,
+      mimeType: ALLOWED_MIME_TYPES.includes((file.mimetype || '').toLowerCase())
+        ? file.mimetype.toLowerCase()
+        : `image/${format === 'jpg' ? 'jpeg' : format}`,
       sizeBytes: file.size,
       width,
       height,

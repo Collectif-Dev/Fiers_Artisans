@@ -23,11 +23,19 @@ export class OtpService {
     });
     this.OTP_TTL = parseInt(process.env.OTP_TTL_SECONDS || '300', 10);
     this.MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS || '5', 10);
-    this.MAX_SENDS_PER_HOUR = parseInt(process.env.OTP_MAX_SENDS_PER_HOUR || '3', 10);
-    this.BLOCK_DURATION = parseInt(process.env.OTP_BLOCK_DURATION_SECONDS || '900', 10);
+    this.MAX_SENDS_PER_HOUR = parseInt(
+      process.env.OTP_MAX_SENDS_PER_HOUR || '3',
+      10,
+    );
+    this.BLOCK_DURATION = parseInt(
+      process.env.OTP_BLOCK_DURATION_SECONDS || '900',
+      10,
+    );
   }
 
-  async sendOtp(phoneNumber: string): Promise<{ sent: boolean; message: string }> {
+  async sendOtp(
+    phoneNumber: string,
+  ): Promise<{ sent: boolean; message: string }> {
     // Vérifier le blocage anti-brute-force
     const blockKey = `otp:block:${phoneNumber}`;
     const isBlocked = await this.redis.exists(blockKey);
@@ -39,10 +47,11 @@ export class OtpService {
 
     // Vérifier le nombre d'envois par heure
     const sendCountKey = `otp:sends:${phoneNumber}`;
-    const sendCount = parseInt(await this.redis.get(sendCountKey) || '0') || 0;
+    const sendCount =
+      parseInt((await this.redis.get(sendCountKey)) || '0') || 0;
     if (sendCount >= this.MAX_SENDS_PER_HOUR) {
       throw new BadRequestException(
-        'Nombre maximum d\'envois atteint. Veuillez réessayer dans 1 heure.',
+        "Nombre maximum d'envois atteint. Veuillez réessayer dans 1 heure.",
       );
     }
 
@@ -67,7 +76,8 @@ export class OtpService {
 
     if (!sent) {
       // Fallback SMS (si configuré)
-      const smsEnabled = this.configService.get<string>('SMS_PROVIDER_ENABLED') === 'true';
+      const smsEnabled =
+        this.configService.get<string>('SMS_PROVIDER_ENABLED') === 'true';
       if (smsEnabled) {
         this.logger.log('WhatsApp failed, trying SMS fallback...');
         // TODO: Implémenter SMS Twilio provider
@@ -84,14 +94,15 @@ export class OtpService {
         this.logger.debug(`[DEV] OTP code for ${phoneNumber}: ${code}`);
         return {
           sent: true,
-          message: 'Code envoyé. Consultez l\'inspecteur OTP dev pour obtenir le code.',
+          message:
+            "Code envoyé. Consultez l'inspecteur OTP dev pour obtenir le code.",
         };
       }
 
       return {
         sent: false,
         message:
-          'Service d\'envoi de code actuellement indisponible. Veuillez réessayer dans quelques instants.',
+          "Service d'envoi de code actuellement indisponible. Veuillez réessayer dans quelques instants.",
       };
     }
 
@@ -101,10 +112,7 @@ export class OtpService {
     };
   }
 
-  async verifyOtp(
-    phoneNumber: string,
-    code: string,
-  ): Promise<boolean> {
+  async verifyOtp(phoneNumber: string, code: string): Promise<boolean> {
     const otpKey = `otp:${phoneNumber}`;
     const blockKey = `otp:block:${phoneNumber}`;
 

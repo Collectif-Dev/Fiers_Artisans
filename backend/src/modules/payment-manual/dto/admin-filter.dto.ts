@@ -16,9 +16,7 @@ export class AdminFilterDto {
     PaymentManualStatus.EXPIRED,
     'REFUND_REQUIRED',
   ])
-  status?:
-    | PaymentManualStatus
-    | 'REFUND_REQUIRED';
+  status?: PaymentManualStatus | 'REFUND_REQUIRED';
 
   @IsOptional()
   @Type(() => Number)

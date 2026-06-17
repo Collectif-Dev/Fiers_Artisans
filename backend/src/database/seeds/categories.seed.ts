@@ -114,7 +114,7 @@ const categories = [
     subcategories: [
       'Soudeur arc',
       'Soudeur inox',
-      'Ferronnier d\'art',
+      "Ferronnier d'art",
       'Chaudronnier',
       'Forgeron',
       'Fabricant portail métallique',
@@ -168,7 +168,7 @@ const categories = [
     icon_url: '🧹',
     display_order: 12,
     subcategories: [
-      'Agent d\'entretien',
+      "Agent d'entretien",
       'Femme/Homme de ménage',
       'Repassage à domicile',
       'Nounou',
@@ -250,7 +250,9 @@ export async function seedCategories(dataSource: DataSource): Promise<void> {
   const subcategoryRepo = dataSource.getRepository('subcategories');
 
   for (const cat of categories) {
-    const existingCat = await categoryRepo.findOne({ where: { slug: cat.slug } });
+    const existingCat = await categoryRepo.findOne({
+      where: { slug: cat.slug },
+    });
     const categoryId = existingCat?.id ?? randomUUID();
 
     await categoryRepo.save({

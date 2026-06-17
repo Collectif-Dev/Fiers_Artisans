@@ -129,7 +129,9 @@ export class NotificationsService {
     });
   }
 
-  private toClientNotification(notification: Notification): Record<string, unknown> {
+  private toClientNotification(
+    notification: Notification,
+  ): Record<string, unknown> {
     const asAny = notification as any;
     const plain =
       typeof asAny.toObject === 'function' ? asAny.toObject() : asAny;

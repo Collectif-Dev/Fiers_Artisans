@@ -36,7 +36,9 @@ export class AnalyticsService {
           });
         })
         .catch((error) => {
-          this.logger.warn(`Analytics write failed for action ${data.action}: ${error}`);
+          this.logger.warn(
+            `Analytics write failed for action ${data.action}: ${error}`,
+          );
         });
     });
   }
@@ -123,8 +125,8 @@ export class AnalyticsService {
         indexFound: Boolean(ttlIndex),
         actualTtlSeconds:
           typeof ttlIndex?.expireAfterSeconds === 'number'
-              ? ttlIndex.expireAfterSeconds
-              : undefined,
+            ? ttlIndex.expireAfterSeconds
+            : undefined,
       };
     } catch (error) {
       this.logger.warn(`Unable to inspect activity log TTL index: ${error}`);

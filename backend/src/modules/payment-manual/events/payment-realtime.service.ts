@@ -31,15 +31,19 @@ export class PaymentRealtimeService {
     this.adminRealtimeService.emit(PAYMENT_MANUAL_UPDATED, payload);
 
     if (payload.userId) {
-      await this.chatGateway.emitUserSyncEvent(payload.userId, 'manualPaymentUpdated', {
-        paymentId: payload.paymentId,
-        transactionId: payload.transactionId,
-        status: payload.status,
-        rejectionReason: payload.rejectionReason ?? null,
-        refundRequired: payload.refundRequired ?? false,
-        refundDone: payload.refundDone ?? false,
-        updatedAt: payload.updatedAt,
-      });
+      await this.chatGateway.emitUserSyncEvent(
+        payload.userId,
+        'manualPaymentUpdated',
+        {
+          paymentId: payload.paymentId,
+          transactionId: payload.transactionId,
+          status: payload.status,
+          rejectionReason: payload.rejectionReason ?? null,
+          refundRequired: payload.refundRequired ?? false,
+          refundDone: payload.refundDone ?? false,
+          updatedAt: payload.updatedAt,
+        },
+      );
     }
   }
 

@@ -22,20 +22,23 @@ export class ExifExtractorService {
     const exifTags = this.parseExifTags(metadata.exif);
 
     const captureDate = this.parseExifDate(
-      exifTags.DateTimeOriginal || exifTags.CreateDate || exifTags.DateTimeDigitized || null,
+      exifTags.DateTimeOriginal ||
+        exifTags.CreateDate ||
+        exifTags.DateTimeDigitized ||
+        null,
     );
     const modifiedDate = this.parseExifDate(
       exifTags.ModifyDate || exifTags.DateTime || null,
     );
 
-    const deviceParts = [exifTags.Make || metadataAny.make, exifTags.Model || metadataAny.model]
+    const deviceParts = [
+      exifTags.Make || metadataAny.make,
+      exifTags.Model || metadataAny.model,
+    ]
       .filter((v) => typeof v === 'string' && v.trim().length > 0)
       .map((v) => (v as string).trim());
 
-    const software =
-      exifTags.Software ||
-      metadataAny.software ||
-      null;
+    const software = exifTags.Software || metadataAny.software || null;
 
     return {
       captureDate,
@@ -96,7 +99,9 @@ export class ExifExtractorService {
       return {};
     }
 
-    const endian = exifBuffer.subarray(exifStart, exifStart + 2).toString('ascii');
+    const endian = exifBuffer
+      .subarray(exifStart, exifStart + 2)
+      .toString('ascii');
     const littleEndian = endian === 'II';
     if (!littleEndian && endian !== 'MM') {
       return {};
@@ -139,7 +144,11 @@ export class ExifExtractorService {
     const values: Record<string, string> = {};
     const visitedIfdOffsets = new Set<number>();
 
-    const readAsciiValue = (entryOffset: number, type: number, count: number): string | null => {
+    const readAsciiValue = (
+      entryOffset: number,
+      type: number,
+      count: number,
+    ): string | null => {
       if (type !== 2 || count <= 0) {
         return null;
       }
@@ -148,7 +157,10 @@ export class ExifExtractorService {
       let valueBytes: Buffer | null = null;
       if (valueLength <= 4) {
         if (entryOffset + 12 > exifBuffer.length) return null;
-        valueBytes = exifBuffer.subarray(entryOffset + 8, entryOffset + 8 + valueLength);
+        valueBytes = exifBuffer.subarray(
+          entryOffset + 8,
+          entryOffset + 8 + valueLength,
+        );
       } else {
         const rel = readU32(entryOffset + 8);
         if (rel === null) return null;
@@ -157,7 +169,10 @@ export class ExifExtractorService {
         valueBytes = exifBuffer.subarray(abs, abs + valueLength);
       }
 
-      const raw = valueBytes.toString('utf8').replace(/\u0000/g, '').trim();
+      const raw = valueBytes
+        .toString('utf8')
+        .replace(/\u0000/g, '')
+        .trim();
       return raw.length > 0 ? raw : null;
     };
 

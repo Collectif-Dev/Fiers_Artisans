@@ -22,8 +22,10 @@ export class SearchService {
       category,
       subcategory,
       query,
-      sort_by = 'distance', available_only = false,
-      page = 1, limit = 20,
+      sort_by = 'distance',
+      available_only = false,
+      page = 1,
+      limit = 20,
     } = dto;
     const offset = (page - 1) * limit;
 
@@ -69,7 +71,10 @@ export class SearchService {
 
     if (category) {
       // Accept both category slug and UUID id from mobile
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(category);
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          category,
+        );
       if (isUuid) {
         qb = qb.andWhere('c.id = :category', { category });
       } else {
@@ -79,7 +84,10 @@ export class SearchService {
 
     if (subcategory) {
       // Accept both subcategory slug and UUID id from mobile
-      const isSubcategoryUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subcategory);
+      const isSubcategoryUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          subcategory,
+        );
       if (isSubcategoryUuid) {
         qb = qb.andWhere('sc.id = :subcategory', { subcategory });
       } else {
@@ -95,7 +103,9 @@ export class SearchService {
     }
 
     if (sort_by === 'rating') {
-      qb = qb.orderBy('ap.rating_avg', 'DESC').addOrderBy('distance_meters', 'ASC');
+      qb = qb
+        .orderBy('ap.rating_avg', 'DESC')
+        .addOrderBy('distance_meters', 'ASC');
     } else {
       qb = qb.orderBy('distance_meters', 'ASC');
     }
@@ -122,24 +132,42 @@ export class SearchService {
         rawLongitude != null ? Number(rawLongitude) : null;
       (entity as any).location_updated_at =
         raw[index]?.user_location_updated_at ?? null;
+
+      // ── SECURITY: Strip sensitive user fields from search results ──
+      if ((entity as any).user) {
+        const user = (entity as any).user;
+        (entity as any).user = {
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          phone_number: user.phone_number,
+          email: user.email,
+          verification_status: user.verification_status,
+          created_at: user.created_at,
+        };
+      }
+      // ── FIN SECURITY ──
+
       return entity;
     });
 
     // Fire-and-forget analytics
-    this.analyticsService.logActivity({
-      actorId: 'anonymous',
-      action: 'SEARCH',
-      metadata: {
-        category,
-        subcategory,
-        query,
-        lat,
-        lng,
-        min_rating,
-        available_only,
-        results: total,
-      },
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: 'anonymous',
+        action: 'SEARCH',
+        metadata: {
+          category,
+          subcategory,
+          query,
+          lat,
+          lng,
+          min_rating,
+          available_only,
+          results: total,
+        },
+      })
+      .catch(() => {});
 
     return {
       data: results,

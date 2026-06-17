@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddPaymentManualSubscriptionRequestIndex1710000000001
-  implements MigrationInterface
-{
+export class AddPaymentManualSubscriptionRequestIndex1710000000001 implements MigrationInterface {
   name = 'AddPaymentManualSubscriptionRequestIndex1710000000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

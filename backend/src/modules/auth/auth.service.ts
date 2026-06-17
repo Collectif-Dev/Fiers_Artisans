@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, HttpStatus, Logger } from '@nestjs/common';
 import { BusinessException } from '../../common/exceptions/business.exception';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -96,18 +92,18 @@ export class AuthService {
   }
 
   async registerArtisan(dto: RegisterArtisanDto) {
-    this.ensureCoordinatesPresent(
-      dto.latitude,
-      dto.longitude,
-      'artisan',
-    );
+    this.ensureCoordinatesPresent(dto.latitude, dto.longitude, 'artisan');
 
     // Vérifier l'unicité du numéro
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
     });
     if (existing) {
-      throw new BusinessException('AUTH_PHONE_ALREADY_USED', 'Ce numéro de téléphone est déjà utilisé.', HttpStatus.CONFLICT);
+      throw new BusinessException(
+        'AUTH_PHONE_ALREADY_USED',
+        'Ce numéro de téléphone est déjà utilisé.',
+        HttpStatus.CONFLICT,
+      );
     }
 
     // Créer l'utilisateur
@@ -168,7 +164,11 @@ export class AuthService {
     await this.artisanProfileRepository.save(profile);
 
     this.logger.log(`Artisan registered: ${savedUser.id}`);
-    this.analyticsService.logActivity({ actorId: savedUser.id, action: 'REGISTRATION', metadata: { role: 'ARTISAN' } });
+    this.analyticsService.logActivity({
+      actorId: savedUser.id,
+      action: 'REGISTRATION',
+      metadata: { role: 'ARTISAN' },
+    });
     this.adminRealtimeService.emit('ARTISAN_REGISTERED', {
       userId: savedUser.id,
       artisanProfileId: profile.id,
@@ -179,17 +179,17 @@ export class AuthService {
   }
 
   async registerClient(dto: RegisterClientDto) {
-    this.ensureCoordinatesPresent(
-      dto.latitude,
-      dto.longitude,
-      'client',
-    );
+    this.ensureCoordinatesPresent(dto.latitude, dto.longitude, 'client');
 
     const existing = await this.userRepository.findOne({
       where: { phone_number: dto.phone_number },
     });
     if (existing) {
-      throw new BusinessException('AUTH_PHONE_ALREADY_USED', 'Ce numéro de téléphone est déjà utilisé.', HttpStatus.CONFLICT);
+      throw new BusinessException(
+        'AUTH_PHONE_ALREADY_USED',
+        'Ce numéro de téléphone est déjà utilisé.',
+        HttpStatus.CONFLICT,
+      );
     }
 
     const pin_hash = await bcrypt.hash(dto.pin_code, 12);
@@ -218,7 +218,11 @@ export class AuthService {
     await this.clientProfileRepository.save(profile);
 
     this.logger.log(`Client registered: ${savedUser.id}`);
-    this.analyticsService.logActivity({ actorId: savedUser.id, action: 'REGISTRATION', metadata: { role: 'CLIENT' } });
+    this.analyticsService.logActivity({
+      actorId: savedUser.id,
+      action: 'REGISTRATION',
+      metadata: { role: 'CLIENT' },
+    });
     this.adminRealtimeService.emit('CLIENT_REGISTERED', {
       userId: savedUser.id,
       clientProfileId: profile.id,
@@ -244,7 +248,9 @@ export class AuthService {
 
   async login(dto: LoginDto) {
     if (await this.pinLoginGuardService.isBlocked(dto.phone_number)) {
-      const ttl = await this.pinLoginGuardService.blockTtlSeconds(dto.phone_number);
+      const ttl = await this.pinLoginGuardService.blockTtlSeconds(
+        dto.phone_number,
+      );
       throw new BusinessException(
         'AUTH_PIN_BLOCKED',
         `Trop de tentatives. Réessayez dans ${ttl || 1} secondes.`,
@@ -285,7 +291,11 @@ export class AuthService {
     await this.pinLoginGuardService.clearFailures(dto.phone_number);
 
     if (!user.is_active) {
-      throw new BusinessException('AUTH_ACCOUNT_DISABLED', 'Compte désactivé.', HttpStatus.UNAUTHORIZED);
+      throw new BusinessException(
+        'AUTH_ACCOUNT_DISABLED',
+        'Compte désactivé.',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     // Si téléphone non vérifié → envoyer OTP et bloquer
@@ -293,12 +303,22 @@ export class AuthService {
       try {
         await this.otpService.sendOtp(user.phone_number);
       } catch (e) {
-        this.logger.warn(`OTP send failed during login for ${user.phone_number}: ${e.message}`);
+        this.logger.warn(
+          `OTP send failed during login for ${user.phone_number}: ${e.message}`,
+        );
       }
-      throw new BusinessException('AUTH_OTP_REQUIRED', 'Vérification du téléphone requise.', HttpStatus.FORBIDDEN);
+      throw new BusinessException(
+        'AUTH_OTP_REQUIRED',
+        'Vérification du téléphone requise.',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
-    this.analyticsService.logActivity({ actorId: user.id, action: 'LOGIN', metadata: { role: user.role } });
+    this.analyticsService.logActivity({
+      actorId: user.id,
+      action: 'LOGIN',
+      metadata: { role: user.role },
+    });
     return this.generateTokens(user);
   }
 
@@ -323,7 +343,10 @@ export class AuthService {
     const saved = await this.userRepository.save(user);
 
     await this.pinLoginGuardService.clearFailures(dto.phone_number);
-    this.analyticsService.logActivity({ actorId: saved.id, action: 'PIN_SETUP' });
+    this.analyticsService.logActivity({
+      actorId: saved.id,
+      action: 'PIN_SETUP',
+    });
 
     return {
       pin_set: true,
@@ -334,7 +357,11 @@ export class AuthService {
   async refreshToken(userId: string) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user || !user.is_active) {
-      throw new BusinessException('AUTH_INVALID_TOKEN', 'Token invalide.', HttpStatus.UNAUTHORIZED);
+      throw new BusinessException(
+        'AUTH_INVALID_TOKEN',
+        'Token invalide.',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
     return this.generateTokens(user);
   }
@@ -348,12 +375,14 @@ export class AuthService {
 
     const access_token = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.secret') || 'fallback',
-      expiresIn: (this.configService.get<string>('jwt.accessExpiration') || '15m') as any,
+      expiresIn: (this.configService.get<string>('jwt.accessExpiration') ||
+        '15m') as any,
     });
 
     const refresh_token = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('jwt.refreshSecret') || 'fallback',
-      expiresIn: (this.configService.get<string>('jwt.refreshExpiration') || '30d') as any,
+      expiresIn: (this.configService.get<string>('jwt.refreshExpiration') ||
+        '30d') as any,
     });
 
     // Resolve first_name / last_name from profile

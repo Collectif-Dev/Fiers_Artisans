@@ -20,7 +20,11 @@ export class PhoneVerifiedGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const userId = request.user?.id;
     if (!userId) {
-      throw new BusinessException('AUTH_OTP_REQUIRED', 'Vérification du téléphone requise.', HttpStatus.FORBIDDEN);
+      throw new BusinessException(
+        'AUTH_OTP_REQUIRED',
+        'Vérification du téléphone requise.',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     const user = await this.userRepository.findOne({
@@ -29,7 +33,11 @@ export class PhoneVerifiedGuard implements CanActivate {
     });
 
     if (!user || !user.is_phone_verified) {
-      throw new BusinessException('AUTH_OTP_REQUIRED', 'Vérification du téléphone requise.', HttpStatus.FORBIDDEN);
+      throw new BusinessException(
+        'AUTH_OTP_REQUIRED',
+        'Vérification du téléphone requise.',
+        HttpStatus.FORBIDDEN,
+      );
     }
 
     return true;

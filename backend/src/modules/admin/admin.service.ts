@@ -88,7 +88,9 @@ export class AdminService {
         .createQueryBuilder('pm')
         .select('COALESCE(SUM(pm.amount_fcfa), 0)', 'total')
         .where('pm.status = :status', { status: PaymentManualStatus.COMPLETED })
-        .andWhere('DATE_TRUNC(\'month\', pm.validated_at) = DATE_TRUNC(\'month\', NOW())')
+        .andWhere(
+          "DATE_TRUNC('month', pm.validated_at) = DATE_TRUNC('month', NOW())",
+        )
         .getRawOne()
         .then((r) => parseInt(r.total, 10)),
       this.paymentManualRepository
@@ -101,7 +103,10 @@ export class AdminService {
           'rate',
         )
         .where('pm.status IN (:...statuses)', {
-          statuses: [PaymentManualStatus.COMPLETED, PaymentManualStatus.REJECTED],
+          statuses: [
+            PaymentManualStatus.COMPLETED,
+            PaymentManualStatus.REJECTED,
+          ],
           completed: PaymentManualStatus.COMPLETED,
         })
         .getRawOne()

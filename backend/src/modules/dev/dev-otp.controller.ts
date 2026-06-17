@@ -36,7 +36,9 @@ export class DevOtpController {
     });
     const key = this.configService.get<string>('OTP_DEV_KEY');
     if (!key) {
-      this.logger.error('OTP_DEV_KEY is not set in .env — dev inspector will reject all requests');
+      this.logger.error(
+        'OTP_DEV_KEY is not set in .env — dev inspector will reject all requests',
+      );
     }
     this.devKey = key || '';
   }
@@ -49,7 +51,7 @@ export class DevOtpController {
     // ── HARDENING: Dev endpoint locked to development only ───────────
     if (process.env.NODE_ENV !== 'development') {
       throw new ForbiddenException(
-        'Dev OTP inspector is only available in development environment.'
+        'Dev OTP inspector is only available in development environment.',
       );
     }
     // ── FIN HARDENING ──────────────────────────────────────────────

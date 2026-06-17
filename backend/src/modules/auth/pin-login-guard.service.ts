@@ -54,7 +54,12 @@ export class PinLoginGuardService {
     }
 
     if (attempts >= this.maxAttempts) {
-      await this.redis.set(this.blockKey(phoneNumber), '1', 'EX', this.blockDurationSeconds);
+      await this.redis.set(
+        this.blockKey(phoneNumber),
+        '1',
+        'EX',
+        this.blockDurationSeconds,
+      );
       await this.redis.del(key);
     }
   }

@@ -88,7 +88,9 @@ export class UsersService {
     return snapshot.latitude != null && snapshot.longitude != null;
   }
 
-  private async ensureArtisanLocationForVisibility(userId: string): Promise<void> {
+  private async ensureArtisanLocationForVisibility(
+    userId: string,
+  ): Promise<void> {
     if (await this.userHasStoredLocation(userId)) {
       return;
     }
@@ -186,11 +188,13 @@ export class UsersService {
       throw new NotFoundException('Artisan non trouvé ou non actif.');
     }
 
-    this.analyticsService.logActivity({
-      actorId: 'anonymous',
-      action: 'PROFILE_VIEW',
-      targetId: profile.id,
-    }).catch(() => {});
+    this.analyticsService
+      .logActivity({
+        actorId: 'anonymous',
+        action: 'PROFILE_VIEW',
+        targetId: profile.id,
+      })
+      .catch(() => {});
 
     return this.attachLocationSnapshot(profile);
   }
@@ -256,11 +260,15 @@ export class UsersService {
         )
         .catch(() => {});
 
-      this.emitMapVisibilityUpdate(savedProfile.user_id, savedProfile.is_available, {
-        category_id: savedProfile.category_id,
-        subcategory_id: savedProfile.subcategory_id,
-        is_subscription_active: savedProfile.is_subscription_active,
-      }).catch(() => {});
+      this.emitMapVisibilityUpdate(
+        savedProfile.user_id,
+        savedProfile.is_available,
+        {
+          category_id: savedProfile.category_id,
+          subcategory_id: savedProfile.subcategory_id,
+          is_subscription_active: savedProfile.is_subscription_active,
+        },
+      ).catch(() => {});
     }
 
     this.adminRealtimeService.emit('ARTISAN_UPDATED', {
@@ -297,10 +305,8 @@ export class UsersService {
     window_hours: number;
   }> {
     const profile = await this.getArtisanProfile(userId);
-    const profileViews48h = await this.analyticsService.countProfileViewsInLastHours(
-      profile.id,
-      48,
-    );
+    const profileViews48h =
+      await this.analyticsService.countProfileViewsInLastHours(profile.id, 48);
     return {
       profile_views_48h: profileViews48h,
       window_hours: 48,
@@ -345,7 +351,9 @@ export class UsersService {
     return this.attachLocationSnapshot(saved);
   }
 
-  async listFavoriteArtisans(clientUserId: string): Promise<Record<string, any>[]> {
+  async listFavoriteArtisans(
+    clientUserId: string,
+  ): Promise<Record<string, any>[]> {
     const clientProfile = await this.getClientProfile(clientUserId);
     const favorites = await this.favoriteArtisanRepository.find({
       where: { client_profile_id: clientProfile.id },
@@ -405,9 +413,8 @@ export class UsersService {
     isFavorite: boolean,
   ): Promise<{ is_favorite: boolean }> {
     const clientProfile = await this.getClientProfile(clientUserId);
-    const artisanProfile = await this.findArtisanProfileByIdentifier(
-      artisanIdentifier,
-    );
+    const artisanProfile =
+      await this.findArtisanProfileByIdentifier(artisanIdentifier);
 
     const existing = await this.favoriteArtisanRepository.findOne({
       where: {
@@ -453,9 +460,8 @@ export class UsersService {
     artisanIdentifier: string,
   ): Promise<boolean> {
     const clientProfile = await this.getClientProfile(clientUserId);
-    const artisanProfile = await this.findArtisanProfileByIdentifier(
-      artisanIdentifier,
-    );
+    const artisanProfile =
+      await this.findArtisanProfileByIdentifier(artisanIdentifier);
     const favorite = await this.favoriteArtisanRepository.findOne({
       where: {
         client_profile_id: clientProfile.id,

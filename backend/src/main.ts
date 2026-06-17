@@ -9,7 +9,10 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters';
-import { LoggingInterceptor, TransformInterceptor } from './common/interceptors';
+import {
+  LoggingInterceptor,
+  TransformInterceptor,
+} from './common/interceptors';
 
 const PRIVATE_LAN_HOST_PATTERN =
   /^(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})$/;
@@ -56,8 +59,8 @@ async function bootstrap() {
   if (!processNodeEnv) {
     Logger.error(
       'FATAL: NODE_ENV is not set. ' +
-      'The application cannot start without an explicit environment. ' +
-      'Set NODE_ENV=production or NODE_ENV=development.',
+        'The application cannot start without an explicit environment. ' +
+        'Set NODE_ENV=production or NODE_ENV=development.',
       'Bootstrap',
     );
     process.exit(1);
@@ -67,8 +70,8 @@ async function bootstrap() {
     if (process.env.OTP_DEV_INSPECTOR === 'true') {
       Logger.error(
         'FATAL: OTP_DEV_INSPECTOR=true is strictly forbidden in production. ' +
-        'This would expose OTP codes to potential attackers. ' +
-        'Set OTP_DEV_INSPECTOR=false or unset it.',
+          'This would expose OTP codes to potential attackers. ' +
+          'Set OTP_DEV_INSPECTOR=false or unset it.',
         'Bootstrap',
       );
       process.exit(1);
@@ -83,7 +86,9 @@ async function bootstrap() {
     'JWT_SECRET',
     'JWT_REFRESH_SECRET',
   ];
-  const missing = requiredSecrets.filter((k) => !process.env[k] || process.env[k]?.startsWith('change_me'));
+  const missing = requiredSecrets.filter(
+    (k) => !process.env[k] || process.env[k]?.startsWith('change_me'),
+  );
   if (missing.length > 0 && process.env.NODE_ENV === 'production') {
     Logger.error(
       `Missing or insecure required secrets: ${missing.join(', ')}. Refusing to start in production.`,
@@ -103,7 +108,9 @@ async function bootstrap() {
   });
   // Required behind reverse proxies (Nginx) so rate limiting sees real client IP.
   const httpAdapter = app.getHttpAdapter();
-  const httpServer = httpAdapter.getInstance() as { set?: (key: string, value: unknown) => void };
+  const httpServer = httpAdapter.getInstance() as {
+    set?: (key: string, value: unknown) => void;
+  };
   httpServer.set?.('trust proxy', 1);
 
   const configService = app.get(ConfigService);
@@ -130,10 +137,7 @@ async function bootstrap() {
         return;
       }
 
-      if (
-        nodeEnv !== 'production' &&
-        isLoopbackOriginAllowed(origin)
-      ) {
+      if (nodeEnv !== 'production' && isLoopbackOriginAllowed(origin)) {
         callback(null, true);
         return;
       }
@@ -173,7 +177,9 @@ async function bootstrap() {
   if (configService.get<string>('app.nodeEnv') !== 'production') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Fiers Artisans API')
-      .setDescription('API pour la plateforme Fiers Artisans — Marketplace artisans ivoiriens')
+      .setDescription(
+        'API pour la plateforme Fiers Artisans — Marketplace artisans ivoiriens',
+      )
       .setVersion('1.0')
       .addBearerAuth()
       .build();
@@ -187,14 +193,8 @@ async function bootstrap() {
     'Bootstrap',
   );
   if (host !== 'localhost') {
-    Logger.log(
-      `🔁 Loopback access: http://localhost:${port}`,
-      'Bootstrap',
-    );
+    Logger.log(`🔁 Loopback access: http://localhost:${port}`, 'Bootstrap');
   }
-  Logger.log(
-    `📖 Swagger docs: http://localhost:${port}/api/docs`,
-    'Bootstrap',
-  );
+  Logger.log(`📖 Swagger docs: http://localhost:${port}/api/docs`, 'Bootstrap');
 }
 bootstrap();

@@ -22,8 +22,8 @@ export class AdminRealtimeService {
   }
 
   asSseStream(): Observable<MessageEvent> {
-    return this.eventsSubject.asObservable().pipe(
-      map((event) => ({ data: event }) as MessageEvent),
-    );
+    return this.eventsSubject
+      .asObservable()
+      .pipe(map((event) => ({ data: event }) as MessageEvent));
   }
 }

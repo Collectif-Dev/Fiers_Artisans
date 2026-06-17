@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Model } from 'mongoose';
@@ -30,17 +34,22 @@ export class ChatService {
     private readonly clientProfileRepository: Repository<ClientProfile>,
   ) {}
 
-  async createConversation(
-    participantIds: string[],
-  ): Promise<Conversation> {
-    const uniqueParticipants = Array.from(new Set(participantIds.filter(Boolean)));
+  async createConversation(participantIds: string[]): Promise<Conversation> {
+    const uniqueParticipants = Array.from(
+      new Set(participantIds.filter(Boolean)),
+    );
     if (uniqueParticipants.length < 2) {
-      throw new ForbiddenException('Une conversation nécessite deux participants.');
+      throw new ForbiddenException(
+        'Une conversation nécessite deux participants.',
+      );
     }
 
     // Vérifier si la conversation existe déjà
     const existing = await this.conversationModel.findOne({
-      participants: { $all: uniqueParticipants, $size: uniqueParticipants.length },
+      participants: {
+        $all: uniqueParticipants,
+        $size: uniqueParticipants.length,
+      },
     });
     if (existing) return existing;
 
@@ -118,9 +127,7 @@ export class ChatService {
     const artisanIds = users
       .filter((u) => u.role === 'ARTISAN')
       .map((u) => u.id);
-    const clientIds = users
-      .filter((u) => u.role === 'CLIENT')
-      .map((u) => u.id);
+    const clientIds = users.filter((u) => u.role === 'CLIENT').map((u) => u.id);
 
     if (artisanIds.length > 0) {
       const profiles = await this.artisanProfileRepository.find({
@@ -258,7 +265,10 @@ export class ChatService {
     return Array.from(participantIds);
   }
 
-  async ensureParticipant(conversationId: string, userId: string): Promise<void> {
+  async ensureParticipant(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
     await this.getConversationForParticipant(conversationId, userId);
   }
 
@@ -272,7 +282,9 @@ export class ChatService {
     });
 
     if (!conversation) {
-      const exists = await this.conversationModel.exists({ _id: conversationId });
+      const exists = await this.conversationModel.exists({
+        _id: conversationId,
+      });
       if (!exists) {
         throw new NotFoundException('Conversation non trouvée.');
       }

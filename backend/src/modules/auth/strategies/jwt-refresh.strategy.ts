@@ -4,7 +4,10 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
-export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
+export class JwtRefreshStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-refresh',
+) {
   constructor(private readonly configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -17,8 +20,8 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
         if (!secret || secret.length < 32) {
           throw new Error(
             'FATAL: JWT_REFRESH_SECRET is not configured or is too short. ' +
-            'The JWT refresh strategy cannot initialize without a secure secret. ' +
-            'Application startup aborted.'
+              'The JWT refresh strategy cannot initialize without a secure secret. ' +
+              'Application startup aborted.',
           );
         }
         return secret;

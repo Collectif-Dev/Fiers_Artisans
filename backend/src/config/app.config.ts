@@ -10,7 +10,9 @@ export default registerAs('app', () => {
   const parsePortCsv = (value?: string): number[] =>
     parseCsv(value)
       .map((entry) => parseInt(entry, 10))
-      .filter((entry) => Number.isInteger(entry) && entry > 0 && entry <= 65535);
+      .filter(
+        (entry) => Number.isInteger(entry) && entry > 0 && entry <= 65535,
+      );
 
   const defaultCorsOrigins = [
     'http://localhost:3000',
@@ -34,7 +36,9 @@ export default registerAs('app', () => {
     port: parseInt(process.env.APP_PORT || '3000', 10),
     host: process.env.APP_HOST || '0.0.0.0',
     appUrl: process.env.APP_URL || 'http://localhost:3000',
-    corsOrigins: Array.from(new Set([...envCorsOrigins, ...defaultCorsOrigins])),
+    corsOrigins: Array.from(
+      new Set([...envCorsOrigins, ...defaultCorsOrigins]),
+    ),
     corsAllowLan,
     corsLanPorts: envLanPorts.length > 0 ? envLanPorts : defaultLanPorts,
   };

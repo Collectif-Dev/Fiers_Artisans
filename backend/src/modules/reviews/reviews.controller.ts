@@ -23,10 +23,7 @@ export class ReviewsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('CLIENT')
-  create(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CreateReviewDto,
-  ) {
+  create(@CurrentUser('id') userId: string, @Body() dto: CreateReviewDto) {
     return this.reviewsService.create(userId, dto);
   }
 

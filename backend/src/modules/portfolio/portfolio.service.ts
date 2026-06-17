@@ -145,7 +145,10 @@ export class PortfolioService {
       artisanProfileId,
       updatedAt: new Date().toISOString(),
     };
-    await this.chatGateway.emitGlobalSyncEvent('artisanPortfolioUpdated', payload);
+    await this.chatGateway.emitGlobalSyncEvent(
+      'artisanPortfolioUpdated',
+      payload,
+    );
     await this.chatGateway.emitUserSyncEvent(
       artisanUserId,
       'artisanPortfolioUpdated',
@@ -171,7 +174,9 @@ export class PortfolioService {
           {
             $set: {
               imageObjects,
-              imageUrls: imageObjects.map((img) => this.toStorageMediaValue(img)),
+              imageUrls: imageObjects.map((img) =>
+                this.toStorageMediaValue(img),
+              ),
             },
           },
         )
@@ -187,7 +192,9 @@ export class PortfolioService {
   }
 
   private resolveImageObjects(source: any): PortfolioImageObject[] {
-    const fromObjects = this.parseImageObjects(source?.imageObjects ?? source?.images);
+    const fromObjects = this.parseImageObjects(
+      source?.imageObjects ?? source?.images,
+    );
     if (fromObjects.length > 0) {
       return fromObjects;
     }
@@ -202,8 +209,8 @@ export class PortfolioService {
     const normalized: PortfolioImageObject[] = [];
     for (const value of values) {
       if (!value || typeof value !== 'object') continue;
-      const bucket = String((value as any).bucket ?? '').trim();
-      const objectKey = String((value as any).objectKey ?? '').trim();
+      const bucket = String(value.bucket ?? '').trim();
+      const objectKey = String(value.objectKey ?? '').trim();
       if (!bucket || !objectKey) continue;
       normalized.push({ bucket, objectKey });
     }
@@ -224,7 +231,9 @@ export class PortfolioService {
     return this.dedupeImageObjects(parsed);
   }
 
-  private dedupeImageObjects(values: PortfolioImageObject[]): PortfolioImageObject[] {
+  private dedupeImageObjects(
+    values: PortfolioImageObject[],
+  ): PortfolioImageObject[] {
     const seen = new Set<string>();
     return values.filter((value) => {
       const key = `${value.bucket}/${value.objectKey}`;
@@ -234,7 +243,9 @@ export class PortfolioService {
     });
   }
 
-  private extractBucketAndObjectKey(value: string): PortfolioImageObject | null {
+  private extractBucketAndObjectKey(
+    value: string,
+  ): PortfolioImageObject | null {
     if (!value) {
       return null;
     }
@@ -263,7 +274,9 @@ export class PortfolioService {
     }
   }
 
-  private extractFromPathParts(pathParts: string[]): PortfolioImageObject | null {
+  private extractFromPathParts(
+    pathParts: string[],
+  ): PortfolioImageObject | null {
     if (pathParts.length < 2) {
       return null;
     }
@@ -273,7 +286,9 @@ export class PortfolioService {
       const routeType = pathParts[mediaIndex + 1];
       if (routeType === 'file' || routeType === 'public') {
         const bucket = pathParts[mediaIndex + 2];
-        const objectKey = decodeURIComponent(pathParts.slice(mediaIndex + 3).join('/'));
+        const objectKey = decodeURIComponent(
+          pathParts.slice(mediaIndex + 3).join('/'),
+        );
         if (bucket && objectKey) {
           return { bucket, objectKey };
         }
@@ -293,11 +308,15 @@ export class PortfolioService {
       return requestBaseUrl.replace(/\/+$/, '');
     }
 
-    const appUrl = this.configService.get<string>('app.appUrl') || 'http://localhost:3000';
+    const appUrl =
+      this.configService.get<string>('app.appUrl') || 'http://localhost:3000';
     return appUrl.replace(/\/+$/, '');
   }
 
-  private buildPublicMediaUrl(baseUrl: string, image: PortfolioImageObject): string {
+  private buildPublicMediaUrl(
+    baseUrl: string,
+    image: PortfolioImageObject,
+  ): string {
     const bucket = encodeURIComponent(image.bucket);
     const objectKey = encodeURIComponent(image.objectKey);
     return `${baseUrl}/api/v1/media/public/${bucket}/${objectKey}`;

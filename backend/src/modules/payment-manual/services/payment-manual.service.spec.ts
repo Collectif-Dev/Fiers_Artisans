@@ -74,14 +74,14 @@ describe('PaymentManualService', () => {
       } as any,
       {
         validateImage: jest.fn(),
-      } as any,
+      },
       {
         extract: jest.fn(),
         detectSuspiciousSoftware: jest.fn(),
       } as any,
       {
         scoreImage: jest.fn(),
-      } as any,
+      },
       {
         emitNewProof: jest.fn(),
         emitPaymentUpdated: jest.fn(),
@@ -125,14 +125,12 @@ describe('PaymentManualService', () => {
       amount_fcfa: 5000,
     });
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
-    paymentManualRepository.findOne = jest
-      .fn()
-      .mockResolvedValue({
-        id: 'pm-1',
-        transaction_id: 'TX-1',
-        status: PaymentManualStatus.PENDING,
-        proofs: [],
-      });
+    paymentManualRepository.findOne = jest.fn().mockResolvedValue({
+      id: 'pm-1',
+      transaction_id: 'TX-1',
+      status: PaymentManualStatus.PENDING,
+      proofs: [],
+    });
 
     const result = await service.initiatePayment(
       'user-1',
@@ -158,16 +156,14 @@ describe('PaymentManualService', () => {
       amount_fcfa: 5000,
     });
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
-    paymentManualRepository.findOne = jest
-      .fn()
-      .mockResolvedValueOnce({
-        id: 'pm-exp-1',
-        transaction_id: 'TX-EXP-1',
-        status: PaymentManualStatus.EXPIRED,
-        refund_required: true,
-        refund_done_at: null,
-        proofs: [],
-      });
+    paymentManualRepository.findOne = jest.fn().mockResolvedValueOnce({
+      id: 'pm-exp-1',
+      transaction_id: 'TX-EXP-1',
+      status: PaymentManualStatus.EXPIRED,
+      refund_required: true,
+      refund_done_at: null,
+      proofs: [],
+    });
 
     await expect(
       service.initiatePayment('user-1', PaymentProviderManual.ORANGE_MONEY),
@@ -193,10 +189,12 @@ describe('PaymentManualService', () => {
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
     paymentManualRepository.findOne = jest.fn().mockResolvedValue(null);
     paymentManualRepository.count = jest.fn().mockResolvedValue(1);
-    paymentManualRepository.save = jest.fn().mockImplementation(async (payload) => ({
-      id: 'pm-new-1',
-      ...payload,
-    }));
+    paymentManualRepository.save = jest
+      .fn()
+      .mockImplementation(async (payload) => ({
+        id: 'pm-new-1',
+        ...payload,
+      }));
 
     const payment = await service.initiatePayment(
       'user-1',
@@ -247,21 +245,19 @@ describe('PaymentManualService', () => {
       amount_fcfa: 5000,
     });
     subscriptionRepository.find = jest.fn().mockResolvedValue([]);
-    paymentManualRepository.findOne = jest
-      .fn()
-      .mockResolvedValueOnce({
-        id: 'pm-old-1',
-        subscription_id: 'sub-1',
-        transaction_id: 'TX-OLD-1',
-        provider: PaymentProviderManual.MTN_MOMO,
-        amount_fcfa: 5000,
-        status: PaymentManualStatus.REJECTED,
-        validated_at: new Date('2026-05-01T08:00:00.000Z'),
-        refund_required: false,
-        refund_done_at: null,
-        proofs: [],
-        timeline: [],
-      });
+    paymentManualRepository.findOne = jest.fn().mockResolvedValueOnce({
+      id: 'pm-old-1',
+      subscription_id: 'sub-1',
+      transaction_id: 'TX-OLD-1',
+      provider: PaymentProviderManual.MTN_MOMO,
+      amount_fcfa: 5000,
+      status: PaymentManualStatus.REJECTED,
+      validated_at: new Date('2026-05-01T08:00:00.000Z'),
+      refund_required: false,
+      refund_done_at: null,
+      proofs: [],
+      timeline: [],
+    });
     paymentManualRepository.count = jest.fn().mockResolvedValue(1);
     paymentManualRepository.save = jest
       .fn()

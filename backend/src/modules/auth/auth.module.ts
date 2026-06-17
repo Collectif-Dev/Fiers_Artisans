@@ -25,11 +25,17 @@ import { PinLoginGuardService } from './pin-login-guard.service';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.secret') || 'fallback-secret',
         signOptions: {
-          expiresIn: (configService.get<string>('jwt.accessExpiration') || '15m') as any,
+          expiresIn: (configService.get<string>('jwt.accessExpiration') ||
+            '15m') as any,
         },
       }),
     }),
-    TypeOrmModule.forFeature([User, ArtisanProfile, ClientProfile, Subcategory]),
+    TypeOrmModule.forFeature([
+      User,
+      ArtisanProfile,
+      ClientProfile,
+      Subcategory,
+    ]),
     AnalyticsModule,
   ],
   controllers: [AuthController],

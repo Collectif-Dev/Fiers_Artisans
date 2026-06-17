@@ -20,8 +20,11 @@ export class DevModule {
    * Appelé par AppModule pour conditionner l'import.
    */
   static isEnabled(configService: ConfigService): boolean {
-    const nodeEnv = configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
-    const inspectorFlag = configService.get<string>('OTP_DEV_INSPECTOR') || process.env.OTP_DEV_INSPECTOR;
+    const nodeEnv =
+      configService.get<string>('app.nodeEnv') || process.env.NODE_ENV;
+    const inspectorFlag =
+      configService.get<string>('OTP_DEV_INSPECTOR') ||
+      process.env.OTP_DEV_INSPECTOR;
     return nodeEnv === 'development' && inspectorFlag === 'true';
   }
 }

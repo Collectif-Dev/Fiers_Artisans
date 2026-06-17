@@ -49,7 +49,11 @@ export class PortfolioController {
     @Body() dto: any,
     @Req() req: Request,
   ) {
-    return this.portfolioService.create(userId, dto, this.getRequestBaseUrl(req));
+    return this.portfolioService.create(
+      userId,
+      dto,
+      this.getRequestBaseUrl(req),
+    );
   }
 
   @Put(':id')

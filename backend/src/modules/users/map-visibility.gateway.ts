@@ -13,18 +13,23 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
+const WS_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'https://fiers-artisans.ci',
+];
+
 @WebSocketGateway({
   namespace: '/ws/map-visibility',
   cors: {
-    origin: '*',
+    origin: WS_ALLOWED_ORIGINS,
     credentials: true,
+    methods: ['GET', 'POST'],
   },
 })
 export class MapVisibilityGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(MapVisibilityGateway.name);
 

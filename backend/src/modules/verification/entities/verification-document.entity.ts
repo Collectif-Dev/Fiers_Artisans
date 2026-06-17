@@ -54,7 +54,11 @@ export class VerificationDocument {
   })
   pages: VerificationDocumentPage[];
 
-  @Column({ type: 'enum', enum: DocumentStatus, default: DocumentStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: DocumentStatus,
+    default: DocumentStatus.PENDING,
+  })
   status: DocumentStatus;
 
   @Column({ nullable: true })

@@ -14,8 +14,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         if (!secret || secret.length < 32) {
           throw new Error(
             'FATAL: JWT_SECRET is not configured or is too short. ' +
-            'The JWT strategy cannot initialize without a secure secret. ' +
-            'Application startup aborted.'
+              'The JWT strategy cannot initialize without a secure secret. ' +
+              'Application startup aborted.',
           );
         }
         return secret;

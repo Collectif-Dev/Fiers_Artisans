@@ -53,7 +53,9 @@ describe('SubscriptionService', () => {
               if (entity === ArtisanProfile) {
                 return transactionArtisanProfileRepository;
               }
-              throw new Error(`Unexpected repository lookup: ${String(entity)}`);
+              throw new Error(
+                `Unexpected repository lookup: ${String(entity)}`,
+              );
             },
           }),
       ),

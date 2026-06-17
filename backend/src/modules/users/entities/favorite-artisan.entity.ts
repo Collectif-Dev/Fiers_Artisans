@@ -12,7 +12,10 @@ import { ClientProfile } from './client-profile.entity';
 import { ArtisanProfile } from './artisan-profile.entity';
 
 @Entity('favorite_artisans')
-@Unique('UQ_favorite_client_artisan', ['client_profile_id', 'artisan_profile_id'])
+@Unique('UQ_favorite_client_artisan', [
+  'client_profile_id',
+  'artisan_profile_id',
+])
 export class FavoriteArtisan {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

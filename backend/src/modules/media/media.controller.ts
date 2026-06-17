@@ -63,7 +63,9 @@ export class MediaController {
   private getBucket(
     bucketKey: 'portfolio' | 'documents' | 'media' | 'profiles',
   ): string {
-    return this.configService.get<string>(`minio.buckets.${bucketKey}`) || bucketKey;
+    return (
+      this.configService.get<string>(`minio.buckets.${bucketKey}`) || bucketKey
+    );
   }
 
   private getAllowedUploadBuckets(): string[] {
@@ -167,7 +169,7 @@ export class MediaController {
         'Cache-Control': 'private, max-age=3600',
         'Content-Disposition': 'inline',
       });
-      (stream as NodeJS.ReadableStream).pipe(res);
+      stream.pipe(res);
     } catch {
       throw new NotFoundException('Fichier introuvable.');
     }
@@ -180,7 +182,9 @@ export class MediaController {
     @Res() res: Response,
   ) {
     if (!this.isPublicBucket(bucket)) {
-      throw new ForbiddenException('AccĂ¨s public non autorisĂ© pour ce bucket.');
+      throw new ForbiddenException(
+        'AccĂ¨s public non autorisĂ© pour ce bucket.',
+      );
     }
 
     try {
@@ -194,7 +198,7 @@ export class MediaController {
         'Cache-Control': 'public, max-age=3600',
         'Content-Disposition': 'inline',
       });
-      (stream as NodeJS.ReadableStream).pipe(res);
+      stream.pipe(res);
     } catch {
       throw new NotFoundException('Fichier introuvable.');
     }

@@ -54,7 +54,8 @@ export class MediaService {
 
   async onModuleInit() {
     // Créer les buckets s'ils n'existent pas
-    const buckets = this.configService.get<Record<string, string>>('minio.buckets') || {};
+    const buckets =
+      this.configService.get<Record<string, string>>('minio.buckets') || {};
     for (const bucket of Object.values(buckets)) {
       const exists = await this.minioClient.bucketExists(bucket);
       if (!exists) {
@@ -76,7 +77,9 @@ export class MediaService {
       );
     }
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('Le fichier dépasse la taille maximale de 10 MB.');
+      throw new BadRequestException(
+        'Le fichier dépasse la taille maximale de 10 MB.',
+      );
     }
 
     const fileId = randomUUID();
@@ -120,9 +123,15 @@ export class MediaService {
         ),
       ]);
     } else {
-      await this.minioClient.putObject(bucket, objectKey, file.buffer, file.size, {
-        'Content-Type': file.mimetype,
-      });
+      await this.minioClient.putObject(
+        bucket,
+        objectKey,
+        file.buffer,
+        file.size,
+        {
+          'Content-Type': file.mimetype,
+        },
+      );
     }
 
     // Sauvegarder les métadonnées dans MongoDB
@@ -176,16 +185,24 @@ export class MediaService {
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('Le fichier depasse la taille maximale de 10 MB.');
+      throw new BadRequestException(
+        'Le fichier depasse la taille maximale de 10 MB.',
+      );
     }
 
     const ext = file.originalname.split('.').pop() || 'bin';
     const fileId = randomUUID();
     const objectKey = forcedObjectKey || `${fileId}.${ext}`;
 
-    await this.minioClient.putObject(bucket, objectKey, file.buffer, file.size, {
-      'Content-Type': file.mimetype || 'application/octet-stream',
-    });
+    await this.minioClient.putObject(
+      bucket,
+      objectKey,
+      file.buffer,
+      file.size,
+      {
+        'Content-Type': file.mimetype || 'application/octet-stream',
+      },
+    );
 
     const media = (await this.mediaFileModel.create({
       userId,
@@ -210,12 +227,15 @@ export class MediaService {
   async streamFile(
     bucket: string,
     objectKey: string,
-  ): Promise<{ stream: NodeJS.ReadableStream; contentType: string; size: number }> {
+  ): Promise<{
+    stream: NodeJS.ReadableStream;
+    contentType: string;
+    size: number;
+  }> {
     const stat = await this.minioClient.statObject(bucket, objectKey);
     const stream = await this.minioClient.getObject(bucket, objectKey);
     const contentType =
-      stat.metaData?.['content-type'] ||
-      this.guessMimeType(objectKey);
+      stat.metaData?.['content-type'] || this.guessMimeType(objectKey);
     return { stream, contentType, size: stat.size };
   }
 

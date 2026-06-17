@@ -1,5 +1,6 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
   RegisterArtisanDto,
@@ -27,16 +28,19 @@ export class AuthController {
   }
 
   @Post('send-otp')
+  @Throttle({ default: { limit: 3, ttl: 3600000 } })
   sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto.phone_number);
   }
 
   @Post('verify-otp')
+  @Throttle({ default: { limit: 5, ttl: 300000 } })
   verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto.phone_number, dto.code);
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 10, ttl: 900000 } })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }

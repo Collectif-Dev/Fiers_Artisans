@@ -11,7 +11,11 @@ import { ChatModule } from '../chat/chat.module';
 @Module({
   imports: [
     ChatModule,
-    TypeOrmModule.forFeature([VerificationDocument, VerificationDocumentPage, User]),
+    TypeOrmModule.forFeature([
+      VerificationDocument,
+      VerificationDocumentPage,
+      User,
+    ]),
     NotificationsModule,
   ],
   controllers: [VerificationController],

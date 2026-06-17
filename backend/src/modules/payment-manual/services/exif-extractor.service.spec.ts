@@ -64,9 +64,9 @@ describe('ExifExtractorService', () => {
     expect(exif.device).toContain('Apple');
     expect(exif.device).toContain('iPhone 14');
     expect(exif.software).toContain('Photoshop');
-    expect(
-      exif.captureDate === null || exif.captureDate instanceof Date,
-    ).toBe(true);
+    expect(exif.captureDate === null || exif.captureDate instanceof Date).toBe(
+      true,
+    );
     expect(
       exif.modifiedDate === null || exif.modifiedDate instanceof Date,
     ).toBe(true);

@@ -51,5 +51,4 @@ export class Notification extends Document {
   expireAt: Date;
 }
 
-export const NotificationSchema =
-  SchemaFactory.createForClass(Notification);
+export const NotificationSchema = SchemaFactory.createForClass(Notification);

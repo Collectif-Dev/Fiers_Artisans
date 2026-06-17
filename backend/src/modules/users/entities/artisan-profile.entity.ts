@@ -104,7 +104,9 @@ export class ArtisanProfile {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @OneToOne(() => Subscription, (sub) => sub.artisan_profile, { nullable: true })
+  @OneToOne(() => Subscription, (sub) => sub.artisan_profile, {
+    nullable: true,
+  })
   subscription: Subscription;
 
   @OneToMany(() => Review, (review) => review.artisan)

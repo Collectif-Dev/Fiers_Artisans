@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import Redis from 'ioredis';
@@ -46,7 +51,8 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {
     const host = this.configService.get<string>('redis.host') || 'localhost';
     const port = this.configService.get<number>('redis.port') || 6379;
-    const password = this.configService.get<string>('redis.password') || undefined;
+    const password =
+      this.configService.get<string>('redis.password') || undefined;
 
     const connectionOptions = {
       host,
@@ -74,7 +80,9 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
       this.subscriber.on('message', this.handleRedisMessage);
       await this.subscriber.subscribe(this.channel);
       this.enabled = true;
-      this.logger.log(`Distributed chat bridge enabled on channel "${this.channel}"`);
+      this.logger.log(
+        `Distributed chat bridge enabled on channel "${this.channel}"`,
+      );
     } catch (error) {
       this.enabled = false;
       this.logger.warn(`Distributed chat bridge disabled: ${error}`);
@@ -83,10 +91,7 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     this.subscriber.off('message', this.handleRedisMessage);
-    await Promise.allSettled([
-      this.subscriber.quit(),
-      this.publisher.quit(),
-    ]);
+    await Promise.allSettled([this.subscriber.quit(), this.publisher.quit()]);
   }
 
   async publishConversationEvent(
@@ -149,7 +154,11 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      if (event.kind === 'conversation' && event.conversationId && event.event) {
+      if (
+        event.kind === 'conversation' &&
+        event.conversationId &&
+        event.event
+      ) {
         this.server
           .to(`conversation:${event.conversationId}`)
           .emit(event.event, event.payload);
@@ -157,9 +166,7 @@ export class ChatEventsBridge implements OnModuleInit, OnModuleDestroy {
       }
 
       if (event.kind === 'user' && event.userId && event.event) {
-        this.server
-          .to(`user:${event.userId}`)
-          .emit(event.event, event.payload);
+        this.server.to(`user:${event.userId}`).emit(event.event, event.payload);
         return;
       }
 

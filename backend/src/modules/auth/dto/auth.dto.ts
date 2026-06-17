@@ -18,7 +18,9 @@ export class RegisterArtisanDto {
   phone_number: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 
   @IsString()
@@ -83,7 +85,9 @@ export class RegisterClientDto {
   phone_number: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 
   @IsString()
@@ -137,7 +141,9 @@ export class LoginDto {
   phone_number: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 }
 
@@ -149,7 +155,9 @@ export class SetupPinDto {
   code: string;
 
   @IsString()
-  @Matches(PIN_REGEX, { message: 'Le code PIN doit contenir exactement 5 chiffres.' })
+  @Matches(PIN_REGEX, {
+    message: 'Le code PIN doit contenir exactement 5 chiffres.',
+  })
   pin_code: string;
 }
 

@@ -210,10 +210,11 @@ function createHarness() {
               enriched.subscription &&
               relations?.includes('subscription.artisan_profile')
             ) {
-              enriched.subscription.artisan_profile = state.artisanProfiles.find(
-                (artisan) =>
-                  artisan.id === enriched.subscription.artisan_profile_id,
-              );
+              enriched.subscription.artisan_profile =
+                state.artisanProfiles.find(
+                  (artisan) =>
+                    artisan.id === enriched.subscription.artisan_profile_id,
+                );
             }
           }
           return enriched;
@@ -310,7 +311,11 @@ function createHarness() {
     }),
     save: jest.fn(async (payload: AnyRecord) => {
       if (!payload.id) {
-        const created = { id: randomUUID(), created_at: new Date(), ...payload };
+        const created = {
+          id: randomUUID(),
+          created_at: new Date(),
+          ...payload,
+        };
         state.subscriptions.push(created);
         return created;
       }
@@ -435,7 +440,7 @@ function createHarness() {
         bytesPerPixel: 0.08,
         suspiciousCompression: false,
       })),
-    } as any,
+    },
     {
       extract: jest.fn(async () => ({
         captureDate: null,
@@ -448,7 +453,7 @@ function createHarness() {
     } as any,
     {
       scoreImage: jest.fn(() => 0.12),
-    } as any,
+    },
     paymentRealtimeService,
     {
       get: jest.fn((key: string) => {
@@ -863,8 +868,13 @@ describe('Payment Manual (e2e scenarios)', () => {
   });
 
   it('Scenario 9: a rejected payment after prior validation deactivates the subscription and auto-replaces with a new transaction', async () => {
-    const { service, state, notificationsService, mockFile, subscriptionService } =
-      createHarness();
+    const {
+      service,
+      state,
+      notificationsService,
+      mockFile,
+      subscriptionService,
+    } = createHarness();
     const initiated = await service.initiatePayment(
       'user-1',
       PaymentProviderManual.ORANGE_MONEY,
@@ -885,7 +895,9 @@ describe('Payment Manual (e2e scenarios)', () => {
     await service.reopenProof(initiated.id, 'admin-1', 're-review');
     await service.rejectProof(initiated.id, 'admin-2', 'proof invalidated');
 
-    const rejected = state.payments.find((payment) => payment.id === initiated.id)!;
+    const rejected = state.payments.find(
+      (payment) => payment.id === initiated.id,
+    )!;
     const subscription = state.subscriptions.find(
       (row) => row.id === initiated.subscription_id,
     );

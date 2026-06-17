@@ -16,20 +16,31 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ChatEventsBridge } from './chat-events.bridge';
 
+const WS_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
+  'https://fiers-artisans.ci',
+];
+
 @WebSocketGateway({
   namespace: '/ws/chat',
-  cors: { origin: '*' },
+  cors: {
+    origin: WS_ALLOWED_ORIGINS,
+    credentials: true,
+    methods: ['GET', 'POST'],
+  },
 })
-export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
   private userSockets = new Map<string, Set<string>>(); // userId -> socketIds
 
   private toClientMessage(message: any) {
     if (!message) return message;
-    const plain = typeof message.toObject === 'function' ? message.toObject() : message;
+    const plain =
+      typeof message.toObject === 'function' ? message.toObject() : message;
     return {
       ...plain,
       id: plain?._id?.toString?.() ?? plain?.id?.toString?.() ?? '',
@@ -126,7 +137,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     this.chatEventsBridge
       .publishConversationEvent('newMessage', data.conversationId, payload)
       .catch((error) => {
-        this.logger.warn(`Failed to fan-out newMessage across instances: ${error}`);
+        this.logger.warn(
+          `Failed to fan-out newMessage across instances: ${error}`,
+        );
       });
 
     return payload;
@@ -149,7 +162,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         userId,
       })
       .catch((error) => {
-        this.logger.warn(`Failed to fan-out messagesRead across instances: ${error}`);
+        this.logger.warn(
+          `Failed to fan-out messagesRead across instances: ${error}`,
+        );
       });
   }
 
@@ -157,9 +172,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     participantId: string,
     isAvailable: boolean,
   ) {
-    const targetUserIds = await this.chatService.findConversationParticipantIds(
-      participantId,
-    );
+    const targetUserIds =
+      await this.chatService.findConversationParticipantIds(participantId);
 
     const payload = {
       participantId,
@@ -168,11 +182,15 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     };
 
     for (const userId of targetUserIds) {
-      this.server.to(`user:${userId}`).emit('participantAvailabilityUpdated', payload);
+      this.server
+        .to(`user:${userId}`)
+        .emit('participantAvailabilityUpdated', payload);
       this.chatEventsBridge
         .publishUserEvent('participantAvailabilityUpdated', userId, payload)
         .catch((error) => {
-          this.logger.warn(`Failed to fan-out participant availability across instances: ${error}`);
+          this.logger.warn(
+            `Failed to fan-out participant availability across instances: ${error}`,
+          );
         });
     }
   }
@@ -183,9 +201,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     payload: Record<string, unknown>,
   ): Promise<void> {
     this.server.to(`user:${userId}`).emit(event, payload);
-    this.chatEventsBridge.publishUserEvent(event, userId, payload).catch((error) => {
-      this.logger.warn(`Failed to fan-out ${event} for user ${userId}: ${error}`);
-    });
+    this.chatEventsBridge
+      .publishUserEvent(event, userId, payload)
+      .catch((error) => {
+        this.logger.warn(
+          `Failed to fan-out ${event} for user ${userId}: ${error}`,
+        );
+      });
   }
 
   async emitGlobalSyncEvent(

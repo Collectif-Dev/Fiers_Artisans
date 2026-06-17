@@ -113,7 +113,8 @@ import { PaymentManualModule } from './modules/payment-manual/payment-manual.mod
 
     // ── Dev Tools (uniquement en développement) ───────────────────
     // Conditionnel : chargé seulement si NODE_ENV=development + OTP_DEV_INSPECTOR=true
-    ...(process.env.NODE_ENV === 'development' && process.env.OTP_DEV_INSPECTOR === 'true'
+    ...(process.env.NODE_ENV === 'development' &&
+    process.env.OTP_DEV_INSPECTOR === 'true'
       ? [DevModule]
       : []),
   ],

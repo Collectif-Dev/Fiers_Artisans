@@ -9,7 +9,9 @@ export class MetricsController {
 
   @Get()
   @SkipThrottle()
-  async getMetrics(@Res({ passthrough: true }) response: Response): Promise<string> {
+  async getMetrics(
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<string> {
     response.setHeader('Content-Type', this.metricsService.getContentType());
     response.setHeader('Cache-Control', 'no-store');
     return this.metricsService.getMetricsSnapshot();

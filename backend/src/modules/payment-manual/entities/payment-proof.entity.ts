@@ -10,7 +10,10 @@ import {
 } from 'typeorm';
 import { PaymentManual } from './payment-manual.entity';
 
-@Index('IDX_PAYMENT_PROOF_PAYMENT_SUBMITTED', ['payment_manual_id', 'submitted_at'])
+@Index('IDX_PAYMENT_PROOF_PAYMENT_SUBMITTED', [
+  'payment_manual_id',
+  'submitted_at',
+])
 @Entity('payment_proof')
 export class PaymentProof {
   @PrimaryGeneratedColumn('uuid')

@@ -280,10 +280,9 @@ export class PaymentManualService implements OnModuleDestroy {
 
     if (
       latestPayment &&
-      [
-        PaymentManualStatus.PENDING,
-        PaymentManualStatus.PENDING_ADMIN,
-      ].includes(latestPayment.status)
+      [PaymentManualStatus.PENDING, PaymentManualStatus.PENDING_ADMIN].includes(
+        latestPayment.status,
+      )
     ) {
       return latestPayment;
     }
@@ -884,9 +883,7 @@ export class PaymentManualService implements OnModuleDestroy {
         const shouldDeactivateSubscription =
           !this.hasPendingRefund(payment) &&
           payment.subscription?.status === SubscriptionStatus.ACTIVE;
-        if (
-          shouldDeactivateSubscription
-        ) {
+        if (shouldDeactivateSubscription) {
           await this.subscriptionService.deactivateSubscriptionFromManualPayment(
             {
               subscriptionId: payment.subscription_id,
@@ -1061,7 +1058,7 @@ export class PaymentManualService implements OnModuleDestroy {
     }
 
     const [data, total] = await qb
-      .orderBy('pm.created_at', sortDirection as 'ASC' | 'DESC')
+      .orderBy('pm.created_at', sortDirection)
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
@@ -1108,7 +1105,9 @@ export class PaymentManualService implements OnModuleDestroy {
 
     const [latestPayment] = await this.paymentManualRepository.find({
       where: {
-        subscription_id: In(subscriptions.map((subscription) => subscription.id)),
+        subscription_id: In(
+          subscriptions.map((subscription) => subscription.id),
+        ),
         deleted_at: IsNull(),
       },
       relations: ['proofs', 'subscription', 'subscription.artisan_profile'],
@@ -1399,7 +1398,9 @@ export class PaymentManualService implements OnModuleDestroy {
     );
   }
 
-  private hasActiveCooldown(payment: Pick<PaymentManual, 'cooldown_until'>): boolean {
+  private hasActiveCooldown(
+    payment: Pick<PaymentManual, 'cooldown_until'>,
+  ): boolean {
     if (!payment.cooldown_until) {
       return false;
     }
@@ -1562,8 +1563,9 @@ export class PaymentManualService implements OnModuleDestroy {
     ];
     await this.paymentManualRepository.save(params.previousPayment);
 
-    const artisanProfile =
-      await this.resolvePreferredArtisanProfileForUser(params.userId);
+    const artisanProfile = await this.resolvePreferredArtisanProfileForUser(
+      params.userId,
+    );
     const artisanUserId = artisanProfile.user_id;
 
     if (artisanUserId) {

@@ -93,11 +93,21 @@ export class CreatePaymentManual1699999999999 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_proof_suspected_fraud`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_proof_payment_submitted`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_manual_refund_required`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_manual_status_expires`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_payment_manual_sub_created`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_proof_suspected_fraud`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_proof_payment_submitted`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_manual_refund_required`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_manual_status_expires`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_payment_manual_sub_created`,
+    );
 
     await queryRunner.query(`DROP TABLE IF EXISTS payment_proof`);
     await queryRunner.query(`DROP TABLE IF EXISTS payment_manual`);

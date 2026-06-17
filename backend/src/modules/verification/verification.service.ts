@@ -46,15 +46,15 @@ export class VerificationService {
   ) {}
 
   /** Emits on new submissions and reviews — admin SSE subscribes to this. */
-  private readonly _docEvents$ = new Subject<{ type: string; documentId: string }>();
+  private readonly _docEvents$ = new Subject<{
+    type: string;
+    documentId: string;
+  }>();
 
   /** SSE stream for admin: emits MessageEvents on document changes. */
   get docEvents$(): Observable<MessageEvent> {
     return this._docEvents$.pipe(
-      map(
-        (payload) =>
-          ({ data: payload }) as MessageEvent,
-      ),
+      map((payload) => ({ data: payload }) as MessageEvent),
     );
   }
 
@@ -120,7 +120,10 @@ export class VerificationService {
         page_order: 0,
       });
       await this.pageRepository.save(page);
-      this._docEvents$.next({ type: 'DOCUMENT_SUBMITTED', documentId: saved.id });
+      this._docEvents$.next({
+        type: 'DOCUMENT_SUBMITTED',
+        documentId: saved.id,
+      });
       this.adminRealtimeService.emit('VERIFICATION_SUBMITTED', {
         documentId: saved.id,
         userId,
@@ -141,9 +144,7 @@ export class VerificationService {
     }
 
     if (!files?.length) {
-      throw new BadRequestException(
-        'Au moins un fichier est requis.',
-      );
+      throw new BadRequestException('Au moins un fichier est requis.');
     }
 
     // Business validation per document type
@@ -339,7 +340,7 @@ export class VerificationService {
         !pageRoles.includes(PageRole.BACK)
       ) {
         throw new BadRequestException(
-          'Impossible d\'approuver une CNI incomplète (recto et verso requis).',
+          "Impossible d'approuver une CNI incomplète (recto et verso requis).",
         );
       }
     }
@@ -349,9 +350,7 @@ export class VerificationService {
     doc.reviewed_at = new Date();
     if (dto.status === DocumentStatus.REJECTED) {
       if (!dto.rejection_reason?.trim()) {
-        throw new BadRequestException(
-          'Le motif de rejet est obligatoire.',
-        );
+        throw new BadRequestException('Le motif de rejet est obligatoire.');
       }
       doc.rejection_reason = dto.rejection_reason.trim();
     }
