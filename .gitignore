@@ -55,3 +55,7 @@ infrastructure/backups/
 globaliste/
 Globaliste/
 Globalist/
+
+# Agent & task documentation (internal use)
+taches_et_problemes/
+.agents/

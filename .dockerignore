@@ -37,3 +37,7 @@ Fiers Artisans/
 # Other
 .codex
 .DS_Store
+
+# Agent & task documentation
+taches_et_problemes/
+.agents/
