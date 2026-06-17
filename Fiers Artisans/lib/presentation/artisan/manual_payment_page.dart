@@ -30,12 +30,6 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     'WAVE': ['07', '05', '01'],
     'MOOV_MONEY': ['01'],
   };
-  static const Map<String, String?> _recipientByProvider = {
-    'ORANGE_MONEY': '0703063570',
-    'MTN_MOMO': '0503265984',
-    'MOOV_MONEY': null,
-    'WAVE': '0703063570',
-  };
 
   final _senderController = TextEditingController();
   XFile? _proofImage;
@@ -230,8 +224,7 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
   }
 
   Future<void> _launchSupportWhatsApp(ManualPaymentModel tx) async {
-    final supportNumber =
-        tx.recipientNumber ?? _recipientByProvider[tx.provider] ?? '';
+    final supportNumber = tx.recipientNumber ?? '';
     final normalized = _normalizePhoneWithPrefix(supportNumber);
     if (normalized.isEmpty) {
       AppSnackBar.show(
@@ -277,14 +270,6 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
   Future<void> _initiate() async {
     final state = ref.read(paymentManualProvider);
     final tx = state.currentTransaction;
-
-    if (_recipientByProvider[_provider] == null) {
-      AppSnackBar.show(
-        context,
-        message: 'manual_payment.provider_unavailable_moov'.tr(),
-      );
-      return;
-    }
 
     if (tx != null && !tx.canInitiateNewRequest) {
       AppSnackBar.show(
@@ -450,14 +435,12 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
     final state = ref.watch(paymentManualProvider);
     final tx = state.currentTransaction;
 
-    final providerUnavailable = _recipientByProvider[_provider] == null;
     final isPendingAdminLocked = tx != null && tx.isPendingAdmin;
     final isCooldownLocked = tx?.hasActiveCooldownAt(_now) == true;
     final canChangeProvider =
         !state.isLoading && (tx == null || tx.canInitiateNewRequest);
     final canInitiate =
         !state.isLoading &&
-        !providerUnavailable &&
         (tx == null || tx.canInitiateNewRequest);
     final canSubmit =
         !state.isLoading &&
@@ -473,10 +456,7 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
 
     final recipientFromBackend =
         tx != null && tx.provider == _provider && tx.recipientNumber != null;
-    final selectedRecipient = recipientFromBackend
-        ? tx.recipientNumber
-        : _recipientByProvider[tx?.provider ?? _provider] ??
-            _recipientByProvider[_provider];
+    final selectedRecipient = recipientFromBackend ? tx.recipientNumber : null;
     final formattedRecipient = selectedRecipient == null
         ? null
         : _formatPhoneSpaced(selectedRecipient);
@@ -709,13 +689,6 @@ class _ManualPaymentPageState extends ConsumerState<ManualPaymentPage> {
                       ],
                     ),
             ),
-            if (providerUnavailable) ...[
-              const SizedBox(height: 8),
-              Text(
-                'manual_payment.moov_temporarily_unavailable'.tr(),
-                style: TextStyle(color: noticeColor),
-              ),
-            ],
             if (tx != null && tx.isPendingAdmin) ...[
               const SizedBox(height: 8),
               Text(

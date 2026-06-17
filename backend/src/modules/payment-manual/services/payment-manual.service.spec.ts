@@ -96,6 +96,9 @@ describe('PaymentManualService', () => {
           if (key === 'PAYMENT_MANUAL_SUBMIT_BURST_LIMIT') return 5;
           if (key === 'PAYMENT_MANUAL_SUBMIT_BURST_TTL_SECONDS') return 300;
           if (key === 'PAYMENT_MANUAL_DISABLE_REDIS_RATE_LIMIT') return 'true';
+          if (key === 'PAYMENT_ORANGE_RECIPIENT') return '0703063570';
+          if (key === 'PAYMENT_MTN_RECIPIENT') return '0503265984';
+          if (key === 'PAYMENT_WAVE_RECIPIENT') return '0703063570';
           return undefined;
         }),
       } as any,

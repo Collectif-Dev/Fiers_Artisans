@@ -185,6 +185,13 @@ class SecureStorage {
   }
 
   static Future<void> clearAuthSession({bool preserveLastPhone = true}) async {
+    if (kIsWeb) {
+      throw UnsupportedError(
+        'Token storage on web must use HttpOnly cookies sent by backend. '
+        'This method is for mobile/tablet only. Implement backend cookie support first.',
+      );
+    }
+
     final keys = <String>[
       AppConstants.keyAccessToken,
       AppConstants.keyRefreshToken,

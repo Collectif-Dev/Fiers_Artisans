@@ -49,16 +49,6 @@ type AutoReplacementReason =
 const MANUAL_PAYMENT_PROOF_ATTEMPTS_PER_CYCLE = 3;
 const MANUAL_PAYMENT_COOLDOWN_BASE_HOURS = 5;
 
-const MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER: Record<
-  PaymentProviderManual,
-  string | null
-> = {
-  [PaymentProviderManual.ORANGE_MONEY]: '0703063570',
-  [PaymentProviderManual.MTN_MOMO]: '0503265984',
-  [PaymentProviderManual.WAVE]: '0703063570',
-  [PaymentProviderManual.MOOV_MONEY]: null,
-};
-
 @Injectable()
 export class PaymentManualService implements OnModuleDestroy {
   private readonly logger = new Logger(PaymentManualService.name);
@@ -71,6 +61,7 @@ export class PaymentManualService implements OnModuleDestroy {
   private readonly maxExpireBatchLoops: number;
   private readonly disableRedisRateLimit: boolean;
   private rateLimitRedis: Redis | null = null;
+  private readonly recipientByProvider: Record<PaymentProviderManual, string | null>;
 
   constructor(
     @InjectRepository(PaymentManual)
@@ -128,6 +119,17 @@ export class PaymentManualService implements OnModuleDestroy {
         this.configService.get('PAYMENT_MANUAL_DISABLE_REDIS_RATE_LIMIT') ||
           'false',
       ) === 'true';
+
+    // Initialize payment recipient numbers from configuration
+    this.recipientByProvider = {
+      [PaymentProviderManual.ORANGE_MONEY]:
+        this.configService.get<string>('PAYMENT_ORANGE_RECIPIENT') || null,
+      [PaymentProviderManual.MTN_MOMO]:
+        this.configService.get<string>('PAYMENT_MTN_RECIPIENT') || null,
+      [PaymentProviderManual.WAVE]:
+        this.configService.get<string>('PAYMENT_WAVE_RECIPIENT') || null,
+      [PaymentProviderManual.MOOV_MONEY]: null,
+    };
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -1350,7 +1352,7 @@ export class PaymentManualService implements OnModuleDestroy {
   getRecipientNumberForProvider(
     provider: PaymentProviderManual,
   ): string | null {
-    return MANUAL_PAYMENT_RECIPIENT_BY_PROVIDER[provider] ?? null;
+    return this.recipientByProvider[provider] ?? null;
   }
 
   isProviderAvailable(provider: PaymentProviderManual): boolean {

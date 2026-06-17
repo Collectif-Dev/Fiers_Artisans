@@ -343,10 +343,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _bootstrapFuture;
+
+    // Security-First: Clear tokens BEFORE UI state change
+    try {
+      await SecureStorage.clearAuthSession();
+    } catch (e) {
+      debugPrint('[Auth] Error clearing session: $e');
+      try {
+        await SecureStorage.clearAll();
+      } catch (e2) {
+        debugPrint('[Auth] CRITICAL: Failed to clear all auth data: $e2');
+        rethrow;
+      }
+    }
+
+    // Verify tokens are actually cleared (optional but recommended for security)
+    try {
+      final verifyToken = await SecureStorage.getAccessToken();
+      if (verifyToken != null && verifyToken.isNotEmpty) {
+        debugPrint('[Auth] ⚠️  WARNING: Access token still present after clearAuthSession');
+      }
+    } catch (_) {}
+
+    // Now update UI and disconnect services
     ChatRealtimeService().disconnect();
     _rotateSessionScope();
     state = const AuthState(status: AuthStatus.unauthenticated);
-    await SecureStorage.clearAuthSession();
   }
 
   void _connectRealtime(String userId) {
