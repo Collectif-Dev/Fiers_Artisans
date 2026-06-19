@@ -1,11 +1,11 @@
 # Fiers Artisans
 node_modules/
 dist/
-.env
+# .env
 *.log
-google-services.json
-GoogleService-Info.plist
-*-firebase-adminsdk-*.json
+# google-services.json
+# GoogleService-Info.plist
+# *-firebase-adminsdk-*.json
 
 # Auto-generated entries
 # Dependencies
@@ -18,21 +18,21 @@ yarn-error.log*
 dist/
 build/
 .next/
-admin-web/.next-local/
+# admin-web/.next-local/
 *.log
 
 # Environment files
-.env
-.env.*
-!.env.example
+# .env
+# .env.*
+# !.env.example
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
+# # IDE files
+# .vscode/
+# .idea/
+# *.swp
+# *.swo
 
-# OS files
+# # OS files
 .DS_Store
 Thumbs.db
 
@@ -41,27 +41,29 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Temporary files
+# # Temporary files
 *.tmp
 *.temp
 .cache/
-.codex
+# .codex
 logs_inspect/
 backend/backend_log.txt
 tmp_api_check.ps1
 
-# Sensitive files (auto-detected)
-.env
-.env.example
-infrastructure/stack.portainer-managed.yml
-infrastructure/backups/
+# # Sensitive files (auto-detected)
+# .env
+# .env.example
+# infrastructure/stack.portainer-managed.yml
+# infrastructure/backups/
 
 # Local fusion exports
 globaliste/
 Globaliste/
 Globalist/
 
-# Agent & task documentation (internal use)
+# # Agent & task documentation (internal use)
 taches_et_problemes/
 Structure_dev/
 .agents/
+
+*.tar.gz

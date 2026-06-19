@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "794880404300",
+    "project_id": "fiers-artisant",
+    "storage_bucket": "fiers-artisant.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:794880404300:android:28ea9e7198e46151ad3de9",
+        "android_client_info": {
+          "package_name": "com.fiersartisans.fiers_artisans"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAY-DbVcHXsxcqp0hf5NKqP2a-YVibkm0o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

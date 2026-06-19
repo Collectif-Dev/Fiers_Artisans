@@ -3,13 +3,13 @@
 .github
 .githooks
 
-# Environment & secrets
-.env
-.env.*
-!.env.example
-.venv
+# # Environment & secrets
+# .env
+# .env.*
+# !.env.example
+# .venv
 
-# IDE
+# # IDE
 .vscode
 .idea
 *.swp
@@ -22,7 +22,7 @@ build
 .next
 *.log
 
-# Documentation
+# # Documentation
 *.md
 !README.md
 
@@ -31,8 +31,8 @@ globaliste/
 Globaliste/
 Globalist/
 
-# Mobile app (not part of web/backend images)
-Fiers Artisans/
+# # Mobile app (not part of web/backend images)
+# Fiers Artisans/
 
 # Other
 .codex
@@ -42,3 +42,5 @@ Fiers Artisans/
 taches_et_problemes/
 Structure_dev/
 .agents/
+
+*.tar.gz

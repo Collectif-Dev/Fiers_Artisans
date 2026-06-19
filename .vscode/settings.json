@@ -1,0 +1,7 @@
+{
+    "chat.agent.maxRequests": 50,
+    "chat.tools.terminal.autoReplyToPrompts": true,
+    "workbench.browser.openLocalhostLinks": true,
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python.terminal.useEnvFile": true
+}

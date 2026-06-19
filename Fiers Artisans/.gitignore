@@ -4,13 +4,13 @@
 *.pyc
 *.swp
 
-# Firebase config files (sensitive — do NOT commit)
-android/app/google-services.json
-ios/Runner/GoogleService-Info.plist
-lib/firebase_options.dart
+# # Firebase config files (sensitive — do NOT commit)
+# android/app/google-services.json
+# ios/Runner/GoogleService-Info.plist
+# lib/firebase_options.dart
 
 # Environment (IP locale, ne pas committer)
-.env
+# .env
 .DS_Store
 .atom/
 .build/
@@ -29,7 +29,7 @@ migrate_working_dir/
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
-#.vscode/
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -68,10 +68,10 @@ dist/
 build/
 *.log
 
-# Environment files
-.env
-.env.*
-!.env.example
+# # Environment files
+# .env
+# .env.*
+# !.env.example
 
 # IDE files
 .vscode/
@@ -89,11 +89,14 @@ Thumbs.db
 .cache/
 
 # Sensitive files (auto-detected)
-.env
-.env.example
+# .env
+# .env.example
 build
 
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh
 ios/Flutter/ephemeral/
 linux/flutter/ephemeral/
+
+
+*.tar.gz
