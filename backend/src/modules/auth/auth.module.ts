@@ -22,13 +22,23 @@ import { PinLoginGuardService } from './pin-login-guard.service';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.secret') || 'fallback-secret',
-        signOptions: {
-          expiresIn: (configService.get<string>('jwt.accessExpiration') ||
-            '15m') as any,
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('jwt.secret');
+        if (!secret || secret.length < 32) {
+          throw new Error(
+            'FATAL: JWT_SECRET is not configured or is too short (< 32 chars). ' +
+            'The JWT module cannot initialize without a secure secret. ' +
+            'Application startup aborted.',
+          );
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn: (configService.get<string>('jwt.accessExpiration') ||
+              '15m') as any,
+          },
+        };
+      },
     }),
     TypeOrmModule.forFeature([
       User,

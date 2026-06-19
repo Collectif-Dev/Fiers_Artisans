@@ -239,10 +239,14 @@ export class ChatGateway
 
   private verifySocketToken(token: string): string | null {
     try {
-      const payload = this.jwtService.verify<{ sub?: string }>(token, {
-        secret:
-          this.configService.get<string>('jwt.secret') || 'fallback-secret',
-      });
+      const secret = this.configService.get<string>('jwt.secret');
+      if (!secret || secret.length < 32) {
+        this.logger.error(
+          'FATAL: JWT_SECRET is missing or too short for WebSocket verification. Rejecting connection.',
+        );
+        return null; 
+      }
+      const payload = this.jwtService.verify<{ sub?: string }>(token, { secret });
       return payload?.sub || null;
     } catch {
       return null;
