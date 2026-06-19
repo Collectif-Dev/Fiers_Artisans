@@ -41,5 +41,13 @@ export default registerAs('app', () => {
     ),
     corsAllowLan,
     corsLanPorts: envLanPorts.length > 0 ? envLanPorts : defaultLanPorts,
+    cookie: {
+      domain: process.env.COOKIE_DOMAIN || undefined,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      path: '/',
+      maxAgeAccess: 15 * 60 * 1000, // 15 minutes
+      maxAgeRefresh: 30 * 24 * 60 * 60 * 1000, // 30 jours
+    },
   };
 });
