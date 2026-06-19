@@ -36,6 +36,11 @@ admin-web/.next-local/
 .DS_Store
 Thumbs.db
 
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
 # Temporary files
 *.tmp
 *.temp
@@ -58,4 +63,5 @@ Globalist/
 
 # Agent & task documentation (internal use)
 taches_et_problemes/
+Structure_dev/
 .agents/

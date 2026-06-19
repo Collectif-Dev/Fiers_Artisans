@@ -1,228 +1,57 @@
-# Global Fusion Script - Improvements & Features
+# Script de fusion globale — guide rapide
 
-## 🎯 Purpose
+## À quoi ça sert
 
-The enhanced `generate_global_fusion.py` script creates a complete code snapshot of all project files while handling encoding issues and preventing synchronization problems.
+`generate_global_fusion.py` agrège le code du dépôt dans `globaliste/global_fusion.txt` pour donner une vue complète à un outil externe ou une IA.
 
-## ✨ Key Improvements
-
-### 1. **Multi-Encoding Fallback Strategy**
-```python
-ENCODINGS = [
-    "utf-8",          # Default
-    "utf-8-sig",      # UTF-8 with BOM (Excel, some Windows editors)
-    "latin-1",        # Western European
-    "iso-8859-1",     # Alternative Latin-1
-    "cp1252",         # Windows-1252 (Windows editors)
-]
-```
-
-**Problem Fixed:** Files from different editors/systems use different encodings:
-- macOS: UTF-8 with BOM
-- Windows: CP1252 or UTF-16
-- Linux/Git: UTF-8
-- Legacy files: Latin-1
-
-**Solution:** Try each encoding in order. Falls back to hex dump if all fail.
-
-### 2. **Comprehensive Error Handling**
-
-```python
-def read_file_with_fallback(file_path: Path, stats: Stats) -> Optional[Tuple[str, str]]:
-    """Try each encoding systematically, then hex as last resort."""
-    for encoding in ENCODINGS:
-        try:
-            content = file_path.read_text(encoding=encoding)
-            return content, encoding
-        except UnicodeDecodeError:
-            continue
-    
-    # Last resort: hex dump for inspection
-    raw_bytes = file_path.read_bytes()
-    return hex_content, "hex"
-```
-
-**Problem Fixed:** Silent failures when files had unexpected encoding
-**Solution:** Track which encoding was needed, log warnings
-
-### 3. **Critical File Validation**
-
-```python
-CRITICAL_FILES = {
-    "backend/src/config/jwt.config.ts",           # Security patches
-    "backend/src/modules/auth/strategies/jwt-refresh.strategy.ts",
-    "infrastructure/docker-compose.portainer.yml",
-    "backend/src/modules/payment-manual/services/payment-manual.service.ts",
-    "Fiers Artisans/lib/core/storage/secure_storage.dart",
-    # ... 9 more
-}
-```
-
-**Problem Fixed:** Missing critical files went undetected
-**Solution:** Validate that all critical files are in the fusion
-
-### 4. **Detailed Statistics & Reporting**
-
-The `Stats` class tracks:
-- Total files scanned
-- Successfully merged
-- Skipped files
-- Failed files (with reasons)
-- Encoding issues (fallbacks used)
-- Critical files validated
-- General warnings
-
-**Generated Report:** `globaliste/fusion_report.log`
-
-```
-STATISTICS:
-  Total files scanned:        513
-  Successfully merged:       415
-  Skipped (filters):         97
-  Failed to read:            1
-  Encoding fallbacks used:   1
-  Critical files validated:  14/14
-
-⚠️  ENCODING ISSUES:
-  - file.pyc (decoded as: latin-1)
-
-❌ FILES THAT COULD NOT BE READ:
-  - problematic_file.md
-    Error: description
-```
-
-### 5. **Command-Line Options**
+## Commandes
 
 ```bash
-# Standard mode (console output)
-python3 infrastructure/scripts/generate_global_fusion.py
-
-# With detailed report file
+# Depuis la racine du projet
 python3 infrastructure/scripts/generate_global_fusion.py --report
 
-# Strict mode (fail on any errors)
+# Mode strict (CI) — échoue si fichier critique manquant
 python3 infrastructure/scripts/generate_global_fusion.py --strict
 ```
 
-## 📋 Usage Examples
+**Sorties :**
+- `globaliste/global_fusion.txt` — snapshot fusionné (UTF-8 pur)
+- `globaliste/fusion_report.log` — rapport (avec `--report`)
 
-### Regular Sync (Recommended)
+## Quand lancer le script
+
+- Après un gros merge ou un patch sécurité
+- Avant de partager le contexte complet du projet
+- En CI avec `--strict` si tu veux bloquer une fusion incomplète
+
+## Ce qui est inclus / exclu
+
+**Inclus :** code source, configs, `.md`, `.env.example`  
+**Exclu :** binaires, images, `node_modules`, `__pycache__`, `.pyc`, `.env` secrets, `globaliste/` lui-même
+
+## Fichiers critiques validés
+
+Le script vérifie la présence de 15 fichiers sensibles (JWT, WebSocket, paiement, mobile, audit interne). Les docs dans `taches_et_problemes/` sont inclus si elles existent localement même si gitignorées.
+
+## Problème connu résolu (2026-06-19)
+
+**Symptôme :** Cursor/VS Code refusait d'ouvrir `global_fusion.txt` (« caractères invalides »).
+
+**Cause :** un fichier `.pyc` binaire avait été fusionné en texte (octets NUL `\x00`).
+
+**Correctifs appliqués :**
+- exclusion `__pycache__` et `.pyc`
+- rejet des fichiers binaires (détection NUL)
+- nettoyage des caractères de contrôle dans la sortie
+- plus de dump hex de binaires dans la fusion
+
+## En cas de problème
+
 ```bash
-# From project root:
-cd /home/arthur/mes_projets_dev/Fiers_Artisans.github
-python3 infrastructure/scripts/generate_global_fusion.py --report
+# Vérifier qu'il n'y a pas d'octets NUL
+python3 -c "d=open('globaliste/global_fusion.txt','rb').read(); print(d.count(b'\\x00'))"
+# Doit afficher 0
 
-# Or from infrastructure/scripts/ directory:
-cd infrastructure/scripts
-python3 generate_global_fusion.py --report
-```
-
-**Output:**
-- ✅ `globaliste/global_fusion.txt` - Complete code snapshot
-- ✅ `globaliste/fusion_report.log` - Detailed statistics
-- ✅ Console summary with warnings
-
-### Debug Mode (Find Problems)
-```bash
-# See detailed reports
+# Lire le rapport
 cat globaliste/fusion_report.log
-
-# Track which files needed encoding fallbacks
-grep "ENCODING ISSUES" -A 10 globaliste/fusion_report.log
 ```
-
-### CI/CD Integration (Strict Mode)
-```bash
-# In your CI pipeline - fails if anything goes wrong
-# From project root:
-python3 infrastructure/scripts/generate_global_fusion.py --strict
-if [ $? -ne 0 ]; then
-  echo "Fusion generation failed!"
-  exit 1
-fi
-
-# Or from infrastructure/scripts/ directory:
-cd infrastructure/scripts && python3 generate_global_fusion.py --strict
-```
-
-## 🛡️ Prevention of Synchronization Issues
-
-### Problem: Files Missing from Fusion
-
-**Root Causes:**
-1. ❌ Encoding errors → Silent failure
-2. ❌ Missing files → No error reported  
-3. ❌ No validation → Corruption undetected
-
-**Solutions Implemented:**
-1. ✅ Multi-encoding with tracking
-2. ✅ Existence check + existence error logging
-3. ✅ Critical file validation + warning on missing
-4. ✅ Detailed report with all statistics
-5. ✅ Strict mode for CI/CD integration
-
-### How to Prevent Regression
-
-1. **After major merges:**
-   ```bash
-   # From project root:
-   python3 infrastructure/scripts/generate_global_fusion.py --report
-   cat globaliste/fusion_report.log  # Check for issues
-   
-   # Or from infrastructure/scripts/ directory:
-   cd infrastructure/scripts && python3 generate_global_fusion.py --report
-   cd ../../ && cat globaliste/fusion_report.log
-   ```
-
-2. **Check report regularly:**
-   - Look for files with encoding fallbacks
-   - Ensure all 14 critical files are present
-   - Monitor failed file count (should stay at 0)
-
-3. **In CI/CD pipeline:**
-   - Add strict mode check to prevent bad commits
-   - Save report as artifact for inspection
-
-## 📊 What Gets Included/Excluded
-
-### ✅ Included
-- All TypeScript/JavaScript files
-- Dart files
-- Python files
-- Configuration files (.yml, .json, .env.example, etc.)
-- Documentation (.md files)
-- Build configuration
-
-### ❌ Excluded
-- Binary files (images, videos, fonts, archives)
-- Build outputs (`node_modules`, `build`, `dist`, `.next`)
-- IDE/tool caches (`.git`, `.vscode`, `.idea`, `.gradle`)
-- Credentials/secrets (private `.env` files)
-- Temporary/report files (`AUDIT_*.md`, `taches_*.md`)
-
-## 🔄 Integration with Project Workflow
-
-1. **Before committing large changes:**
-   ```bash
-   # From project root:
-   python3 infrastructure/scripts/generate_global_fusion.py --report
-   git diff globaliste/fusion_report.log  # Review changes
-   ```
-
-2. **After security patches:**
-   ```bash
-   # From project root:
-   python3 infrastructure/scripts/generate_global_fusion.py
-   grep -E "requireEnv|WS_ALLOWED_ORIGINS|@Throttle" globaliste/global_fusion.txt
-   ```
-
-3. **Regular maintenance:**
-   - Run monthly to catch encoding drift
-   - Archive reports to track file health over time
-
-## 📝 Notes
-
-- The fusion file is designed for **external tools and AI models** to understand the complete codebase
-- It's not meant to replace git - it's a **supplement** for context
-- The report helps identify if any files are having trouble being read
-- Keep the script in version control and run it as part of your build process

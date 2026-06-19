@@ -53,6 +53,7 @@ EXCLUDE_DIRS = {
     ".venv",
     "target",
     "Pods",
+    "__pycache__",
     "_pycache_",
 }
 
@@ -91,6 +92,9 @@ SKIP_EXTS = {
     ".db",
     ".sqlite",
     ".sqlite3",
+    ".pyc",
+    ".pyo",
+    ".pyd",
 }
 
 SKIP_FILES = {".DS_Store"}
@@ -226,6 +230,24 @@ def should_skip_file(path: Path, output_path: Path) -> bool:
     return False
 
 
+def is_probably_text(raw_bytes: bytes) -> bool:
+    """Reject binary payloads that would corrupt the UTF-8 fusion output."""
+    if not raw_bytes:
+        return True
+    if b"\x00" in raw_bytes:
+        return False
+    sample = raw_bytes[:4096]
+    non_text = sum(1 for byte in sample if byte < 9 or (13 < byte < 32))
+    return (non_text / len(sample)) < 0.05
+
+
+def sanitize_text(content: str) -> str:
+    """Strip control chars that break text editors (NUL, etc.)."""
+    return "".join(
+        ch for ch in content if ch in ("\n", "\r", "\t") or ord(ch) >= 32
+    )
+
+
 def read_file_with_fallback(file_path: Path, stats: Stats, strict: bool = False) -> Optional[Tuple[str, str]]:
     """
     Try to read a file with multiple encoding strategies.
@@ -234,9 +256,7 @@ def read_file_with_fallback(file_path: Path, stats: Stats, strict: bool = False)
         Tuple[content, encoding_used] if successful
         None if all attempts fail
     """
-    # Verify file actually exists (not just in git index)
     if not file_path.exists():
-        # Try to find similar files (case-insensitive match)
         parent = file_path.parent
         if parent.exists():
             for candidate in parent.iterdir():
@@ -247,7 +267,6 @@ def read_file_with_fallback(file_path: Path, stats: Stats, strict: bool = False)
                 if strict:
                     stats.add_failure(file_path, f"File path does not exist: {file_path}")
                 else:
-                    # In normal mode, just skip silently (file was removed)
                     stats.skipped += 1
                 return None
         else:
@@ -257,28 +276,28 @@ def read_file_with_fallback(file_path: Path, stats: Stats, strict: bool = False)
                 stats.skipped += 1
             return None
 
-    # Try each encoding in order
-    for encoding in ENCODINGS:
-        try:
-            content = file_path.read_text(encoding=encoding)
-            if encoding != "utf-8":
-                stats.add_encoding_issue(file_path, encoding)
-            return content, encoding
-        except UnicodeDecodeError:
-            continue
-        except Exception as e:
-            continue
-
-    # Last resort: read as hex for inspection
     try:
         raw_bytes = file_path.read_bytes()
-        content = f"[BINARY FILE - {len(raw_bytes)} bytes]\n"
-        content += f"[First 100 bytes (hex)]: {raw_bytes[:100].hex()}\n"
-        stats.add_warning(f"File {file_path.name} is binary/unreadable - included as hex dump")
-        return content, "hex"
-    except Exception as e:
-        stats.add_failure(file_path, f"All encoding attempts failed: {e}")
+    except OSError as exc:
+        stats.add_failure(file_path, f"Cannot read bytes: {exc}")
         return None
+
+    if not is_probably_text(raw_bytes):
+        stats.skipped += 1
+        stats.add_warning(f"Skipped binary file: {file_path}")
+        return None
+
+    for encoding in ENCODINGS:
+        try:
+            content = raw_bytes.decode(encoding)
+            if encoding != "utf-8":
+                stats.add_encoding_issue(file_path, encoding)
+            return sanitize_text(content), encoding
+        except UnicodeDecodeError:
+            continue
+
+    stats.add_failure(file_path, "All text encodings failed")
+    return None
 
 
 
@@ -322,6 +341,29 @@ def iter_repo_files(repo_root: Path) -> list[Path]:
     return sorted(files, key=safe_sort_key)
 
 
+def append_local_critical_files(repo_root: Path, files: list[Path]) -> list[Path]:
+    """Include gitignored critical docs when they exist locally."""
+    seen = {path.resolve() for path in files}
+    extra: list[Path] = []
+
+    for rel_path in sorted(CRITICAL_FILES):
+        candidate = (repo_root / rel_path).resolve()
+        if candidate.exists() and candidate.resolve() not in seen:
+            extra.append(candidate)
+            seen.add(candidate.resolve())
+
+    if not extra:
+        return files
+
+    def safe_sort_key(path: Path) -> str:
+        try:
+            return path.relative_to(repo_root).as_posix()
+        except (ValueError, TypeError):
+            return str(path)
+
+    return sorted(files + extra, key=safe_sort_key)
+
+
 def main() -> None:
     # Parse command-line arguments
     strict_mode = "--strict" in sys.argv
@@ -347,7 +389,7 @@ def main() -> None:
     found_critical_files = set()
 
     # Process all files
-    all_files = iter_repo_files(repo_root)
+    all_files = append_local_critical_files(repo_root, iter_repo_files(repo_root))
     stats.total_files = len(all_files)
 
     print(f"🔄 Processing {stats.total_files} files from git...")
@@ -413,7 +455,8 @@ def main() -> None:
 
     # Write fusion file
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("\n".join(content), encoding="utf-8")
+    fusion_text = sanitize_text("\n".join(content))
+    output_path.write_text(fusion_text, encoding="utf-8", newline="\n")
 
     # Generate report if requested
     if generate_report:
