@@ -19,6 +19,8 @@ lib/firebase_options.dart
 .svn/
 .swiftpm/
 migrate_working_dir/
+env
+venv/
 
 # IntelliJ related
 *.iml
@@ -70,8 +72,9 @@ build/
 
 # Environment files
 .env
+**/.env
 .env.*
-#!.env.example
+!.env.example
 
 # IDE files
 .vscode/
@@ -89,9 +92,8 @@ Thumbs.db
 .cache/
 
 # Sensitive files (auto-detected)
-.env
-.env.example
 build
+
 
 ios/Flutter/Generated.xcconfig
 ios/Flutter/flutter_export_environment.sh

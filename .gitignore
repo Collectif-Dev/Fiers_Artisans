@@ -1,5 +1,5 @@
 # Fiers Artisans
-node_modules/
+**/node_modules/
 dist/
 .env
 *.log
@@ -20,11 +20,12 @@ build/
 .next/
 admin-web/.next-local/
 *.log
+**/.log
 
 # Environment files
-.env
+**/.env
 .env.*
-#!.env.example
+!.env.example
 
 # IDE files
 .vscode/
@@ -32,11 +33,13 @@ admin-web/.next-local/
 *.swp
 *.swo
 
+
 # OS files
 .DS_Store
 Thumbs.db
 
 # Python bytecode
+**/__pycache__/
 __pycache__/
 *.pyc
 *.pyo
@@ -52,7 +55,6 @@ tmp_api_check.ps1
 
 # Sensitive files (auto-detected)
 .env
-.env.example
 infrastructure/stack.portainer-managed.yml
 infrastructure/backups/
 
