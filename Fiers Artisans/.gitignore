@@ -4,13 +4,13 @@
 *.pyc
 *.swp
 
-# # Firebase config files (sensitive — do NOT commit)
-# android/app/google-services.json
-# ios/Runner/GoogleService-Info.plist
-# lib/firebase_options.dart
+# Firebase config files (sensitive — do NOT commit)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
 
 # Environment (IP locale, ne pas committer)
-# .env
+.env
 .DS_Store
 .atom/
 .build/
@@ -68,10 +68,10 @@ dist/
 build/
 *.log
 
-# # Environment files
-# .env
-# .env.*
-# !.env.example
+# Environment files
+.env
+.env.*
+!.env.example
 
 # IDE files
 .vscode/
@@ -89,8 +89,8 @@ Thumbs.db
 .cache/
 
 # Sensitive files (auto-detected)
-# .env
-# .env.example
+.env
+.env.example
 build
 
 ios/Flutter/Generated.xcconfig
