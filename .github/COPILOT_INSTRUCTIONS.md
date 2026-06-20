@@ -4,7 +4,7 @@
 
 Ce document definit les regles strictes a respecter avant toute modification du projet `Fiers-Artisans`, qu'il s'agisse :
 
-- d'une correction de bug
+- d'une correction de bugs
 - d'une amelioration
 - d'un refactor
 - d'un changement UX/UI
