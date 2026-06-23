@@ -48,6 +48,10 @@ __pycache__/
 *.tmp
 *.temp
 .cache/
+
+# Test and temp files
+**/fichier_de_transmission.txt
+fichier_de_transmission.txt
 # .codex
 logs_inspect/
 backend/backend_log.txt
