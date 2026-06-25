@@ -303,8 +303,9 @@ export class AuthService {
       try {
         await this.otpService.sendOtp(user.phone_number);
       } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
         this.logger.warn(
-          `OTP send failed during login for ${user.phone_number}: ${e.message}`,
+          `OTP send failed during login for ${user.phone_number}: ${message}`,
         );
       }
       throw new BusinessException(
