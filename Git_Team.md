@@ -2,7 +2,37 @@
 
 > 📋 **Version** : 3.0 — 6 juin 2026  
 > **Pour** : Développeurs junior et confirmé  
-> **Objectif** : Workflow simple, pragmatique et sans casse-tête  
+> **Objectif** : Workflow GitLab simple, pragmatique et sans casse-tête
+
+---
+
+## 📌 Périmètre de ce guide
+
+Ce guide cible uniquement le dépôt GitLab utilisé par l'équipe :
+
+```bash
+git@gitlab.com:mellykelkun/Fiers_Artisants.git
+```
+
+Dans ce document, `origin` désigne le remote GitLab de l'équipe.
+
+Le dépôt GitHub privé est hors workflow équipe. Il sert uniquement au lead pour maintenir une copie privée synchronisée avec GitLab. Les développeurs ne clonent pas, ne poussent pas et n'ouvrent pas de demande de fusion sur GitHub dans le cadre de ce guide.
+
+### Synchronisation GitHub privée / GitLab équipe
+
+Cette procédure est réservée au lead.
+
+Objectif : garder les branches `develop` du dépôt GitHub privé et du dépôt GitLab équipe au même niveau.
+
+Principe opérationnel :
+
+1. travailler localement sur des branches `fix/*` côté dépôt GitHub privé
+2. rebase la branche de travail sur le `develop` local GitHub
+3. pousser le `develop` remote GitHub après validation
+4. pousser le même `develop` vers le remote GitLab équipe
+5. faire un pull du `develop` local GitLab pour réaligner l'environnement équipe
+
+L'équipe ne doit pas appliquer cette procédure. Pour les développeurs, la source de travail reste GitLab et le flux normal reste : `develop` GitLab → branche feature/fix → MR GitLab → merge.
 
 ---
 
@@ -11,8 +41,8 @@
 ```
 1. ❌ JAMAIS coder directement sur develop, merge, vers_production ou main
 2. ✅ Toujours créer une branche feature/fix à partir de develop
-3. ✅ Toujours ouvrir une Pull Request (PR) pour fusionner
-4. ✅ Toujours se synchroniser avec develop avant la PR
+3. ✅ Toujours ouvrir une Merge Request (MR) GitLab pour fusionner
+4. ✅ Toujours se synchroniser avec develop avant la MR
 ```
 
 **Une seule exception** : hotfix depuis main (urgence production seulement)
@@ -51,8 +81,8 @@ feature/*  fix/*  chore/*  ← Vos branches de travail
 ### Cloner le dépôt
 
 ```bash
-git clone git@github.com:Collectif-Dev/Fiers_Artisans.git
-cd Fiers_Artisans
+git clone git@gitlab.com:mellykelkun/Fiers_Artisants.git
+cd Fiers_Artisants
 ```
 
 ### Vérifier la branche courante
@@ -95,7 +125,7 @@ Supposons que vous devez implémenter la feature : **#101 OTP Backend Authentica
 
 ```bash
 git checkout develop
-git pull mellykelkun develop
+git pull origin develop
 ```
 
 **Pourquoi** : Vous assurez que votre `develop` local est à jour avant de créer une branche.
@@ -176,7 +206,7 @@ git commit -m "feat(auth): implement OTP generation and verification service"
 | **docs** | Documentation | `docs(readme): update setup instructions` |
 | **chore** | Maintenance, dépendances | `chore(deps): update NestJS packages` |
 
-### Pousser votre branche vers GitHub
+### Pousser votre branche vers GitLab
 
 ```bash
 git push origin feature/backend/auth-otp
@@ -187,15 +217,15 @@ git push origin feature/backend/auth-otp
 git push origin
 ```
 
-✅ Votre branche est maintenant sur GitHub !
+✅ Votre branche est maintenant sur GitLab !
 
 ---
 
 ## 4️⃣ METTRE À JOUR SA BRANCHE QUAND DEVELOP AVANCE
 
-**Scénario** : Vous travaillez sur `feature/backend/auth-otp`, et d'autres PRs sont fusionnées dans `develop`.
+**Scénario** : Vous travaillez sur `feature/backend/auth-otp`, et d'autres MRs sont fusionnées dans `develop`.
 
-### Ce qu'il faut faire AVANT d'ouvrir une PR
+### Ce qu'il faut faire AVANT d'ouvrir une MR
 
 ```bash
 git fetch origin
@@ -240,12 +270,12 @@ git push --force-with-lease origin feature/backend/auth-otp
 
 ---
 
-## 5️⃣ OUVRIR UNE PULL REQUEST (PR)
+## 5️⃣ OUVRIR UNE MERGE REQUEST (MR)
 
-### Sur GitHub
+### Sur GitLab
 
-1. Allez sur [github.com/Collectif-Dev/Fiers_Artisans](https://github.com/Collectif-Dev/Fiers_Artisans)
-2. Cliquez sur **Pull Requests** → **New Pull Request**
+1. Allez sur le projet GitLab `mellykelkun/Fiers_Artisants`
+2. Cliquez sur **Merge requests** → **New merge request**
 3. Configurez :
    - **Base (cible)** : `develop`
    - **Compare (source)** : `feature/backend/auth-otp`
@@ -276,19 +306,19 @@ Dépend de : feature/contracts/api-dto-auth (MERGÉE ✅)
 - Nécessite variable d'environnement : OTP_TTL_SECONDS
 ```
 
-4. Cliquez sur **Create Pull Request**
+4. Cliquez sur **Create merge request**
 
-### Après ouverture de la PR
+### Après ouverture de la MR
 
 - La CI/CD se lance automatiquement
 - Les reviewers sont notifiés
-- Si la CI échoue → Corrigez et poussez des commits (la PR se met à jour seule)
+- Si la CI échoue → Corrigez et poussez des commits (la MR se met à jour seule)
 
 ---
 
-## 6️⃣ APRÈS FUSION DE VOTRE PR
+## 6️⃣ APRÈS FUSION DE VOTRE MR
 
-Une fois que votre PR est fusionnée dans `develop` :
+Une fois que votre MR est fusionnée dans `develop` :
 
 ### Nettoyer sa branche locale
 
@@ -314,7 +344,7 @@ git checkout -b feature/backend/mon-feature
 git add .
 git commit -m "feat(backend): ma nouvelle feature"
 git push origin
-# Ouvrez une PR sur GitHub
+# Ouvrez une MR sur GitLab
 ```
 
 ### Scénario B — Ma branche est en retard sur develop
@@ -325,13 +355,13 @@ git rebase origin/develop
 git push --force-with-lease origin
 ```
 
-### Scénario C — Je dois corriger la PR après review
+### Scénario C — Je dois corriger la MR après review
 
 ```bash
 git add .
 git commit -m "fix: address review comments"
 git push origin
-# La PR se met à jour automatiquement
+# La MR se met à jour automatiquement
 ```
 
 ### Scénario D — J'ai modifié des fichiers que je veux abandonner
@@ -368,7 +398,7 @@ git pull origin develop
 | ❌ À NE JAMAIS FAIRE | ❌ Pourquoi | ✅ À LA PLACE |
 |---------------------|-----------|-------------|
 | Coder directement sur `develop` ou `main` | Bypass des reviews, casse l'intégration | Créer une branche `feature/*` |
-| `git push origin develop` depuis votre PC | Injecte du code non revu | Ouvrir une PR (fusion depuis GitHub) |
+| `git push origin develop` depuis votre PC | Injecte du code non revu | Ouvrir une MR GitLab |
 | `git merge develop` dans votre feature | Historique sale, incohérent | `git rebase origin/develop` |
 | `git push --force` (sans lease) | Écrase le travail d'un autre | `git push --force-with-lease` |
 | Créer une branche `feature/otp` (sans domaine) | Non respecte la convention | `feature/backend/auth-otp` |
@@ -407,7 +437,7 @@ npm run build         # (vérifier la build)
 git push origin
 ```
 
-### Avant chaque Pull Request
+### Avant chaque Merge Request
 
 ```bash
 # Mettez à jour votre branche
@@ -417,8 +447,8 @@ git rebase origin/develop
 # Poussez
 git push --force-with-lease origin
 
-# Vérifiez que la CI passe sur GitHub
-# → Puis ouvrez la PR
+# Vérifiez que la CI passe sur GitLab
+# → Puis ouvrez la MR
 ```
 
 ---
@@ -449,7 +479,7 @@ git push --force-with-lease origin
 
 ```
 Clone → develop à jour → feature branche → commit/push régulier 
-→ rebase sur origin/develop → ouvrir PR → supprime après merge
+→ rebase sur origin/develop → ouvrir MR → supprime après merge
 ```
 
 ---
@@ -470,7 +500,7 @@ git commit -m "fix(payment): prevent double spending"
 # 3. Tester
 npm run test
 
-# 4. PR vers main + ouvrir URGENCE
+# 4. MR vers main + signalement URGENCE
 # 5. Après merge → backport vers develop (même jour)
 git checkout develop
 git pull origin develop
@@ -485,7 +515,7 @@ git push origin
 - **Conflit Git** → Demandez à un senior
 - **Rebase cassé** → `git rebase --abort` + demandez de l'aide
 - **Branche supprimée par erreur** → Reflex : `git reflog`
-- **Pas sûr(e)** → Ouvrez une PR en draft et demandez review
+- **Pas sûr(e)** → Ouvrez une MR en draft et demandez review
 
 ---
 
@@ -612,7 +642,7 @@ git commit -m "refactor(payment-manual): extract validation service"
 git push origin feature/backend/payment-manual-lifecycle
 ```
 
-### 4️⃣ Rebase avant PR (OBLIGATOIRE)
+### 4️⃣ Rebase avant MR (OBLIGATOIRE)
 
 ```bash
 git checkout feature/backend/payment-manual-lifecycle
@@ -629,7 +659,7 @@ git push --force-with-lease origin feature/backend/payment-manual-lifecycle
 
 **Règle absolue** : `rebase` sur develop, jamais `merge` de develop dans une feature.
 
-### 5️⃣ Créer une Pull Request (PR)
+### 5️⃣ Créer une Merge Request (MR)
 
 **Vers** : `develop`
 **Titre** : `[FEATURE] Backend: Add payment manual lifecycle with cooldown`
@@ -678,7 +708,7 @@ Closes #123
 
 ```
 Dev_1: feature/backend/payment-manual-lifecycle ────┐
-Dev_2: feature/flutter/artisan-manual-payment       ├──→ develop (rebase + PR)
+Dev_2: feature/flutter/artisan-manual-payment       ├──→ develop (rebase + MR)
 Dev_3: feature/admin-web/payments-manual-validation   │
 Dev_4: feature/contracts/api-dto-payment             ───┘ (doit être mergée EN PREMIER)
 ```
@@ -692,7 +722,7 @@ Dev_4: feature/contracts/api-dto-payment             ───┘ (doit être me
 ### Phase 2 : Intégration (develop → merge)
 
 ```
-develop ────→ merge (PR + CI/CD complet)
+develop ────→ merge (MR + CI/CD complet)
 ```
 **Checks obligatoires** :
 - Backend : `npm run build && npm run test && npm run test:e2e`
@@ -703,7 +733,7 @@ develop ────→ merge (PR + CI/CD complet)
 ### Phase 3 : QA & Tests (merge → vers_production)
 
 ```
-merge ────→ vers_production (PR + tests E2E + charge + sécurité)
+merge ────→ vers_production (MR + tests E2E + charge + sécurité)
 ```
 **Checks obligatoires** :
 - Tests E2E end-to-end (auth + payment + chat + search)
@@ -714,7 +744,7 @@ merge ────→ vers_production (PR + tests E2E + charge + sécurité)
 ### Phase 4 : Production (vers_production → main)
 
 ```
-vers_production ────→ main (PR + tag + déploiement)
+vers_production ────→ main (MR + tag + déploiement)
 ```
 **Actions automatiques** :
 - Tag version : `git tag -a v1.2.3 -m "Release v1.2.3"`
@@ -727,8 +757,8 @@ vers_production ────→ main (PR + tag + déploiement)
 
 ### ✅ À FAIRE
 
-- [ ] **Toujours** créer une PR avant de merger vers `develop`
-- [ ] **Toujours** rebase sur `develop` avant PR (jamais merge de develop dans feature)
+- [ ] **Toujours** créer une MR avant de merger vers `develop`
+- [ ] **Toujours** rebase sur `develop` avant MR (jamais merge de develop dans feature)
 - [ ] **Toujours** attendre l'approval avant de merger
 - [ ] **Toujours** faire des commits atomiques et descriptifs (conventional commits)
 - [ ] **Toujours** mettre à jour `develop` avant de créer une branche feature
@@ -740,7 +770,7 @@ vers_production ────→ main (PR + tag + déploiement)
 
 ### ❌ À NE JAMAIS FAIRE
 
-- [ ] **JAMAIS** merger directement sur `develop` sans PR
+- [ ] **JAMAIS** merger directement sur `develop` sans MR
 - [ ] **JAMAIS** pusher directement sur `main`, `vers_production`, `merge`
 - [ ] **JAMAIS** créer des branches hors de la structure définie (`feature/payment` ❌)
 - [ ] **JAMAIS** commiter sur `develop` ou `main` directement
@@ -818,15 +848,15 @@ vers_production ────→ main (PR + tag + déploiement)
 
 ## 🚀 Checklist de Mise en Place
 
-### Configuration GitHub/GitLab
+### Configuration GitLab
 
-- [ ] Protection de `main` : PR obligatoire, 2 approvals, signed commits
-- [ ] Protection de `vers_production` : PR obligatoire, 1 approval QA
-- [ ] Protection de `merge` : PR obligatoire, CI/CD passé
-- [ ] Protection de `develop` : PR obligatoire, 1 approval, build passé
+- [ ] Protection de `main` : MR obligatoire, 2 approvals, signed commits
+- [ ] Protection de `vers_production` : MR obligatoire, 1 approval QA
+- [ ] Protection de `merge` : MR obligatoire, CI/CD passé
+- [ ] Protection de `develop` : MR obligatoire, 1 approval, build passé
 - [ ] Configuration des status checks (CI/CD)
 - [ ] Configuration des webhooks (Slack/Teams notifications)
-- [ ] Templates de PR (feature, fix, hotfix, release)
+- [ ] Templates de MR (feature, fix, hotfix, release)
 - [ ] Templates d'issues (bug, feature, technical debt)
 
 ### Configuration Locale (chaque développeur)
@@ -835,7 +865,7 @@ vers_production ────→ main (PR + tag + déploiement)
 - [ ] Configurer git hooks (pre-commit lint)
 - [ ] Verifier les scripts disponibles dans `infrastructure/scripts/`
 - [ ] Configurer l'éditeur (ESLint, Prettier, Flutter analyze)
-- [ ] Tester le workflow : créer une branche test → PR → merge → supprimer
+- [ ] Tester le workflow : créer une branche test → MR → merge → supprimer
 
 ### Scripts et Outils
 
@@ -843,7 +873,7 @@ vers_production ────→ main (PR + tag + déploiement)
 - [ ] `infrastructure/scripts/validate-mr.sh` ✅
 - [ ] `infrastructure/scripts/clean-docker.sh` ✅
 - [ ] `infrastructure/scripts/generate-portainer-stack.sh` ✅
-- [ ] CI/CD pipeline (GitHub Actions / GitLab CI)
+- [ ] Pipeline GitLab CI
 - [ ] Pre-commit hooks (husky + lint-staged)
 
 ---
@@ -920,7 +950,7 @@ v<MAJOR>.<MINOR>.<PATCH>[-<prerelease>]
 3. Merge `release/vX.Y.Z` → `merge` → `vers_production` → `main`
 4. Tag sur `main` : `git tag -a vX.Y.Z -m "Release vX.Y.Z"`
 5. Push du tag : `git push origin vX.Y.Z`
-6. Création de la release GitHub avec changelog
+6. Création de la release GitLab avec changelog
 
 ---
 
@@ -946,8 +976,8 @@ git commit -m "fix(payment): prevent double spending in manual payment"
 # 3. Tests rapides
 npm run test
 
-# 4. PR vers main (URGENT — contacter CTO)
-# 5. PR vers develop (backport — même jour)
+# 4. MR vers main (URGENT — contacter CTO)
+# 5. MR vers develop (backport — même jour)
 ```
 
 ### Règles
@@ -959,7 +989,7 @@ npm run test
 
 ---
 
-## 📋 Templates de Pull Request
+## 📋 Templates de Merge Request
 
 ### Template Feature
 
@@ -1001,7 +1031,7 @@ Closes #
 
 ---
 
-## 📘 Dictionnaire Git/GitHub/GitLab — Débutant à Pro
+## 📘 Dictionnaire Git/GitLab — Débutant à Pro
 
 Cette section sert d'anti-sèche pédagogique. Elle explique les commandes Git les plus fréquentes, leur usage, les scénarios typiques et les réflexes de sécurité.
 
@@ -1031,12 +1061,12 @@ git init
 **Scénario** : tu arrives sur un projet existant et tu dois le récupérer.
 
 ```text
-GitHub/GitLab distant  -- git clone -->  copie locale avec .git
+GitLab distant  -- git clone -->  copie locale avec .git
 ```
 
 ```bash
-git clone https://github.com/user/repo.git
-git clone git@github.com:user/repo.git
+git clone https://gitlab.com/user/repo.git
+git clone git@gitlab.com:user/repo.git
 ```
 
 #### 3. `git status`
@@ -1275,7 +1305,7 @@ git diff abc123..def456
 
 ### 🔴 Niveau 3 — Pro
 
-#### 18. Pull Request / Merge Request
+#### 18. Merge Request
 
 **Fonction** : demander la revue et l'intégration d'une branche.
 
@@ -1290,7 +1320,7 @@ git commit -m "feat: ma super feature"
 git push -u origin feature/mon-truc
 ```
 
-Ensuite, créer la Pull Request ou Merge Request sur GitHub/GitLab, faire relire, corriger si nécessaire, puis fusionner via l'interface.
+Ensuite, créer la Merge Request sur GitLab, faire relire, corriger si nécessaire, puis fusionner via l'interface.
 
 #### 19. `git fetch` + `git merge`
 
@@ -1357,7 +1387,7 @@ git switch -c recuperation
 **Fonction** : inclure un autre dépôt Git dans ton projet.
 
 ```bash
-git submodule add https://github.com/team/lib.git libs/ma-lib
+git submodule add git@gitlab.com:team/lib.git libs/ma-lib
 git submodule update --init --recursive
 ```
 
@@ -1397,18 +1427,7 @@ Principes :
 - `feature/*` isole les nouvelles fonctionnalités
 - `hotfix/*` part de `main` pour corriger une urgence
 
-#### 26. GitHub CLI (`gh`)
-
-```bash
-gh auth login
-gh repo create mon-projet
-gh pr create --title "feat: ..."
-gh pr checkout 123
-gh pr review --approve
-gh issue create --title "bug: ..."
-```
-
-#### 27. GitLab CLI (`glab`)
+#### 26. GitLab CLI (`glab`)
 
 ```bash
 glab auth login
@@ -1458,7 +1477,6 @@ modifications -- git stash --> stash -- git stash pop --> restaure
 
 - [Git Flow Documentation](https://git-flow.readthedocs.io/)
 - [Conventional Commits](https://www.conventionalcommits.org/)
-- [GitHub Flow Guide](https://guides.github.com/introduction/flow/)
 - [Semantic Versioning](https://semver.org/)
 - `SECURITY_ARCHITECTURE.md` — Politique de sécurité et préservation
 - `instructions-agent-ia-v2.md` — Guide operationnel agent IA
