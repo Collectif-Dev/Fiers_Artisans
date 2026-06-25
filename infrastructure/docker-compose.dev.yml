@@ -31,7 +31,8 @@ services:
       minio:
         condition: service_started
 
-  # Admin Web en mode developpement (mode stable par defaut)
+  # Admin Web en mode stable par defaut pour eviter les compilations page par page.
+  # Mettre ADMIN_WEB_STABLE_MODE=false uniquement pour travailler activement sur l'UI.
   admin-web:
     build:
       target: development
@@ -42,8 +43,7 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
-      - NODE_ENV=development
-      - ADMIN_WEB_STABLE_MODE=${ADMIN_WEB_STABLE_MODE:-false}
+      - ADMIN_WEB_STABLE_MODE=${ADMIN_WEB_STABLE_MODE:-true}
       # Vide en dev pour conserver la resolution automatique selon l'hote courant.
       - NEXT_PUBLIC_API_URL=
       - NEXT_PUBLIC_API_PORT=${NEXT_PUBLIC_API_PORT:-3000}
@@ -54,9 +54,15 @@ services:
       - -lc
       - |
         if [ "$${ADMIN_WEB_STABLE_MODE}" = "true" ]; then
-          npm run build && npm run start
+          NODE_ENV=production npm run build
+          mkdir -p .next/standalone/.next
+          rm -rf .next/standalone/.next/static .next/standalone/public
+          cp -R .next/static .next/standalone/.next/static
+          [ ! -d public ] || cp -R public .next/standalone/public
+          cd .next/standalone
+          NODE_ENV=production HOSTNAME=0.0.0.0 PORT=3002 node server.js
         else
-          npm run dev
+          NODE_ENV=development npm run dev
         fi
     depends_on:
       api:
