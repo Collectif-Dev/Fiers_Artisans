@@ -1,3 +1,5 @@
+import 'phone_number.dart';
+
 class Validators {
   Validators._();
 
@@ -12,10 +14,8 @@ class Validators {
     if (value == null || value.trim().isEmpty) {
       return 'Numéro de téléphone requis';
     }
-    // Côte d'Ivoire: 10 digits (07/05/01 XX XX XX XX)
-    final cleaned = value.replaceAll(RegExp(r'[\s\-\+]'), '');
-    if (cleaned.length < 10) {
-      return 'Numéro invalide';
+    if (!isLocalPhoneNumber(value)) {
+      return 'Numéro à 10 chiffres attendu';
     }
     return null;
   }

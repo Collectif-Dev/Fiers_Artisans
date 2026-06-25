@@ -71,5 +71,7 @@ Globalist/
 taches_et_problemes/
 Structure_dev/
 .agents/
+**/fichier_de_transmission.txt
+fichier_de_transmission.txt
 
 *.tar.gz

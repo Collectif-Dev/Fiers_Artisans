@@ -1,6 +1,7 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_endpoints.dart';
 import '../../core/storage/secure_storage.dart';
+import '../../core/utils/phone_number.dart';
 import '../models/user_model.dart';
 
 class AuthRepository {
@@ -12,7 +13,10 @@ class AuthRepository {
   }) async {
     final response = await _api.post(
       ApiEndpoints.login,
-      data: {'phone_number': phone, 'pin_code': pinCode},
+      data: {
+        'phone_number': normalizeLocalPhoneNumber(phone),
+        'pin_code': pinCode,
+      },
     );
     return response.data;
   }
@@ -34,7 +38,7 @@ class AuthRepository {
     int? experienceYears,
   }) async {
     final body = <String, dynamic>{
-      'phone_number': phone,
+      'phone_number': normalizeLocalPhoneNumber(phone),
       'pin_code': pinCode,
       'first_name': firstName,
       'last_name': lastName,
@@ -66,7 +70,7 @@ class AuthRepository {
     String? email,
   }) async {
     final body = <String, dynamic>{
-      'phone_number': phone,
+      'phone_number': normalizeLocalPhoneNumber(phone),
       'pin_code': pinCode,
       'first_name': firstName,
       'last_name': lastName,
@@ -82,7 +86,10 @@ class AuthRepository {
   }
 
   Future<void> sendOtp(String phone) async {
-    await _api.post(ApiEndpoints.sendOtp, data: {'phone_number': phone});
+    await _api.post(
+      ApiEndpoints.sendOtp,
+      data: {'phone_number': normalizeLocalPhoneNumber(phone)},
+    );
   }
 
   Future<Map<String, dynamic>> verifyOtp({
@@ -91,7 +98,7 @@ class AuthRepository {
   }) async {
     final response = await _api.post(
       ApiEndpoints.verifyOtp,
-      data: {'phone_number': phone, 'code': code},
+      data: {'phone_number': normalizeLocalPhoneNumber(phone), 'code': code},
     );
     return response.data;
   }
@@ -103,7 +110,11 @@ class AuthRepository {
   }) async {
     final response = await _api.post(
       ApiEndpoints.setupPin,
-      data: {'phone_number': phone, 'code': code, 'pin_code': pinCode},
+      data: {
+        'phone_number': normalizeLocalPhoneNumber(phone),
+        'code': code,
+        'pin_code': pinCode,
+      },
     );
     return response.data;
   }

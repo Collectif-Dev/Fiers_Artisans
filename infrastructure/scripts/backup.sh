@@ -27,6 +27,8 @@ BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"
 : "${MONGO_DB:?MONGO_DB est requis}"
 : "${REDIS_PASSWORD:?REDIS_PASSWORD est requis}"
 
+export MONGO_USER MONGO_PASSWORD MONGO_DB
+
 BACKUP_DIR="${BACKUP_ROOT}/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 
@@ -34,10 +36,24 @@ echo "Backup PostgreSQL..."
 docker exec "${POSTGRES_CONTAINER}" pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" | gzip > "$BACKUP_DIR/postgres.sql.gz"
 
 echo "Backup MongoDB..."
-docker exec "${MONGO_CONTAINER}" mongodump --username="${MONGO_USER}" --password="${MONGO_PASSWORD}" --authenticationDatabase=admin --db="${MONGO_DB}" --archive | gzip > "$BACKUP_DIR/mongodb.gz"
+docker exec \
+  -e MONGO_USER \
+  -e MONGO_PASSWORD \
+  -e MONGO_DB \
+  "${MONGO_CONTAINER}" \
+  sh -ceu '
+    config_file="$(mktemp)"
+    trap "rm -f \"$config_file\"" EXIT
+    umask 077
+    {
+      printf "%s\n" "password: |-"
+      printf "%s\n" "$MONGO_PASSWORD" | sed "s/^/  /"
+    } > "$config_file"
+    mongodump --username="$MONGO_USER" --config="$config_file" --authenticationDatabase=admin --db="$MONGO_DB" --archive
+  ' | gzip > "$BACKUP_DIR/mongodb.gz"
 
 echo "Backup Redis..."
-docker exec "${REDIS_CONTAINER}" redis-cli -a "${REDIS_PASSWORD}" BGSAVE
+REDISCLI_AUTH="$REDIS_PASSWORD" docker exec -e REDISCLI_AUTH "${REDIS_CONTAINER}" redis-cli BGSAVE
 sleep 2
 docker cp "${REDIS_CONTAINER}:/data/dump.rdb" "$BACKUP_DIR/redis.rdb"
 

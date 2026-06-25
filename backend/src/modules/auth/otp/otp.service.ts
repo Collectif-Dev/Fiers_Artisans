@@ -1,7 +1,19 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+import { randomInt } from 'crypto';
 import Redis from 'ioredis';
 import { ConfigService } from '@nestjs/config';
 import { WhatsappOtpProvider } from './whatsapp-otp.provider';
+import {
+  isLocalPhoneNumber,
+  LOCAL_PHONE_NUMBER_MESSAGE,
+  normalizeLocalPhoneNumber,
+} from '../../../common/utils/phone-number.util';
 
 @Injectable()
 export class OtpService {
@@ -36,43 +48,43 @@ export class OtpService {
   async sendOtp(
     phoneNumber: string,
   ): Promise<{ sent: boolean; message: string }> {
+    const normalizedPhoneNumber = this.normalizePhoneNumber(phoneNumber);
+
     // Vérifier le blocage anti-brute-force
-    const blockKey = `otp:block:${phoneNumber}`;
+    const blockKey = this.blockKey(normalizedPhoneNumber);
     const isBlocked = await this.redis.exists(blockKey);
     if (isBlocked) {
-      throw new BadRequestException(
+      throw new HttpException(
         'Trop de tentatives. Veuillez réessayer dans 15 minutes.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
     // Vérifier le nombre d'envois par heure
-    const sendCountKey = `otp:sends:${phoneNumber}`;
-    const sendCount =
-      parseInt((await this.redis.get(sendCountKey)) || '0') || 0;
-    if (sendCount >= this.MAX_SENDS_PER_HOUR) {
-      throw new BadRequestException(
+    const sendCount = await this.incrementWithTtl(
+      this.sendCountKey(normalizedPhoneNumber),
+      3600,
+    );
+    if (sendCount > this.MAX_SENDS_PER_HOUR) {
+      throw new HttpException(
         "Nombre maximum d'envois atteint. Veuillez réessayer dans 1 heure.",
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
     // Générer le code OTP à 6 chiffres
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = randomInt(100000, 1000000).toString();
 
     // Stocker dans Redis avec TTL
-    const otpKey = `otp:${phoneNumber}`;
-    await this.redis.set(
-      otpKey,
-      JSON.stringify({ code, attempts: 0 }),
-      'EX',
-      this.OTP_TTL,
-    );
-
-    // Incrémenter le compteur d'envois
-    await this.redis.incr(sendCountKey);
-    await this.redis.expire(sendCountKey, 3600); // 1 heure
+    const otpKey = this.otpKey(normalizedPhoneNumber);
+    await this.redis.set(otpKey, code, 'EX', this.OTP_TTL);
+    await this.redis.del(this.attemptKey(normalizedPhoneNumber));
 
     // Cascade de providers : WhatsApp → SMS (fallback) → Notification
-    let sent = await this.whatsappOtpProvider.sendOtp(phoneNumber, code);
+    let sent = await this.whatsappOtpProvider.sendOtp(
+      normalizedPhoneNumber,
+      code,
+    );
 
     if (!sent) {
       // Fallback SMS (si configuré)
@@ -87,11 +99,15 @@ export class OtpService {
 
     if (!sent) {
       // Aucun provider disponible — message gracieux (non bloquant)
-      this.logger.warn(`No OTP provider available for ${phoneNumber}`);
+      this.logger.warn(
+        `No OTP provider available for ${normalizedPhoneNumber}`,
+      );
 
       // En mode développement, log le code pour faciliter les tests
       if (this.configService.get('app.nodeEnv') === 'development') {
-        this.logger.debug(`[DEV] OTP code for ${phoneNumber}: ${code}`);
+        this.logger.debug(
+          `[DEV] OTP code for ${normalizedPhoneNumber}: ${code}`,
+        );
         return {
           sent: true,
           message:
@@ -113,35 +129,108 @@ export class OtpService {
   }
 
   async verifyOtp(phoneNumber: string, code: string): Promise<boolean> {
-    const otpKey = `otp:${phoneNumber}`;
-    const blockKey = `otp:block:${phoneNumber}`;
+    const normalizedPhoneNumber = this.normalizePhoneNumber(phoneNumber);
+    const normalizedCode = code.trim();
+    const otpKey = this.otpKey(normalizedPhoneNumber);
+    const attemptKey = this.attemptKey(normalizedPhoneNumber);
+    const blockKey = this.blockKey(normalizedPhoneNumber);
+
+    const isBlocked = await this.redis.exists(blockKey);
+    if (isBlocked) {
+      throw new HttpException(
+        'Trop de tentatives échouées. Compte bloqué pour 15 minutes.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
 
     const data = await this.redis.get(otpKey);
     if (!data) {
       throw new BadRequestException('Code expiré ou non envoyé.');
     }
 
-    const otpData = JSON.parse(data);
-
-    // Vérifier le nombre de tentatives
-    if (otpData.attempts >= this.MAX_ATTEMPTS) {
-      await this.redis.set(blockKey, '1', 'EX', this.BLOCK_DURATION);
-      await this.redis.del(otpKey);
-      throw new BadRequestException(
-        'Trop de tentatives échouées. Compte bloqué pour 15 minutes.',
-      );
-    }
-
-    if (otpData.code !== code) {
-      // Incrémenter les tentatives
-      otpData.attempts += 1;
+    if (this.extractOtpCode(data) !== normalizedCode) {
       const ttl = await this.redis.ttl(otpKey);
-      await this.redis.set(otpKey, JSON.stringify(otpData), 'EX', ttl);
+      if (ttl <= 0) {
+        await this.redis.del(otpKey);
+        await this.redis.del(attemptKey);
+        throw new BadRequestException('Code expiré ou non envoyé.');
+      }
+
+      const attempts = await this.incrementWithTtl(attemptKey, ttl);
+      if (attempts >= this.MAX_ATTEMPTS) {
+        await this.redis.set(blockKey, '1', 'EX', this.BLOCK_DURATION);
+        await this.redis.del(otpKey);
+        await this.redis.del(attemptKey);
+        throw new HttpException(
+          'Trop de tentatives échouées. Compte bloqué pour 15 minutes.',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
       throw new BadRequestException('Code incorrect.');
     }
 
     // Code valide — supprimer de Redis
     await this.redis.del(otpKey);
+    await this.redis.del(attemptKey);
     return true;
+  }
+
+  private otpKey(phoneNumber: string): string {
+    return `otp:${phoneNumber}`;
+  }
+
+  private attemptKey(phoneNumber: string): string {
+    return `otp:attempts:${phoneNumber}`;
+  }
+
+  private blockKey(phoneNumber: string): string {
+    return `otp:block:${phoneNumber}`;
+  }
+
+  private sendCountKey(phoneNumber: string): string {
+    return `otp:sends:${phoneNumber}`;
+  }
+
+  private normalizePhoneNumber(phoneNumber: string): string {
+    const normalized = normalizeLocalPhoneNumber(phoneNumber);
+    if (!isLocalPhoneNumber(normalized)) {
+      throw new BadRequestException(LOCAL_PHONE_NUMBER_MESSAGE);
+    }
+    return normalized;
+  }
+
+  private extractOtpCode(data: string): string {
+    if (!data.startsWith('{')) {
+      return data;
+    }
+
+    try {
+      const parsed = JSON.parse(data) as { code?: unknown };
+      return typeof parsed.code === 'string' ? parsed.code : '';
+    } catch {
+      return '';
+    }
+  }
+
+  private async incrementWithTtl(
+    key: string,
+    ttlSeconds: number,
+  ): Promise<number> {
+    const result = await this.redis.eval(
+      `
+local count = redis.call("INCR", KEYS[1])
+local ttl = redis.call("TTL", KEYS[1])
+if ttl < 0 then
+  redis.call("EXPIRE", KEYS[1], tonumber(ARGV[1]))
+end
+return count
+      `,
+      1,
+      key,
+      ttlSeconds,
+    );
+
+    return Number(result);
   }
 }

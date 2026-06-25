@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/errors/error_mapper.dart';
 import '../core/storage/secure_storage.dart';
+import '../core/utils/phone_number.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';
 import 'session_scope_provider.dart';
@@ -81,10 +82,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> login({required String phone, required String pinCode}) async {
     await _bootstrapFuture;
     await _prepareFreshSession();
+    final normalizedPhone = normalizeLocalPhoneNumber(phone);
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
-      final data = await _repo.login(phone: phone, pinCode: pinCode);
-      await SecureStorage.saveLastLoginPhone(phone);
+      final data = await _repo.login(phone: normalizedPhone, pinCode: pinCode);
+      await SecureStorage.saveLastLoginPhone(normalizedPhone);
       final tokens = _extractTokens(data);
       await SecureStorage.saveTokens(
         accessToken: tokens.$1,
@@ -116,11 +118,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       // Détecter OTP requis via le code stable
       if (appError.isOtpRequired) {
-        await SecureStorage.saveLastLoginPhone(phone);
+        await SecureStorage.saveLastLoginPhone(normalizedPhone);
         state = state.copyWith(
           status: AuthStatus.unauthenticated,
           otpRequired: true,
-          otpPhone: phone,
+          otpPhone: normalizedPhone,
           pinSetupRequired: false,
           pinSetupPhone: null,
         );
@@ -128,13 +130,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       if (appError.isPinSetupRequired) {
-        await SecureStorage.saveLastLoginPhone(phone);
+        await SecureStorage.saveLastLoginPhone(normalizedPhone);
         state = state.copyWith(
           status: AuthStatus.unauthenticated,
           otpRequired: false,
           otpPhone: null,
           pinSetupRequired: true,
-          pinSetupPhone: phone,
+          pinSetupPhone: normalizedPhone,
           error: null,
         );
         return false;
@@ -170,10 +172,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     await _bootstrapFuture;
     await _prepareFreshSession();
+    final normalizedPhone = normalizeLocalPhoneNumber(phone);
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       final data = await _repo.registerArtisan(
-        phone: phone,
+        phone: normalizedPhone,
         pinCode: pinCode,
         firstName: firstName,
         lastName: lastName,
@@ -232,10 +235,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     await _bootstrapFuture;
     await _prepareFreshSession();
+    final normalizedPhone = normalizeLocalPhoneNumber(phone);
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       final data = await _repo.registerClient(
-        phone: phone,
+        phone: normalizedPhone,
         pinCode: pinCode,
         firstName: firstName,
         lastName: lastName,
@@ -277,12 +281,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> sendOtp(String phone) async {
-    await _repo.sendOtp(phone);
+    await _repo.sendOtp(normalizeLocalPhoneNumber(phone));
   }
 
   Future<bool> verifyOtp({required String phone, required String code}) async {
     try {
-      await _repo.verifyOtp(phone: phone, code: code);
+      await _repo.verifyOtp(
+        phone: normalizeLocalPhoneNumber(phone),
+        code: code,
+      );
       if (state.user != null) {
         state = state.copyWith(
           user: state.user!.copyWith(isPhoneVerified: true),
@@ -301,15 +308,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     await _bootstrapFuture;
     await _prepareFreshSession();
+    final normalizedPhone = normalizeLocalPhoneNumber(phone);
     state = state.copyWith(status: AuthStatus.loading, error: null);
     try {
       final data = await _repo.setupPin(
-        phone: phone,
+        phone: normalizedPhone,
         code: code,
         pinCode: pinCode,
       );
 
-      await SecureStorage.saveLastLoginPhone(phone);
+      await SecureStorage.saveLastLoginPhone(normalizedPhone);
       final tokens = _extractTokens(data);
       await SecureStorage.saveTokens(
         accessToken: tokens.$1,
@@ -361,7 +369,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final verifyToken = await SecureStorage.getAccessToken();
       if (verifyToken != null && verifyToken.isNotEmpty) {
-        debugPrint('[Auth] ⚠️  WARNING: Access token still present after clearAuthSession');
+        debugPrint(
+          '[Auth] ⚠️  WARNING: Access token still present after clearAuthSession',
+        );
       }
     } catch (_) {}
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../config/theme.dart';
+import '../../core/utils/phone_number.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/categories_provider.dart';
 import '../../data/models/category_model.dart';
@@ -148,10 +149,11 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
     }
 
     setState(() => _isLoading = true);
+    final phone = normalizeLocalPhoneNumber(_phoneCtrl.text);
     final success = await ref
         .read(authProvider.notifier)
         .registerArtisan(
-          phone: _phoneCtrl.text.trim(),
+          phone: phone,
           pinCode: _pinCtrl.text,
           firstName: _firstNameCtrl.text.trim(),
           lastName: _lastNameCtrl.text.trim(),
@@ -175,7 +177,6 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
     setState(() => _isLoading = false);
 
     if (success && mounted) {
-      final phone = _phoneCtrl.text.trim();
       context.push('/otp', extra: phone);
     } else if (mounted) {
       AppSnackBar.show(
@@ -247,7 +248,16 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
                   prefixIcon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
-                  validator: (v) => v!.isEmpty ? 'common.required'.tr() : null,
+                  inputFormatters: const [LocalPhoneNumberInputFormatter()],
+                  maxLength: localPhoneNumberLength,
+                  validator: (v) {
+                    if ((v ?? '').trim().isEmpty) {
+                      return 'auth.phone_required'.tr();
+                    }
+                    return isLocalPhoneNumber(v ?? '')
+                        ? null
+                        : 'auth.phone_invalid'.tr();
+                  },
                 ),
                 const SizedBox(height: 16),
 

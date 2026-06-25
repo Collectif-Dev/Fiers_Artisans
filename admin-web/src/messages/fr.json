@@ -21,6 +21,7 @@
     "phone_placeholder": "07 XX XX XX XX",
     "password": "Code PIN (5 chiffres)",
     "submit": "Se connecter",
+    "error_phone": "Entrez un numéro à 10 chiffres",
     "error_credentials": "Identifiants incorrects",
     "error_role": "Accès réservé aux administrateurs",
     "error_generic": "Erreur de connexion"

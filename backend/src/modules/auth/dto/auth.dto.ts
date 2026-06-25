@@ -9,12 +9,25 @@ import {
   IsUUID,
   IsNumber,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import {
+  LOCAL_PHONE_NUMBER_MESSAGE,
+  LOCAL_PHONE_NUMBER_REGEX,
+  normalizeLocalPhoneNumber,
+} from '../../../common/utils/phone-number.util';
 
 const PIN_REGEX = /^\d{5}$/;
+const OTP_REGEX = /^\d{6}$/;
+
+const LocalPhoneNumber = () =>
+  Transform(({ value }) => normalizeLocalPhoneNumber(value));
 
 export class RegisterArtisanDto {
+  @LocalPhoneNumber()
   @IsString()
+  @Matches(LOCAL_PHONE_NUMBER_REGEX, {
+    message: LOCAL_PHONE_NUMBER_MESSAGE,
+  })
   phone_number: string;
 
   @IsString()
@@ -72,7 +85,11 @@ export class RegisterArtisanDto {
   commune?: string;
 
   @IsOptional()
+  @LocalPhoneNumber()
   @IsString()
+  @Matches(LOCAL_PHONE_NUMBER_REGEX, {
+    message: LOCAL_PHONE_NUMBER_MESSAGE,
+  })
   whatsapp_number?: string;
 
   @IsOptional()
@@ -81,7 +98,11 @@ export class RegisterArtisanDto {
 }
 
 export class RegisterClientDto {
+  @LocalPhoneNumber()
   @IsString()
+  @Matches(LOCAL_PHONE_NUMBER_REGEX, {
+    message: LOCAL_PHONE_NUMBER_MESSAGE,
+  })
   phone_number: string;
 
   @IsString()
@@ -124,20 +145,35 @@ export class RegisterClientDto {
 }
 
 export class SendOtpDto {
+  @LocalPhoneNumber()
   @IsString()
+  @Matches(LOCAL_PHONE_NUMBER_REGEX, {
+    message: LOCAL_PHONE_NUMBER_MESSAGE,
+  })
   phone_number: string;
 }
 
 export class VerifyOtpDto {
+  @LocalPhoneNumber()
   @IsString()
+  @Matches(LOCAL_PHONE_NUMBER_REGEX, {
+    message: LOCAL_PHONE_NUMBER_MESSAGE,
+  })
   phone_number: string;
 
   @IsString()
+  @Matches(OTP_REGEX, {
+    message: 'Le code OTP doit contenir exactement 6 chiffres.',
+  })
   code: string;
 }
 
 export class LoginDto {
+  @LocalPhoneNumber()
   @IsString()
+  @Matches(LOCAL_PHONE_NUMBER_REGEX, {
+    message: LOCAL_PHONE_NUMBER_MESSAGE,
+  })
   phone_number: string;
 
   @IsString()
@@ -148,10 +184,17 @@ export class LoginDto {
 }
 
 export class SetupPinDto {
+  @LocalPhoneNumber()
   @IsString()
+  @Matches(LOCAL_PHONE_NUMBER_REGEX, {
+    message: LOCAL_PHONE_NUMBER_MESSAGE,
+  })
   phone_number: string;
 
   @IsString()
+  @Matches(OTP_REGEX, {
+    message: 'Le code OTP doit contenir exactement 6 chiffres.',
+  })
   code: string;
 
   @IsString()

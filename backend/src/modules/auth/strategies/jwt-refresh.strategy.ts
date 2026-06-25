@@ -2,6 +2,32 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import type { Request } from 'express';
+
+function extractAdminCookie(request: Request, name: string): string | null {
+  if (request.header('x-admin-web-auth') !== 'cookie') {
+    return null;
+  }
+
+  const header = request.headers.cookie;
+  if (!header) {
+    return null;
+  }
+
+  for (const part of header.split(';')) {
+    const [rawKey, ...rawValue] = part.trim().split('=');
+    if (rawKey === name) {
+      const value = rawValue.join('=');
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return value;
+      }
+    }
+  }
+
+  return null;
+}
 
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(
@@ -13,6 +39,8 @@ export class JwtRefreshStrategy extends PassportStrategy(
       jwtFromRequest: ExtractJwt.fromExtractors([
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         ExtractJwt.fromBodyField('refresh_token'),
+        (request: Request) =>
+          extractAdminCookie(request, 'admin_refresh_token'),
       ]),
       ignoreExpiration: false,
       secretOrKey: (() => {

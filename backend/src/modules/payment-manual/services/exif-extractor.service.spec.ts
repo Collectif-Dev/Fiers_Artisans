@@ -45,17 +45,13 @@ describe('ExifExtractorService', () => {
     })
       .jpeg()
       .withExif({
-        '0th': {
+        IFD0: {
           Make: 'Apple',
           Model: 'iPhone 14',
           Software: 'Adobe Photoshop 2025',
           DateTime: '2026:04:30 11:12:13',
         },
-        Exif: {
-          DateTimeOriginal: '2026:04:30 10:11:12',
-          DateTimeDigitized: '2026:04:30 10:11:13',
-        },
-      } as any)
+      })
       .toBuffer();
 
     const exif = await service.extract(withExif);

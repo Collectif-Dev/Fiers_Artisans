@@ -30,7 +30,7 @@ export class WhatsappOtpProvider {
         `${this.apiUrl}/${this.phoneNumberId}/messages`,
         {
           messaging_product: 'whatsapp',
-          to: phoneNumber.replace('+', ''),
+          to: this.toWhatsappRecipient(phoneNumber),
           type: 'template',
           template: {
             name: this.templateName,
@@ -57,5 +57,10 @@ export class WhatsappOtpProvider {
       this.logger.error(`WhatsApp OTP failed: ${error.message}`);
       return false;
     }
+  }
+
+  private toWhatsappRecipient(phoneNumber: string): string {
+    const digits = phoneNumber.replace(/\D/g, '');
+    return digits.length === 10 ? `225${digits}` : digits;
   }
 }

@@ -208,15 +208,6 @@ export function useAdminSSE(onEvent: () => void, options?: UseAdminSSEOptions) {
     const startSSE = async () => {
       if (disposed || document.visibilityState !== 'visible') return;
 
-      const token =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('admin_token')
-          : null;
-      if (!token) {
-        forceLogout(true);
-        return;
-      }
-
       stopSSE();
       stopPolling();
 
@@ -229,9 +220,10 @@ export function useAdminSSE(onEvent: () => void, options?: UseAdminSSEOptions) {
             method: 'GET',
             headers: {
               Accept: 'text/event-stream',
-              Authorization: `Bearer ${token}`,
+              'X-Admin-Web-Auth': 'cookie',
               'Cache-Control': 'no-cache',
             },
+            credentials: 'include',
             signal: controller.signal,
             cache: 'no-store',
           });

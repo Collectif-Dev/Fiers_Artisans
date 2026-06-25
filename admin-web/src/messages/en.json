@@ -21,6 +21,7 @@
     "phone_placeholder": "07 XX XX XX XX",
     "password": "PIN code (5 digits)",
     "submit": "Sign in",
+    "error_phone": "Enter a 10-digit phone number",
     "error_credentials": "Invalid credentials",
     "error_role": "Admin access only",
     "error_generic": "Connection error"

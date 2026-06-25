@@ -1,5 +1,13 @@
-import { Controller, Post, Body, UseGuards, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Res,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
@@ -10,7 +18,6 @@ import {
   SendOtpDto,
   VerifyOtpDto,
   LoginDto,
-  RefreshTokenDto,
   SetupPinDto,
 } from './dto/auth.dto';
 import { CurrentUser } from '../../common/decorators';
@@ -46,12 +53,23 @@ export class AuthController {
 
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 900000 } })
-  login(@Body() dto: LoginDto, @Res({ passthrough: true }) response: Response) {
-    const result = this.authService.login(dto);
-    return result.then((data) => {
+  async login(
+    @Body() dto: LoginDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const data = await this.authService.login(dto);
+
+    if (this.isAdminCookieMode(request)) {
+      if (data.user.role !== 'ADMIN') {
+        this.clearAuthCookies(response);
+        throw new ForbiddenException('Admin access only.');
+      }
       this.setAuthCookies(response, data.access_token, data.refresh_token);
-      return data;
-    });
+      return { user: data.user };
+    }
+
+    return data;
   }
 
   @Post('setup-pin')
@@ -63,17 +81,25 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt-refresh'))
   refreshToken(
     @CurrentUser('id') userId: string,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = this.authService.refreshToken(userId);
     return result.then((data) => {
-      this.setAuthCookies(response, data.access_token, data.refresh_token);
+      if (this.isAdminCookieMode(request)) {
+        if (data.user.role !== 'ADMIN') {
+          this.clearAuthCookies(response);
+          throw new ForbiddenException('Admin access only.');
+        }
+        this.setAuthCookies(response, data.access_token, data.refresh_token);
+        return { user: data.user };
+      }
+
       return data;
     });
   }
 
   @Post('logout')
-  @UseGuards(AuthGuard('jwt'))
   logout(@Res({ passthrough: true }) response: Response) {
     // Clear les cookies HttpOnly (admin-web)
     this.clearAuthCookies(response);
@@ -81,6 +107,10 @@ export class AuthController {
     // Note : Le JWT reste valide côté serveur jusqu'à son expiration
     // Pour une invalidation serveur stricte, ajouter le token à une blacklist Redis (Phase 2)
     return { message: 'Déconnexion réussie.' };
+  }
+
+  private isAdminCookieMode(request: Request): boolean {
+    return request.header('x-admin-web-auth') === 'cookie';
   }
 
   private clearAuthCookies(response: Response) {
@@ -109,7 +139,6 @@ export class AuthController {
     refreshToken: string,
   ) {
     const cookieConfig = this.configService.get('app.cookie');
-    const isProd = this.configService.get('app.nodeEnv') === 'production';
 
     response.cookie('admin_token', accessToken, {
       httpOnly: true,

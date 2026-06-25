@@ -190,12 +190,25 @@ if [[ -z "${MONGO_PASSWORD:-}" ]]; then
   echo "[ERROR] MONGO_PASSWORD is not set in environment/.env" >&2
   exit 1
 fi
-docker compose exec -T mongodb \
-  mongosh --quiet \
-    -u "$MONGO_USER" \
-    -p "$MONGO_PASSWORD" \
-    --authenticationDatabase admin \
-    "$MONGO_DB" <<'JS'
+export MONGO_USER MONGO_PASSWORD MONGO_DB
+docker compose exec -T \
+  -e MONGO_USER \
+  -e MONGO_PASSWORD \
+  -e MONGO_DB \
+  mongodb \
+  mongosh --nodb --quiet <<'JS'
+const requiredEnv = ['MONGO_USER', 'MONGO_PASSWORD', 'MONGO_DB'];
+for (const key of requiredEnv) {
+  if (!process.env[key]) {
+    throw new Error(`${key} is not set`);
+  }
+}
+
+const mongoUser = encodeURIComponent(process.env.MONGO_USER);
+const mongoPassword = encodeURIComponent(process.env.MONGO_PASSWORD);
+const mongoDbName = process.env.MONGO_DB;
+const appDb = new Mongo(`mongodb://${mongoUser}:${mongoPassword}@127.0.0.1:27017/?authSource=admin`).getDB(mongoDbName);
+
 const targets = [
   'messages',
   'conversations',
@@ -217,20 +230,25 @@ const adminMarkers = [
   { admin: true },
 ];
 
-const existing = new Set(db.getCollectionNames());
+const existing = new Set(appDb.getCollectionNames());
 for (const name of targets) {
   if (!existing.has(name)) {
     print(`[mongo] ${name}: not found`);
     continue;
   }
-  const result = db.getCollection(name).deleteMany({ $nor: adminMarkers });
+  const result = appDb.getCollection(name).deleteMany({ $nor: adminMarkers });
   print(`[mongo] ${name}: ${result.deletedCount} deleted`);
 }
 JS
 
 echo "[3/5] Redis purge..."
-docker compose exec -T redis \
-  sh -lc 'redis-cli -a "$REDIS_PASSWORD" FLUSHALL >/dev/null && echo "[redis] FLUSHALL done"'
+if [[ -z "${REDIS_PASSWORD:-}" ]]; then
+  echo "[ERROR] REDIS_PASSWORD is not set in environment/.env" >&2
+  exit 1
+fi
+REDISCLI_AUTH="$REDIS_PASSWORD" docker compose exec -T -e REDISCLI_AUTH redis \
+  redis-cli FLUSHALL >/dev/null
+echo "[redis] FLUSHALL done"
 
 echo "[4/5] MinIO object purge (bucket structures preserved)..."
 if [[ -z "${MINIO_ACCESS_KEY:-}" || -z "${MINIO_SECRET_KEY:-}" ]]; then
@@ -292,21 +310,33 @@ UNION ALL
 SELECT 'reviews', COUNT(*) FROM public.reviews;
 SQL
 
-docker compose exec -T mongodb \
-  mongosh --quiet \
-    -u "$MONGO_USER" \
-    -p "$MONGO_PASSWORD" \
-    --authenticationDatabase admin \
-    "$MONGO_DB" <<'JS'
+docker compose exec -T \
+  -e MONGO_USER \
+  -e MONGO_PASSWORD \
+  -e MONGO_DB \
+  mongodb \
+  mongosh --nodb --quiet <<'JS'
+const requiredEnv = ['MONGO_USER', 'MONGO_PASSWORD', 'MONGO_DB'];
+for (const key of requiredEnv) {
+  if (!process.env[key]) {
+    throw new Error(`${key} is not set`);
+  }
+}
+
+const mongoUser = encodeURIComponent(process.env.MONGO_USER);
+const mongoPassword = encodeURIComponent(process.env.MONGO_PASSWORD);
+const mongoDbName = process.env.MONGO_DB;
+const appDb = new Mongo(`mongodb://${mongoUser}:${mongoPassword}@127.0.0.1:27017/?authSource=admin`).getDB(mongoDbName);
+
 const targets = ['messages','conversations','notifications','activity_logs','portfolio_items','media_files'];
 for (const name of targets) {
-  const count = db.getCollectionNames().includes(name) ? db.getCollection(name).countDocuments({}) : -1;
+  const count = appDb.getCollectionNames().includes(name) ? appDb.getCollection(name).countDocuments({}) : -1;
   print(`[mongo-check] ${name}: ${count >= 0 ? count : 'not found'}`);
 }
 JS
 
-docker compose exec -T redis \
-  sh -lc 'echo "[redis-check] dbsize=$(redis-cli -a "$REDIS_PASSWORD" DBSIZE)"'
+redis_dbsize="$(REDISCLI_AUTH="$REDIS_PASSWORD" docker compose exec -T -e REDISCLI_AUTH redis redis-cli DBSIZE)"
+echo "[redis-check] dbsize=$redis_dbsize"
 
 if [[ -n "$ENV_CHECKSUM_TOOL" && ${#PRESENT_ENV_FILES[@]} -gt 0 ]]; then
   POST_ENV_CHECKSUMS="$(capture_env_checksums || true)"

@@ -5,9 +5,15 @@ import {
   ForbiddenException,
   NotFoundException,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import {
+  isLocalPhoneNumber,
+  LOCAL_PHONE_NUMBER_MESSAGE,
+  normalizeLocalPhoneNumber,
+} from '../../common/utils/phone-number.util';
 
 /**
  * DEV-ONLY Controller — Inspection OTP via navigateur
@@ -65,35 +71,49 @@ export class DevOtpController {
       throw new NotFoundException('Paramètre phone_number requis.');
     }
 
-    // Chercher dans Redis avec plusieurs variantes du numéro
-    const candidates = [
-      phoneNumber,
-      `+225${phoneNumber}`,
-      phoneNumber.replace(/^\+/, ''),
-    ];
+    const normalizedPhoneNumber = normalizeLocalPhoneNumber(phoneNumber);
+    if (!isLocalPhoneNumber(normalizedPhoneNumber)) {
+      throw new BadRequestException(LOCAL_PHONE_NUMBER_MESSAGE);
+    }
 
-    for (const candidate of candidates) {
-      const otpKey = `otp:${candidate}`;
-      const data = await this.redis.get(otpKey);
+    const otpKey = `otp:${normalizedPhoneNumber}`;
+    const data = await this.redis.get(otpKey);
 
-      if (data) {
-        const parsed = JSON.parse(data);
-        const ttl = await this.redis.ttl(otpKey);
+    if (data) {
+      const attempts =
+        parseInt(
+          (await this.redis.get(`otp:attempts:${normalizedPhoneNumber}`)) ||
+            '0',
+          10,
+        ) || 0;
+      const ttl = await this.redis.ttl(otpKey);
 
-        this.logger.debug(`[DEV] OTP inspected for ${candidate}`);
+      this.logger.debug(`[DEV] OTP inspected for ${normalizedPhoneNumber}`);
 
-        return {
-          phone_number: candidate,
-          code: parsed.code,
-          attempts_used: parsed.attempts,
-          expires_in_seconds: ttl,
-          generated_at: new Date(Date.now() - (300 - ttl) * 1000).toISOString(),
-        };
-      }
+      return {
+        phone_number: normalizedPhoneNumber,
+        code: this.extractOtpCode(data),
+        attempts_used: attempts,
+        expires_in_seconds: ttl,
+        generated_at: new Date(Date.now() - (300 - ttl) * 1000).toISOString(),
+      };
     }
 
     throw new NotFoundException(
-      `Aucun OTP trouvé pour ${phoneNumber}. Le code a expiré ou n'a pas encore été envoyé.`,
+      `Aucun OTP trouvé pour ${normalizedPhoneNumber}. Le code a expiré ou n'a pas encore été envoyé.`,
     );
+  }
+
+  private extractOtpCode(data: string): string {
+    if (!data.startsWith('{')) {
+      return data;
+    }
+
+    try {
+      const parsed = JSON.parse(data) as { code?: unknown };
+      return typeof parsed.code === 'string' ? parsed.code : '';
+    } catch {
+      return '';
+    }
   }
 }

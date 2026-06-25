@@ -1,15 +1,11 @@
 'use client';
 
 import { useReducer, useCallback, useEffect } from 'react';
-import { loginAdmin, refreshAdminSession } from '@/lib/api';
+import { loginAdmin, logoutAdmin, refreshAdminSession } from '@/lib/api';
 import {
   AUTH_LOGOUT_EVENT,
   forceLogout,
-  getRefreshToken,
-  getToken,
-  getUser,
-  isTokenExpired,
-  saveAuth,
+  saveAuthUser,
 } from '@/lib/auth';
 import type { User } from '@/types';
 
@@ -36,6 +32,15 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
   }
 }
 
+function isForbiddenResponse(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'response' in error &&
+    (error as { response?: { status?: number } }).response?.status === 403
+  );
+}
+
 export function useAuth() {
   const [{ user, loading }, dispatch] = useReducer(authReducer, {
     user: null,
@@ -53,37 +58,13 @@ export function useAuth() {
     window.addEventListener(AUTH_LOGOUT_EVENT, onForcedLogout);
 
     const bootstrapSession = async () => {
-      const token = getToken();
-      const refreshToken = getRefreshToken();
-      const savedUser = getUser();
-
-      if (!savedUser || savedUser.role !== 'ADMIN') {
-        dispatch({ type: 'hydrate', user: null });
-        return;
-      }
-
-      if (token && !isTokenExpired(token)) {
-        dispatch({ type: 'hydrate', user: savedUser });
-        return;
-      }
-
-      if (!refreshToken) {
-        forceLogout(false);
-        dispatch({ type: 'hydrate', user: null });
-        return;
-      }
-
       try {
-        const refreshed = await refreshAdminSession(refreshToken);
+        const refreshed = await refreshAdminSession();
         if (!refreshed?.user || refreshed.user.role !== 'ADMIN') {
           throw new Error('NOT_ADMIN');
         }
 
-        saveAuth(
-          refreshed.access_token,
-          refreshed.refresh_token || refreshToken,
-          refreshed.user,
-        );
+        saveAuthUser(refreshed.user);
         if (active) {
           dispatch({ type: 'hydrate', user: refreshed.user });
         }
@@ -104,16 +85,29 @@ export function useAuth() {
   }, []);
 
   const login = useCallback(async (phone: string, pinCode: string) => {
-    const data = await loginAdmin(phone, pinCode);
+    let data;
+    try {
+      data = await loginAdmin(phone, pinCode);
+    } catch (error) {
+      if (isForbiddenResponse(error)) {
+        throw new Error('NOT_ADMIN');
+      }
+      throw error;
+    }
+
     if (data.user.role !== 'ADMIN') {
       throw new Error('NOT_ADMIN');
     }
-    saveAuth(data.access_token, data.refresh_token, data.user);
+    saveAuthUser(data.user);
     dispatch({ type: 'login', user: data.user });
   }, []);
 
-  const logout = useCallback(() => {
-    forceLogout(true);
+  const logout = useCallback(async () => {
+    try {
+      await logoutAdmin();
+    } finally {
+      forceLogout(true);
+    }
     dispatch({ type: 'logout' });
   }, []);
 

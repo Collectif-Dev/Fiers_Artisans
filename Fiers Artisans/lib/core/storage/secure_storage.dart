@@ -3,15 +3,16 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../config/constants.dart';
+import '../utils/phone_number.dart';
 import 'web_local_storage_stub.dart'
     if (dart.library.js_interop) 'web_local_storage_web.dart'
     as web_storage;
 
 class SecureStorage {
   static bool _looksLikePhone(String? value) {
-    final normalized = value?.trim() ?? '';
+    final normalized = normalizeLocalPhoneNumber(value ?? '');
     if (normalized.isEmpty) return false;
-    return RegExp(r'^\+?[0-9]{6,20}$').hasMatch(normalized);
+    return isLocalPhoneNumber(normalized);
   }
 
   static const _storage = FlutterSecureStorage(
@@ -130,7 +131,7 @@ class SecureStorage {
 
   // Login identifier (phone only, no password)
   static Future<void> saveLastLoginPhone(String phone) async {
-    final normalized = phone.replaceAll(' ', '').trim();
+    final normalized = normalizeLocalPhoneNumber(phone);
     if (normalized.isEmpty) return;
 
     if (kIsWeb) {
@@ -160,7 +161,7 @@ class SecureStorage {
         AppConstants.keyLastLoginPhone,
       );
       if (_looksLikePhone(webValue)) {
-        return webValue!.trim();
+        return normalizeLocalPhoneNumber(webValue!);
       }
       return null;
     }
@@ -171,14 +172,14 @@ class SecureStorage {
     } catch (_) {}
 
     if (_looksLikePhone(secureValue)) {
-      return secureValue!.trim();
+      return normalizeLocalPhoneNumber(secureValue!);
     }
 
     final webValue = web_storage.readWebLocalStorage(
       AppConstants.keyLastLoginPhone,
     );
     if (_looksLikePhone(webValue)) {
-      return webValue!.trim();
+      return normalizeLocalPhoneNumber(webValue!);
     }
 
     return null;

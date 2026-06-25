@@ -48,7 +48,7 @@ next-env.d.ts
 
 # Agent & task documentation
 /taches_et_problemes/
-Structure_dev/
+# Structure_dev/
 /.agents/
 
 *.tar.gz

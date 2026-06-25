@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../config/theme.dart';
 import '../../core/storage/secure_storage.dart';
+import '../../core/utils/phone_number.dart';
 import '../../providers/auth_provider.dart';
 import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
@@ -51,7 +52,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final savedPhone = await SecureStorage.getLastLoginPhone();
       if (!mounted) return;
-      final normalized = savedPhone?.trim() ?? '';
+      final normalized = normalizeLocalPhoneNumber(savedPhone ?? '');
       if (normalized.isNotEmpty && _phoneController.text.trim().isEmpty) {
         _phoneController.text = normalized;
         _phoneController.selection = TextSelection.fromPosition(
@@ -70,8 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   bool _isPhoneComplete(String value) {
-    final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
-    return digitsOnly.length >= 10;
+    return isLocalPhoneNumber(value);
   }
 
   void _dismissKeyboard() {
@@ -228,6 +228,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
                   autofillHints: const [AutofillHints.telephoneNumber],
+                  inputFormatters: const [LocalPhoneNumberInputFormatter()],
+                  maxLength: localPhoneNumberLength,
                   onChanged: (_) => _scheduleAutoLoginIfReady(),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {

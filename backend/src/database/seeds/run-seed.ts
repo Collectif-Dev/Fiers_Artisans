@@ -13,6 +13,11 @@ import { VerificationDocumentPage } from '../../modules/verification/entities/ve
 import { Review } from '../../modules/reviews/entities/review.entity';
 import { Subscription } from '../../modules/subscription/entities/subscription.entity';
 import { Payment } from '../../modules/subscription/entities/payment.entity';
+import {
+  isLocalPhoneNumber,
+  LOCAL_PHONE_NUMBER_MESSAGE,
+  normalizeLocalPhoneNumber,
+} from '../../common/utils/phone-number.util';
 
 // Load .env from project root
 config({ path: resolve(__dirname, '../../../../.env') });
@@ -50,7 +55,13 @@ async function run() {
 }
 
 async function seedAdmin(dataSource: DataSource) {
-  const phone = process.env.ADMIN_PHONE || '0700000000';
+  const phone = normalizeLocalPhoneNumber(
+    process.env.ADMIN_PHONE || '0700000000',
+  );
+  if (!isLocalPhoneNumber(phone)) {
+    throw new Error(`ADMIN_PHONE invalide. ${LOCAL_PHONE_NUMBER_MESSAGE}`);
+  }
+
   const pin = process.env.ADMIN_PIN || '12345';
   const repo = dataSource.getRepository(User);
 

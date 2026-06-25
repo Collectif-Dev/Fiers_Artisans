@@ -12,9 +12,10 @@ import type {
   PaginatedResult,
   PaymentManualRecord,
 } from "@/types";
-import { forceLogout, getUser, saveAuth } from "@/lib/auth";
+import { forceLogout, getUser, saveAuthUser } from "@/lib/auth";
 
 const API_URL = resolveApiUrl();
+const ADMIN_COOKIE_AUTH_HEADER = { "X-Admin-Web-Auth": "cookie" };
 
 function resolveApiUrl(): string {
   const explicitUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
@@ -40,26 +41,22 @@ function resolveApiUrl(): string {
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: { "Content-Type": "application/json" },
+  headers: { "Content-Type": "application/json", ...ADMIN_COOKIE_AUTH_HEADER },
+  withCredentials: true,
 });
 
-export async function refreshAdminSession(
-  refreshToken: string,
-): Promise<AuthResponse> {
-  const { data } = await axios.post<AuthResponse>(
-    `${API_URL}/auth/refresh`,
-    { refresh_token: refreshToken },
-    {
-      headers: { Authorization: `Bearer ${refreshToken}` },
-    },
-  );
+export async function refreshAdminSession(): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>("/auth/refresh", undefined, {
+    headers: ADMIN_COOKIE_AUTH_HEADER,
+  });
 
-  const payload =
-    data && typeof data === "object" && "data" in data
-      ? (data as { data: AuthResponse }).data
-      : data;
+  return data;
+}
 
-  return payload;
+export async function logoutAdmin(): Promise<void> {
+  await api.post("/auth/logout", undefined, {
+    headers: ADMIN_COOKIE_AUTH_HEADER,
+  });
 }
 
 function toPaginatedResult<T>(
@@ -119,23 +116,20 @@ api.interceptors.response.use((response) => {
   return response;
 });
 
-// Inject JWT
-api.interceptors.request.use((config) => {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("admin_token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return config;
-});
-
 // Auto-refresh on 401
 let isRefreshing = false;
-let pendingRequests: ((token: string) => void)[] = [];
+let pendingRequests: Array<{
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}> = [];
 
-function onRefreshed(token: string) {
-  pendingRequests.forEach((cb) => cb(token));
+function onRefreshed() {
+  pendingRequests.forEach(({ resolve }) => resolve());
+  pendingRequests = [];
+}
+
+function onRefreshFailed(error: unknown) {
+  pendingRequests.forEach(({ reject }) => reject(error));
   pendingRequests = [];
 }
 
@@ -160,10 +154,12 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
   }
 
   if (isRefreshing) {
-    return new Promise((resolve) => {
-      pendingRequests.push((token: string) => {
-        originalRequest.headers.Authorization = `Bearer ${token}`;
-        resolve(api(originalRequest));
+    return new Promise((resolve, reject) => {
+      pendingRequests.push({
+        resolve: () => {
+          resolve(api(originalRequest));
+        },
+        reject,
       });
     });
   }
@@ -172,24 +168,25 @@ api.interceptors.response.use(undefined, async (error: AxiosError) => {
   isRefreshing = true;
 
   try {
-    const refreshToken = localStorage.getItem("admin_refresh_token");
-    if (!refreshToken) throw new Error("No refresh token");
-
-    const refreshed = await refreshAdminSession(refreshToken);
-    const newToken = refreshed?.access_token;
-    const newRefreshToken = refreshed?.refresh_token || refreshToken;
+    const refreshed = await refreshAdminSession();
     const user = refreshed?.user || getUser();
 
-    if (!newToken || !newRefreshToken || !user) {
+    if (!user || user.role !== "ADMIN") {
       throw new Error("Invalid refresh response");
     }
 
-    saveAuth(newToken, newRefreshToken, user);
+    saveAuthUser(user);
 
-    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-    onRefreshed(newToken);
+    onRefreshed();
     return api(originalRequest);
-  } catch {
+  } catch (refreshError) {
+    onRefreshFailed(refreshError);
+    await axios
+      .post(`${API_URL}/auth/logout`, undefined, {
+        withCredentials: true,
+        headers: ADMIN_COOKIE_AUTH_HEADER,
+      })
+      .catch(() => undefined);
     forceLogout(true);
     return Promise.reject(error);
   } finally {
@@ -202,10 +199,16 @@ export async function loginAdmin(
   phone: string,
   pinCode: string,
 ): Promise<AuthResponse> {
-  const { data } = await api.post<AuthResponse>("/auth/login", {
-    phone_number: phone,
-    pin_code: pinCode,
-  });
+  const { data } = await api.post<AuthResponse>(
+    "/auth/login",
+    {
+      phone_number: phone,
+      pin_code: pinCode,
+    },
+    {
+      headers: ADMIN_COOKIE_AUTH_HEADER,
+    },
+  );
   return data;
 }
 
