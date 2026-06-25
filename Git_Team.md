@@ -51,8 +51,8 @@ feature/*  fix/*  chore/*  ← Vos branches de travail
 ### Cloner le dépôt
 
 ```bash
-git clone git@github.com:mellykelkun/Fiers_Artisants.git
-cd Fiers_Artisants
+git clone git@github.com:Collectif-Dev/Fiers_Artisans.git
+cd Fiers_Artisans
 ```
 
 ### Vérifier la branche courante
@@ -244,7 +244,7 @@ git push --force-with-lease origin feature/backend/auth-otp
 
 ### Sur GitHub
 
-1. Allez sur [github.com/mellykelkun/Fiers_Artisants](https://github.com/mellykelkun/Fiers_Artisants)
+1. Allez sur [github.com/Collectif-Dev/Fiers_Artisans](https://github.com/Collectif-Dev/Fiers_Artisans)
 2. Cliquez sur **Pull Requests** → **New Pull Request**
 3. Configurez :
    - **Base (cible)** : `develop`
@@ -594,10 +594,6 @@ git log --oneline --grep="contracts" -10
 ### 2️⃣ Créer sa branche feature
 
 ```bash
-# Utiliser le script helper (recommandé)
-./infrastructure/scripts/create-feature-branch.sh payment-manual-lifecycle backend
-
-# Ou manuellement
 git checkout -b feature/backend/payment-manual-lifecycle
 ```
 
@@ -787,9 +783,10 @@ vers_production ────→ main (PR + tag + déploiement)
 
 **Stratégie** :
 1. **Branche dédiée** : `chore/env-variables-update`
-2. **Synchronisation** : Modifier `.env.example` ET `infrastructure/stack.portainer-managed.yml` ET `docker-compose*.yml`
-3. **Documentation** : Mettre à jour `README.md` et `DOCUMENTATION_DOCKER.md`
-4. **Notification** : Informer tous les développeurs du changement
+2. **Synchronisation** : Modifier `.env.example` ET les fichiers Compose sources concernes (`infrastructure/docker-compose*.yml`)
+3. **Portainer** : Regenerer `infrastructure/stack.portainer-managed.yml` avec `infrastructure/scripts/generate-portainer-stack.sh` si une stack Portainer doit etre livree. Ne pas editer ce fichier genere a la main.
+4. **Documentation** : Mettre a jour `README.md` et, si Docker est impacte, `infrastructure/FORMATION_DOCKER_POUR_EQUIPE.md`
+5. **Notification** : Informer tous les développeurs du changement
 
 ---
 
@@ -836,15 +833,16 @@ vers_production ────→ main (PR + tag + déploiement)
 
 - [ ] Cloner le repo avec `develop` par défaut
 - [ ] Configurer git hooks (pre-commit lint)
-- [ ] Installer les scripts helpers (`create-feature-branch.sh`)
+- [ ] Verifier les scripts disponibles dans `infrastructure/scripts/`
 - [ ] Configurer l'éditeur (ESLint, Prettier, Flutter analyze)
 - [ ] Tester le workflow : créer une branche test → PR → merge → supprimer
 
 ### Scripts et Outils
 
-- [ ] `infrastructure/scripts/create-feature-branch.sh` ✅
 - [ ] `infrastructure/scripts/check-contracts-sync.sh` ✅
-- [ ] `infrastructure/scripts/validate-pr.sh` (lint + test + build)
+- [ ] `infrastructure/scripts/validate-mr.sh` ✅
+- [ ] `infrastructure/scripts/clean-docker.sh` ✅
+- [ ] `infrastructure/scripts/generate-portainer-stack.sh` ✅
 - [ ] CI/CD pipeline (GitHub Actions / GitLab CI)
 - [ ] Pre-commit hooks (husky + lint-staged)
 
@@ -852,91 +850,42 @@ vers_production ────→ main (PR + tag + déploiement)
 
 ## 📚 Scripts Utilitaires
 
-### `create-feature-branch.sh`
+### Creation de branche
+
+Aucun script `create-feature-branch.sh` n'est present dans le depot actuel. Creer les branches manuellement:
 
 ```bash
-#!/bin/bash
-# Usage: ./infrastructure/scripts/create-feature-branch.sh <feature-name> <domain>
-# Example: ./infrastructure/scripts/create-feature-branch.sh payment-manual-lifecycle backend
-
-set -euo pipefail
-
-DOMAINS=("backend" "flutter" "admin-web" "infra" "contracts")
-FEATURE_NAME="${1:-}"
-DOMAIN="${2:-}"
-
-if [[ -z "$FEATURE_NAME" || -z "$DOMAIN" ]]; then
-  echo "Usage: $0 <feature-name> <domain>"
-  echo "Domains: ${DOMAINS[*]}"
-  exit 1
-fi
-
-if [[ ! " ${DOMAINS[*]} " =~ " ${DOMAIN} " ]]; then
-  echo "❌ Domaine invalide. Choix: ${DOMAINS[*]}"
-  exit 1
-fi
-
-echo "🔄 Mise à jour de develop..."
 git checkout develop
 git pull origin develop
-
-echo "🌿 Création de la branche..."
-git checkout -b "feature/${DOMAIN}/${FEATURE_NAME}"
-
-echo "✅ Branche créée: feature/${DOMAIN}/${FEATURE_NAME}"
-echo ""
-echo "📋 Prochaines étapes:"
-echo "   1. Développer votre feature"
-echo "   2. Commits atomiques avec conventional commits"
-echo "   3. Tests locaux : npm run test / flutter analyze"
-echo "   4. Rebase sur develop avant PR : git fetch origin && git rebase origin/develop"
-echo "   5. Créer la PR vers develop avec le template"
-echo ""
-echo "⚠️  Si votre feature dépend d'un contrat:"
-echo "   - Vérifier que feature/contracts/* est mergée"
-echo "   - Rebase sur develop après merge de contracts"
+git checkout -b feature/backend/payment-manual-lifecycle
 ```
 
 ### `check-contracts-sync.sh`
 
 ```bash
-#!/bin/bash
-# Vérifie la synchronisation des contrats entre backend, Flutter et admin-web
+./infrastructure/scripts/check-contracts-sync.sh
+```
 
-set -euo pipefail
+Verifie les contrats sensibles entre backend, Flutter et admin-web: modules metier, modeles, types, routes, enums, evenements WebSocket et SSE.
 
-echo "🔍 Vérification des contrats..."
+### `validate-mr.sh`
 
-# Vérifier que les DTOs backend ont des équivalents Flutter et admin
-BACKEND_DTOS="backend/src/modules"
-FLUTTER_MODELS="Fiers Artisans/lib/data/models"
-ADMIN_TYPES="admin-web/src/types"
+```bash
+./infrastructure/scripts/validate-mr.sh
+```
 
-# Liste des modules critiques
-MODULES=("auth" "payment-manual" "users" "chat" "subscription")
+Quality gate local avant MR. Le script lance les controles disponibles sans installer automatiquement les dependances:
+- contrats multi-couches
+- tests et build backend si `backend/node_modules` existe
+- lint et build admin-web si `admin-web/node_modules` existe
+- `flutter analyze` et `flutter test` si Flutter est disponible
 
-for module in "${MODULES[@]}"; do
-  echo ""
-  echo "📦 Module: $module"
+### Scripts Docker et serveur
 
-  # Compter les DTOs backend
-  backend_count=$(find "$BACKEND_DTOS/$module" -name "*.dto.ts" 2>/dev/null | wc -l)
-  echo "   Backend DTOs: $backend_count"
-
-  # Vérifier présence dans Flutter
-  flutter_file="$FLUTTER_MODELS/${module//-/_}_model.dart"
-  if [[ -f "$flutter_file" ]]; then
-    echo "   ✅ Flutter model: $(basename $flutter_file)"
-  else
-    echo "   ⚠️  Flutter model manquant: ${module//-/_}_model.dart"
-  fi
-
-  # Vérifier présence dans admin-web
-  # (simplifié — à adapter selon la structure réelle)
-done
-
-echo ""
-echo "✅ Vérification terminée"
+```bash
+./infrastructure/scripts/clean-docker.sh
+./infrastructure/scripts/clean-docker.sh --all
+./infrastructure/scripts/generate-portainer-stack.sh
 ```
 
 ---
@@ -1052,6 +1001,459 @@ Closes #
 
 ---
 
+## 📘 Dictionnaire Git/GitHub/GitLab — Débutant à Pro
+
+Cette section sert d'anti-sèche pédagogique. Elle explique les commandes Git les plus fréquentes, leur usage, les scénarios typiques et les réflexes de sécurité.
+
+### 🔰 Niveau 1 — Les fondamentaux
+
+#### 1. `git init`
+
+**Fonction** : créer un dépôt Git local dans un dossier existant.
+
+**Scénario** : tu commences un nouveau projet from scratch.
+
+```text
+mon-projet/  -- git init -->  mon-projet/.git/
+dossier normal                depot Git local
+```
+
+```bash
+mkdir mon-super-projet
+cd mon-super-projet
+git init
+```
+
+#### 2. `git clone`
+
+**Fonction** : copier un dépôt distant en local.
+
+**Scénario** : tu arrives sur un projet existant et tu dois le récupérer.
+
+```text
+GitHub/GitLab distant  -- git clone -->  copie locale avec .git
+```
+
+```bash
+git clone https://github.com/user/repo.git
+git clone git@github.com:user/repo.git
+```
+
+#### 3. `git status`
+
+**Fonction** : voir l'état des fichiers.
+
+**Scénario** : tu ne sais plus où tu en es.
+
+```text
+modifie -- git add --> stage -- git commit --> historique
+```
+
+```bash
+git status
+```
+
+#### 4. `git add`
+
+**Fonction** : ajouter des modifications dans la zone de staging.
+
+**Scénario** : tu as modifié des fichiers et tu veux préparer un commit.
+
+```bash
+git add index.html
+git add .
+git add '*.js'
+git add -p
+```
+
+`git add -p` permet de choisir les changements morceau par morceau.
+
+#### 5. `git commit`
+
+**Fonction** : enregistrer les modifications stagées dans l'historique.
+
+**Scénario** : ta correction ou ta feature est prête.
+
+```bash
+git commit -m "feat: ajout du formulaire de connexion"
+git commit -am "fix: correction typo"
+```
+
+Convention recommandée :
+
+```text
+type(scope): description courte
+```
+
+Types fréquents :
+
+- `feat` : nouvelle fonctionnalité
+- `fix` : correction de bug
+- `docs` : documentation
+- `refactor` : réorganisation sans changement fonctionnel
+- `test` : tests
+- `chore` : maintenance
+
+#### 6. `git push`
+
+**Fonction** : envoyer les commits locaux vers le dépôt distant.
+
+**Scénario** : tu as commité en local et tu veux partager avec l'équipe.
+
+```bash
+git push origin main
+git push
+git push -u origin feature/login
+```
+
+`-u` configure le lien entre la branche locale et la branche distante pour les prochains `git push`.
+
+#### 7. `git pull`
+
+**Fonction** : récupérer les commits distants et les intégrer au local.
+
+**Scénario** : un collègue a poussé du travail, tu veux le récupérer.
+
+```bash
+git pull origin main
+git pull --rebase
+```
+
+Réflexe avant de commencer une tâche :
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b ma-feature
+```
+
+#### 8. `git branch`
+
+**Fonction** : gérer les branches.
+
+**Scénario** : tu veux isoler ton travail.
+
+```bash
+git branch
+git branch -a
+git branch feature/paiement
+git branch -d feature/login
+git branch -D feature/login
+```
+
+`-d` supprime une branche déjà fusionnée. `-D` force la suppression.
+
+#### 9. `git checkout` / `git switch`
+
+**Fonction** : changer de branche.
+
+**Scénario** : tu dois passer sur une autre branche ou créer une branche.
+
+```bash
+git checkout feature/login
+git switch feature/login
+git switch -c nouvelle-branche
+git checkout -b nouvelle-branche
+```
+
+`git switch` est la syntaxe moderne pour changer de branche.
+
+#### 10. `git merge`
+
+**Fonction** : fusionner une branche dans une autre.
+
+**Scénario** : ta feature est terminée et doit être intégrée.
+
+```bash
+git checkout main
+git merge feature/login
+```
+
+En cas de conflit :
+
+```bash
+git add .
+git commit
+```
+
+### 🟡 Niveau 2 — Intermédiaire
+
+#### 11. `git stash`
+
+**Fonction** : mettre de côté des modifications non commitées.
+
+**Scénario** : tu travailles sur une feature, mais un hotfix urgent arrive.
+
+```bash
+git stash
+git stash list
+git stash pop
+git stash apply stash@{1}
+git stash drop stash@{0}
+```
+
+#### 12. `git rebase`
+
+**Fonction** : rejouer des commits sur une nouvelle base.
+
+**Scénario** : ta branche a divergé et tu veux un historique linéaire.
+
+```bash
+git checkout feature/login
+git rebase main
+git rebase --continue
+git rebase --abort
+```
+
+Règle de prudence : ne pas rebase une branche partagée sans coordination. Après un rebase d'une branche déjà poussée, utiliser `--force-with-lease`, jamais `--force` brut.
+
+#### 13. `git reset`
+
+**Fonction** : revenir en arrière dans l'historique local.
+
+**Scénario** : tu as fait un mauvais commit local.
+
+```bash
+git reset --soft HEAD~1
+git reset --mixed HEAD~1
+git reset --hard HEAD~1
+```
+
+- `--soft` : annule le commit, garde les fichiers stagés
+- `--mixed` : annule le commit et le staging
+- `--hard` : annule tout, y compris les modifications locales
+
+`--hard` est destructeur. Ne pas l'utiliser sans être certain de ce qui sera perdu.
+
+#### 14. `git revert`
+
+**Fonction** : créer un nouveau commit qui annule un commit précédent.
+
+**Scénario** : tu dois annuler un commit déjà poussé.
+
+```bash
+git revert abc123
+git revert HEAD
+```
+
+`revert` est plus sûr que `reset` pour du travail partagé.
+
+#### 15. `git log`
+
+**Fonction** : voir l'historique des commits.
+
+```bash
+git log --oneline
+git log --graph --oneline --all
+git log --author="Jean"
+git log --since="2024-01-01"
+git log -p
+git log --grep="fix"
+```
+
+#### 16. `git cherry-pick`
+
+**Fonction** : appliquer un commit précis sur ta branche.
+
+**Scénario** : un fix existe déjà ailleurs et tu en as besoin ici.
+
+```bash
+git checkout feature/ma-branche
+git cherry-pick abc123
+```
+
+#### 17. `git diff`
+
+**Fonction** : voir les différences entre versions.
+
+```bash
+git diff
+git diff --staged
+git diff main..feature
+git diff abc123..def456
+```
+
+### 🔴 Niveau 3 — Pro
+
+#### 18. Pull Request / Merge Request
+
+**Fonction** : demander la revue et l'intégration d'une branche.
+
+Workflow type :
+
+```bash
+git checkout main
+git pull origin main
+git checkout -b feature/mon-truc
+git add .
+git commit -m "feat: ma super feature"
+git push -u origin feature/mon-truc
+```
+
+Ensuite, créer la Pull Request ou Merge Request sur GitHub/GitLab, faire relire, corriger si nécessaire, puis fusionner via l'interface.
+
+#### 19. `git fetch` + `git merge`
+
+**Fonction** : récupérer les changements distants sans les intégrer automatiquement.
+
+**Scénario** : tu veux voir ce qui a changé avant de fusionner.
+
+```bash
+git fetch origin
+git diff main..origin/main
+git merge origin/main
+```
+
+#### 20. Squash de commits
+
+**Fonction** : fusionner plusieurs commits en un seul avant merge.
+
+**Scénario** : ta branche contient beaucoup de commits temporaires.
+
+```bash
+git rebase -i HEAD~4
+```
+
+Dans l'éditeur :
+
+```text
+pick abc123 feat: ma feature
+squash def456 wip
+squash ghi789 fix typo
+squash jkl012 wip final
+```
+
+#### 21. `git bisect`
+
+**Fonction** : trouver le commit qui a introduit un bug.
+
+```bash
+git bisect start
+git bisect bad HEAD
+git bisect good v1.0
+git bisect good
+git bisect bad
+git bisect reset
+```
+
+Git teste par dichotomie jusqu'à identifier le commit suspect.
+
+#### 22. `git reflog`
+
+**Fonction** : voir les mouvements récents de `HEAD`, même ceux qui ne sont plus visibles dans l'historique classique.
+
+**Scénario** : tu as fait un reset et tu veux récupérer un commit.
+
+```bash
+git reflog
+git checkout def456
+git switch -c recuperation
+```
+
+`reflog` est une commande de sauvetage locale très utile.
+
+#### 23. Submodules
+
+**Fonction** : inclure un autre dépôt Git dans ton projet.
+
+```bash
+git submodule add https://github.com/team/lib.git libs/ma-lib
+git submodule update --init --recursive
+```
+
+À utiliser avec prudence : les submodules ajoutent une dépendance Git à maintenir explicitement.
+
+#### 24. Hooks Git
+
+**Fonction** : automatiser des vérifications avant commit ou push.
+
+Exemple de hook `pre-commit` :
+
+```bash
+#!/bin/sh
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "Lint failed, commit annule"
+  exit 1
+fi
+```
+
+#### 25. Workflow GitFlow simplifié
+
+```text
+main      -----o-----------o----- releases stables
+             \           /
+develop      o--o--o--o--o--o--- integration continue
+               \    \    /
+feature/a       o--o ----
+feature/b             o--
+hotfix    ----------------o------ urgence depuis main
+```
+
+Principes :
+
+- `main` garde les versions stables
+- `develop` centralise l'intégration
+- `feature/*` isole les nouvelles fonctionnalités
+- `hotfix/*` part de `main` pour corriger une urgence
+
+#### 26. GitHub CLI (`gh`)
+
+```bash
+gh auth login
+gh repo create mon-projet
+gh pr create --title "feat: ..."
+gh pr checkout 123
+gh pr review --approve
+gh issue create --title "bug: ..."
+```
+
+#### 27. GitLab CLI (`glab`)
+
+```bash
+glab auth login
+glab mr create --title "feat: ..."
+glab mr checkout 45
+glab mr merge 45
+glab ci status
+glab ci trace
+```
+
+### 📊 Cycle de vie d'un fichier
+
+```text
+                    git add             git commit
+modifie ----------------------------> stage ----------------> historique
+  ^                                     |                       |
+  |                                     | git reset --mixed     | git reset --soft
+  |                                     v                       v
+  +-------------------------- fichiers modifies <--------- commit annule
+
+modifications -- git stash --> stash -- git stash pop --> restaure
+```
+
+### 🎯 Anti-sèche rapide
+
+| Action | Commande |
+|--------|----------|
+| Nouveau projet | `git init` |
+| Récupérer un projet | `git clone URL` |
+| Voir l'état | `git status` |
+| Préparer un commit | `git add .` |
+| Commit | `git commit -m "message"` |
+| Envoyer | `git push origin main` |
+| Récupérer | `git pull` |
+| Nouvelle branche | `git switch -c nom` |
+| Changer de branche | `git switch nom` |
+| Fusionner | `git merge branche` |
+| Mettre de côté | `git stash` |
+| Restaurer stash | `git stash pop` |
+| Annuler dernier commit local | `git reset --soft HEAD~1` |
+| Historique compact | `git log --oneline` |
+| Sauvetage | `git reflog` |
+
+---
+
 ## 📚 Ressources Complémentaires
 
 - [Git Flow Documentation](https://git-flow.readthedocs.io/)
@@ -1059,7 +1461,7 @@ Closes #
 - [GitHub Flow Guide](https://guides.github.com/introduction/flow/)
 - [Semantic Versioning](https://semver.org/)
 - `SECURITY_ARCHITECTURE.md` — Politique de sécurité et préservation
-- `RÈGLES GLOBALES.md` — Pipeline IA et gouvernance
+- `instructions-agent-ia-v2.md` — Guide operationnel agent IA
 
 ---
 

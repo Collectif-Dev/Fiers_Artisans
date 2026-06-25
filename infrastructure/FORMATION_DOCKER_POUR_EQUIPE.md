@@ -121,30 +121,40 @@ Objectif: supprimer ce qui est inutilise, sans casser la stack active.
     docker compose ps
     docker system df
 
-### Etape B: nettoyages cibles
-- Containers arretes:
+### Etape B: utiliser le script securise du depot
+Depuis la racine du depot:
 
-    docker container prune
+    ./infrastructure/scripts/clean-docker.sh
 
-- Images non utilisees:
+Nettoyage plus agressif des images inutilisees et du build cache, sans suppression des volumes nommes:
 
-    docker image prune -a
+    ./infrastructure/scripts/clean-docker.sh --all
 
-- Networks non utilises:
+Ce script:
+- detecte les fichiers Compose du projet
+- propose d'arreter la stack si elle tourne en session interactive
+- supprime les conteneurs arretes
+- supprime les images dangling, ou toutes les images inutilisees avec `--all`
+- purge le build cache inutilise
+- supprime les reseaux orphelins
+- supprime seulement les volumes anonymes orphelins
+- preserve les volumes nommes critiques
 
-    docker network prune
+### Etape C: commandes directes reservees au diagnostic
 
-- Volumes non utilises (attention donnees):
+Ces commandes peuvent aider a inspecter l'etat Docker:
 
+    docker system df
+    docker builder du
+    docker image ls --filter dangling=true
+    docker volume ls --filter dangling=true
+
+Ne pas utiliser en routine:
+
+    docker system prune -a --volumes
     docker volume prune
 
-### Etape C: grand nettoyage (danger si mal utilise)
-    docker system prune -a --volumes
-
-A utiliser seulement si:
-- tu es sur de ne rien vouloir garder hors stack active
-- tu as des sauvegardes
-- tu as confirme les volumes critiques
+Ces commandes peuvent supprimer des donnees utiles. Elles exigent une validation humaine explicite, une sauvegarde verifiee et une comprehension precise des volumes touches.
 
 ## 5) Distinguer "inutilise" vs "important"
 
@@ -236,15 +246,16 @@ Dans votre cas:
 
     docker system df
 
-2. Nettoyer progressivement:
+2. Nettoyer via le script securise:
 
-    docker container prune
-    docker image prune -a
-    docker network prune
+    ./infrastructure/scripts/clean-docker.sh
+    ./infrastructure/scripts/clean-docker.sh --all
 
-3. Volumes: seulement apres verification:
+3. Volumes: seulement apres verification et validation humaine:
 
-    docker volume prune
+    docker volume ls --filter dangling=true
+
+Ne jamais lancer `docker volume prune` pour un nettoyage courant de cette stack.
 
 ### Scenario 3: besoin d'un second environnement de test
 1. Dupliquer stack avec nom de projet dedie

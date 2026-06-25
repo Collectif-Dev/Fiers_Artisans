@@ -368,16 +368,16 @@ npm run test
 npm run test:e2e
 ```
 
-### Frontend (React/Next.js)
+### Admin Web (Next.js)
 ```bash
-cd frontend
+cd admin-web
 npm run lint
 npm run build
 ```
 
 ### Mobile (Flutter)
 ```bash
-cd mobile
+cd "Fiers Artisans"
 flutter analyze
 flutter test
 ```
@@ -385,7 +385,7 @@ flutter test
 ### Infrastructure / Docker
 ```bash
 cd infrastructure
-docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.dev.yml config
+docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.portainer.yml config
 ```
 
 ### Si les Tests Ne Peuvent Pas Être Lancés
@@ -431,7 +431,7 @@ docker compose --env-file ../.env -f docker-compose.yml -f docker-compose.dev.ym
 - [ ] L'affirmation utilisateur a été vérifiée quand c'était possible.
 - [ ] Le backend compile ou reste structurellement cohérent.
 - [ ] Les contrats JSON restent compatibles ou ont été propagés à tous les consommateurs identifiés.
-- [ ] Les pages frontend concernées restent cohérentes.
+- [ ] Les pages admin-web concernées restent cohérentes.
 - [ ] Les routes, events, statuts et noms de champs sont alignés partout où ils sont utilisés.
 - [ ] Les variables d'environnement restent cohérentes entre code, exemples (`.env.example`) et configuration Docker.
 - [ ] Les intégrations externes ne sont pas cassées.
