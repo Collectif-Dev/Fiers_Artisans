@@ -63,9 +63,7 @@ infrastructure/stack.portainer-managed.yml
 infrastructure/backups/
 
 # Local fusion exports
-globaliste/
-Globaliste/
-Globalist/
+**/global_fusion.txt
 
 # Agent & task documentation (internal use)
 taches_et_problemes/
