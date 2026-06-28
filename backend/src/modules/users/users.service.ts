@@ -642,6 +642,23 @@ export class UsersService {
   }
 
   async updateFcmToken(userId: string, fcmToken: string): Promise<void> {
-    await this.userRepository.update(userId, { fcm_token: fcmToken });
+    const normalizedToken = (fcmToken || '').trim();
+
+    await this.userRepository.manager.transaction(async (manager) => {
+      const userRepository = manager.getRepository(User);
+
+      // A device token must never remain attached to another account.
+      if (normalizedToken) {
+        await userRepository
+          .createQueryBuilder()
+          .update(User)
+          .set({ fcm_token: '' })
+          .where('fcm_token = :token', { token: normalizedToken })
+          .andWhere('id != :userId', { userId })
+          .execute();
+      }
+
+      await userRepository.update(userId, { fcm_token: normalizedToken });
+    });
   }
 }

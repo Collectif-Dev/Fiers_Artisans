@@ -352,6 +352,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _bootstrapFuture;
 
+    // Detach current account from this device token before dropping auth.
+    await PushNotificationService().unregisterCurrentUserToken();
+
     // Security-First: Clear tokens BEFORE UI state change
     try {
       await SecureStorage.clearAuthSession();
@@ -413,6 +416,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _prepareFreshSession() async {
     ChatRealtimeService().disconnect();
+    await PushNotificationService().unregisterCurrentUserToken();
     await SecureStorage.clearAuthSession();
     _rotateSessionScope();
   }
