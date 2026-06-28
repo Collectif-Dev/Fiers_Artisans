@@ -27,13 +27,56 @@ export class SearchService {
       page = 1,
       limit = 20,
     } = dto;
-    const offset = (page - 1) * limit;
+    const safeRadiusKm = Math.min(Math.max(radius_km ?? 10, 1), 100);
+    const safePage = Math.max(page ?? 1, 1);
+    const safeLimit = Math.min(Math.max(limit ?? 20, 1), 50);
+    const offset = (safePage - 1) * safeLimit;
+    const normalizedQuery = query?.trim();
 
     let qb = this.artisanProfileRepository
       .createQueryBuilder('ap')
       .innerJoinAndSelect('ap.user', 'u')
       .leftJoinAndSelect('ap.category', 'c')
       .leftJoinAndSelect('ap.subcategory', 'sc')
+      .select([
+        'ap.id',
+        'ap.user_id',
+        'ap.first_name',
+        'ap.last_name',
+        'ap.business_name',
+        'ap.bio',
+        'ap.category_id',
+        'ap.subcategory_id',
+        'ap.city',
+        'ap.commune',
+        'ap.address',
+        'ap.rating_avg',
+        'ap.total_reviews',
+        'ap.years_experience',
+        'ap.is_available',
+        'ap.is_subscription_active',
+        'ap.whatsapp_number',
+        'ap.working_hours',
+        'ap.last_active_at',
+        'ap.created_at',
+        'ap.updated_at',
+        'u.id',
+        'u.phone_number',
+        'u.verification_status',
+        'u.is_active',
+        'u.location',
+        'u.location_updated_at',
+        'c.id',
+        'c.name',
+        'c.icon_url',
+        'c.slug',
+        'c.is_active',
+        'c.display_order',
+        'sc.id',
+        'sc.category_id',
+        'sc.name',
+        'sc.slug',
+      ])
       .where('ap.is_subscription_active = :active', { active: true })
       .andWhere('u.is_active = :isActive', { isActive: true })
       .andWhere('ap.is_available = :isAvailable', { isAvailable: true })
@@ -44,7 +87,7 @@ export class SearchService {
           ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
           :radius
         )`,
-        { lat, lng, radius: radius_km * 1000 },
+        { lat, lng, radius: safeRadiusKm * 1000 },
       )
       // Ajouter la distance calculée
       .addSelect(
@@ -95,10 +138,18 @@ export class SearchService {
       }
     }
 
-    if (query) {
+    if (normalizedQuery) {
       qb = qb.andWhere(
-        `(ap.first_name ILIKE :query OR ap.last_name ILIKE :query OR ap.business_name ILIKE :query)`,
-        { query: `%${query}%` },
+        `(
+          ap.first_name ILIKE :query OR
+          ap.last_name ILIKE :query OR
+          ap.business_name ILIKE :query OR
+          c.name ILIKE :query OR
+          c.slug ILIKE :query OR
+          sc.name ILIKE :query OR
+          sc.slug ILIKE :query
+        )`,
+        { query: `%${normalizedQuery}%` },
       );
     }
 
@@ -114,7 +165,7 @@ export class SearchService {
 
     const { entities, raw } = await qb
       .skip(offset)
-      .take(limit)
+      .take(safeLimit)
       .getRawAndEntities();
 
     const results = entities.map((entity, index) => {
@@ -141,15 +192,16 @@ export class SearchService {
           first_name: user.first_name,
           last_name: user.last_name,
           phone_number: user.phone_number,
-          email: user.email,
           verification_status: user.verification_status,
-          created_at: user.created_at,
         };
       }
       // ── FIN SECURITY ──
 
       return entity;
     });
+
+    const roundedLat = Number(Number(lat).toFixed(4));
+    const roundedLng = Number(Number(lng).toFixed(4));
 
     // Fire-and-forget analytics
     this.analyticsService
@@ -159,9 +211,9 @@ export class SearchService {
         metadata: {
           category,
           subcategory,
-          query,
-          lat,
-          lng,
+          query: normalizedQuery,
+          lat: roundedLat,
+          lng: roundedLng,
           min_rating,
           available_only,
           results: total,
@@ -173,9 +225,9 @@ export class SearchService {
       data: results,
       meta: {
         total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        page: safePage,
+        limit: safeLimit,
+        totalPages: Math.ceil(total / safeLimit),
       },
     };
   }

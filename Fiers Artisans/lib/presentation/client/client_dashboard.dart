@@ -281,7 +281,10 @@ class _ClientDashboardState extends ConsumerState<ClientDashboard>
                                   icon: cat.icon,
                                   onTap: () => context.push(
                                     '/client/search',
-                                    extra: {'categoryId': cat.id},
+                                    extra: {
+                                      'categoryId': cat.id,
+                                      'query': cat.name,
+                                    },
                                   ),
                                 ),
                               );

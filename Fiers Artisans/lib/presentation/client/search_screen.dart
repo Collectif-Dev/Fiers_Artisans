@@ -43,6 +43,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   StreamSubscription<Map<String, dynamic>>? _visibilitySubscription;
   StreamSubscription<ChatRealtimeEvent>? _domainEventSubscription;
   Timer? _availabilityRefreshDebounce;
+  Timer? _queryDebounce;
 
   String? _selectedCategoryId;
   String? _selectedSubcategoryId;
@@ -54,6 +55,109 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   double? _latitude;
   double? _longitude;
   bool _locationLoading = false;
+
+  static const Map<String, String> _accentReplacements = {
+    'à': 'a',
+    'á': 'a',
+    'â': 'a',
+    'ä': 'a',
+    'ã': 'a',
+    'å': 'a',
+    'ç': 'c',
+    'è': 'e',
+    'é': 'e',
+    'ê': 'e',
+    'ë': 'e',
+    'ì': 'i',
+    'í': 'i',
+    'î': 'i',
+    'ï': 'i',
+    'ñ': 'n',
+    'ò': 'o',
+    'ó': 'o',
+    'ô': 'o',
+    'ö': 'o',
+    'õ': 'o',
+    'ù': 'u',
+    'ú': 'u',
+    'û': 'u',
+    'ü': 'u',
+    'ý': 'y',
+    'ÿ': 'y',
+  };
+
+  String _normalizeSearchTerm(String value) {
+    var normalized = value.trim().toLowerCase();
+    _accentReplacements.forEach((from, to) {
+      normalized = normalized.replaceAll(from, to);
+    });
+
+    normalized = normalized.replaceAll(RegExp(r'[^a-z0-9\s-]'), ' ');
+    normalized = normalized.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return normalized;
+  }
+
+  bool _matchesTerm(String haystack, String query) {
+    final normalizedHaystack = _normalizeSearchTerm(haystack);
+    final normalizedQuery = _normalizeSearchTerm(query);
+    if (normalizedHaystack.isEmpty || normalizedQuery.isEmpty) {
+      return false;
+    }
+    return normalizedHaystack.contains(normalizedQuery) ||
+        normalizedQuery.contains(normalizedHaystack);
+  }
+
+  ({String? categoryId, String? subcategoryId}) _resolveQueryFilters(
+    List<CategoryModel> categories,
+    String rawQuery,
+    String? currentCategoryId,
+    String? currentSubcategoryId,
+  ) {
+    if (rawQuery.trim().isEmpty) {
+      return (
+        categoryId: currentCategoryId,
+        subcategoryId: currentSubcategoryId,
+      );
+    }
+
+    var resolvedCategoryId = currentCategoryId;
+    var resolvedSubcategoryId = currentSubcategoryId;
+
+    if (resolvedSubcategoryId == null) {
+      final candidateCategories = resolvedCategoryId == null
+          ? categories
+          : categories.where((c) => c.id == resolvedCategoryId).toList();
+
+      for (final category in candidateCategories) {
+        for (final sub in category.subcategories) {
+          final slug = sub.slug ?? '';
+          if (_matchesTerm(sub.name, rawQuery) ||
+              _matchesTerm(slug, rawQuery)) {
+            resolvedCategoryId = category.id;
+            resolvedSubcategoryId = sub.id;
+            break;
+          }
+        }
+        if (resolvedSubcategoryId != null) break;
+      }
+    }
+
+    if (resolvedCategoryId == null) {
+      for (final category in categories) {
+        final slug = category.slug ?? '';
+        if (_matchesTerm(category.name, rawQuery) ||
+            _matchesTerm(slug, rawQuery)) {
+          resolvedCategoryId = category.id;
+          break;
+        }
+      }
+    }
+
+    return (
+      categoryId: resolvedCategoryId,
+      subcategoryId: resolvedSubcategoryId,
+    );
+  }
 
   String _categoryLabel(List<CategoryModel> categories, String? categoryId) {
     if (categoryId == null) return 'search.all_categories'.tr();
@@ -86,6 +190,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         if (cat != null) _selectedCategoryId = cat;
         final subcat = params['subcategoryId'] as String?;
         if (subcat != null) _selectedSubcategoryId = subcat;
+        final initialQuery = params['query']?.toString().trim();
+        if (initialQuery != null && initialQuery.isNotEmpty) {
+          _searchCtrl.text = initialQuery;
+        }
 
         final preset = params['preset']?.toString();
 
@@ -207,9 +315,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   void _search() {
+    final queryText = _searchCtrl.text.trim();
+    final categories = ref.read(categoriesProvider).categories;
+    final resolved = _resolveQueryFilters(
+      categories,
+      queryText,
+      _selectedCategoryId,
+      _selectedSubcategoryId,
+    );
+
+    final effectiveCategoryId = resolved.categoryId;
+    final effectiveSubcategoryId = resolved.subcategoryId;
+
     _mapRealtimeService.updateFilterRooms(
-      categoryId: _selectedCategoryId,
-      subcategoryId: _selectedSubcategoryId,
+      categoryId: effectiveCategoryId,
+      subcategoryId: effectiveSubcategoryId,
     );
 
     ref
@@ -218,11 +338,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           latitude: _latitude,
           longitude: _longitude,
           radius: _radius,
-          categoryId: _selectedCategoryId,
-          subcategoryId: _selectedSubcategoryId,
-          query: _searchCtrl.text.trim().isNotEmpty
-              ? _searchCtrl.text.trim()
-              : null,
+          categoryId: effectiveCategoryId,
+          subcategoryId: effectiveSubcategoryId,
+          query: queryText.isNotEmpty ? queryText : null,
           sortBy: _sortBy,
           minRating: _minRating,
         );
@@ -250,6 +368,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _visibilitySubscription?.cancel();
     _domainEventSubscription?.cancel();
     _availabilityRefreshDebounce?.cancel();
+    _queryDebounce?.cancel();
     _mapRealtimeService.disconnect();
     _searchCtrl.dispose();
     super.dispose();
@@ -358,6 +477,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               hint: 'search.placeholder'.tr(),
               prefixIcon: Icons.search_rounded,
               textInputAction: TextInputAction.search,
+              onChanged: (_) {
+                _queryDebounce?.cancel();
+                _queryDebounce = Timer(
+                  const Duration(milliseconds: 350),
+                  _search,
+                );
+              },
               onSubmitted: (_) => _search(),
               suffix: IconButton(
                 icon: const Icon(Icons.tune_rounded, size: 20),

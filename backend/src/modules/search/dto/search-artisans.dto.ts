@@ -6,16 +6,21 @@ import {
   IsBoolean,
   Min,
   Max,
+  MaxLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 export class SearchArtisansDto {
   @Type(() => Number)
   @IsNumber()
+  @Min(-90)
+  @Max(90)
   lat: number;
 
   @Type(() => Number)
   @IsNumber()
+  @Min(-180)
+  @Max(180)
   lng: number;
 
   @IsOptional()
@@ -33,15 +38,27 @@ export class SearchArtisansDto {
   min_rating?: number;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
+  @MaxLength(64)
   category?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
+  @MaxLength(64)
   subcategory?: string;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
+  @MaxLength(80)
   query?: string;
 
   @IsOptional()
