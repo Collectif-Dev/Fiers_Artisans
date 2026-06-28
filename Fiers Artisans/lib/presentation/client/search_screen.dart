@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,8 +34,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   static const double _urgentRadiusKm = 20;
   static const double _topRatedRadiusKm = 20;
   static const double _topRatedMinRating = 3;
+  static const double _initialMapZoom = 12;
+  static const double _minMapZoom = 10;
+  static const double _maxMapZoom = 19;
+  static const double _clusterTapZoomStep = 1.2;
 
   final _searchCtrl = TextEditingController();
+  final MapController _mapController = MapController();
   final LocationService _locationService = LocationService();
   final MapVisibilityRealtimeService _mapRealtimeService =
       MapVisibilityRealtimeService();
@@ -55,6 +61,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   double? _latitude;
   double? _longitude;
   bool _locationLoading = false;
+  double _currentMapZoom = _initialMapZoom;
+  DateTime? _lastRealtimeRefreshAt;
+  String? _selectedMapArtisanId;
+  String _cachedMarkersKey = '';
+  List<Marker> _cachedMarkers = const [];
 
   static const Map<String, String> _accentReplacements = {
     'à': 'a',
@@ -274,10 +285,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     if (isAvailable) {
       _availabilityRefreshDebounce?.cancel();
-      _availabilityRefreshDebounce = Timer(
-        const Duration(milliseconds: 800),
-        _search,
-      );
+      _availabilityRefreshDebounce = Timer(const Duration(seconds: 2), () {
+        final now = DateTime.now();
+        final elapsed = _lastRealtimeRefreshAt == null
+            ? null
+            : now.difference(_lastRealtimeRefreshAt!);
+        if (elapsed != null && elapsed < const Duration(milliseconds: 900)) {
+          return;
+        }
+        _lastRealtimeRefreshAt = now;
+        _search(silent: true);
+      });
     }
   }
 
@@ -314,38 +332,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _search();
   }
 
-  void _search() {
-    final queryText = _searchCtrl.text.trim();
-    final categories = ref.read(categoriesProvider).categories;
-    final resolved = _resolveQueryFilters(
-      categories,
-      queryText,
-      _selectedCategoryId,
-      _selectedSubcategoryId,
-    );
-
-    final effectiveCategoryId = resolved.categoryId;
-    final effectiveSubcategoryId = resolved.subcategoryId;
-
-    _mapRealtimeService.updateFilterRooms(
-      categoryId: effectiveCategoryId,
-      subcategoryId: effectiveSubcategoryId,
-    );
-
-    ref
-        .read(searchProvider.notifier)
-        .search(
-          latitude: _latitude,
-          longitude: _longitude,
-          radius: _radius,
-          categoryId: effectiveCategoryId,
-          subcategoryId: effectiveSubcategoryId,
-          query: queryText.isNotEmpty ? queryText : null,
-          sortBy: _sortBy,
-          minRating: _minRating,
-        );
-  }
-
   void _handleDomainRealtimeEvent(ChatRealtimeEvent event) {
     final shouldRefreshSearch = switch (event.event) {
       'artisanProfileUpdated' => true,
@@ -359,7 +345,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _availabilityRefreshDebounce?.cancel();
     _availabilityRefreshDebounce = Timer(
       const Duration(milliseconds: 700),
-      _search,
+      () => _search(silent: true),
     );
   }
 
@@ -464,6 +450,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         }
       }
     }
+
+    final hasPartialResults = searchState.hasMore || searchState.isLoadingMore;
+    final resultsCountText =
+        '${searchState.results.length}${hasPartialResults ? '+' : ''}';
 
     return Scaffold(
       appBar: AppBar(title: Text('search.title'.tr())),
@@ -612,7 +602,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
                 if (searchState.results.isNotEmpty)
                   Text(
-                    '  •  ${'search.results'.tr(namedArgs: {'count': '${searchState.results.length}'})}',
+                    '  •  ${'search.results'.tr(namedArgs: {'count': resultsCountText})}',
                     style: theme.textTheme.bodySmall,
                   ),
               ],
@@ -690,9 +680,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Widget _buildMapResults(SearchState searchState) {
-    final mapArtisans = searchState.results
-        .where((a) => a.latitude != null && a.longitude != null)
-        .toList(growable: false);
+    final mapArtisans = _deduplicateArtisansByUserId(
+      searchState.results
+          .where(
+            (a) =>
+                a.latitude != null &&
+                a.longitude != null &&
+                a.latitude!.isFinite &&
+                a.longitude!.isFinite &&
+                a.latitude! >= -90 &&
+                a.latitude! <= 90 &&
+                a.longitude! >= -180 &&
+                a.longitude! <= 180,
+          )
+          .toList(growable: false),
+    );
 
     if (_latitude == null || _longitude == null) {
       return EmptyState(
@@ -715,52 +717,616 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     final center = LatLng(_latitude!, _longitude!);
+    final selectedArtisanId =
+        mapArtisans.any((artisan) => artisan.userId == _selectedMapArtisanId)
+        ? _selectedMapArtisanId
+        : null;
+    final clusters = _clusterArtisans(mapArtisans, _currentMapZoom);
+    final markerColor = Theme.of(context).colorScheme.primary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final isPartialCount = searchState.hasMore || searchState.isLoadingMore;
+    final zoomPercent = _zoomUsagePercent(_currentMapZoom);
+    _scheduleMapPrefetch(searchState);
+    final mapMarkers = _buildMarkers(
+      center: center,
+      clusters: clusters,
+      markerColor: markerColor,
+      isPartialCount: isPartialCount,
+      selectedArtisanId: selectedArtisanId,
+    );
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: FlutterMap(
-          options: MapOptions(initialCenter: center, initialZoom: 12),
+        child: Stack(
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.fiers.artisans.app',
-            ),
-            CircleLayer(
-              circles: [
-                CircleMarker(
-                  point: center,
-                  radius: _radius * 1000,
-                  useRadiusInMeter: true,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.12),
-                  borderStrokeWidth: 1.5,
-                  borderColor: Theme.of(context).colorScheme.primary,
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: center,
+                initialZoom: _initialMapZoom,
+                minZoom: _minMapZoom,
+                maxZoom: _maxMapZoom,
+                onTap: (_, _) {
+                  if (_selectedMapArtisanId == null) return;
+                  setState(() {
+                    _selectedMapArtisanId = null;
+                    _cachedMarkersKey = '';
+                  });
+                },
+                onPositionChanged: (position, _) {
+                  final zoom = position.zoom
+                      .clamp(_minMapZoom, _maxMapZoom)
+                      .toDouble();
+                  if ((zoom - _currentMapZoom).abs() < 0.15) return;
+                  setState(() {
+                    _currentMapZoom = zoom;
+                    _cachedMarkersKey = '';
+                  });
+                },
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.fiers.artisans.app',
                 ),
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: center,
+                      radius: _radius * 1000,
+                      useRadiusInMeter: true,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12),
+                      borderStrokeWidth: 1.5,
+                      borderColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
+                ),
+                MarkerLayer(markers: mapMarkers),
               ],
             ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  width: 36,
-                  height: 36,
-                  point: center,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.my_location,
-                      size: 18,
-                      color: Colors.white,
+            Positioned(
+              top: 10,
+              right: 10,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withValues(alpha: 0.84),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${zoomPercent.toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        width: 78,
+                        child: LinearProgressIndicator(
+                          value: (zoomPercent / 100).clamp(0, 1),
+                          minHeight: 4,
+                          borderRadius: BorderRadius.circular(999),
+                          backgroundColor: colorScheme.onSurface.withValues(
+                            alpha: 0.14,
+                          ),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 10,
+              bottom: 12,
+              child: Material(
+                color: colorScheme.surface.withValues(alpha: 0.9),
+                shape: const CircleBorder(),
+                elevation: 3,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _recenterToUserPosition,
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Icon(
+                      Icons.my_location_rounded,
+                      size: 20,
+                      color: colorScheme.primary,
                     ),
                   ),
                 ),
-                ...mapArtisans.map(_buildArtisanMarker),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Marker> _buildMarkers({
+    required LatLng center,
+    required List<_MapCluster> clusters,
+    required Color markerColor,
+    required bool isPartialCount,
+    required String? selectedArtisanId,
+  }) {
+    final key = _buildMarkersCacheKey(
+      center,
+      clusters,
+      markerColor,
+      isPartialCount,
+      selectedArtisanId,
+    );
+    if (key == _cachedMarkersKey && _cachedMarkers.isNotEmpty) {
+      return _cachedMarkers;
+    }
+
+    final markers = <Marker>[
+      ...clusters.map(
+        (cluster) => _buildClusterMarker(
+          cluster,
+          markerColor,
+          isPartialCount,
+          selectedArtisanId,
+        ),
+      ),
+      _buildUserLocationMarker(center, markerColor),
+    ];
+
+    _cachedMarkersKey = key;
+    _cachedMarkers = List<Marker>.unmodifiable(markers);
+    return _cachedMarkers;
+  }
+
+  String _buildMarkersCacheKey(
+    LatLng center,
+    List<_MapCluster> clusters,
+    Color markerColor,
+    bool isPartialCount,
+    String? selectedArtisanId,
+  ) {
+    final buff = StringBuffer()
+      ..write(center.latitude.toStringAsFixed(5))
+      ..write(':')
+      ..write(center.longitude.toStringAsFixed(5))
+      ..write(':')
+      ..write(_currentMapZoom.toStringAsFixed(2))
+      ..write(':')
+      ..write(markerColor.toARGB32())
+      ..write(':')
+      ..write(isPartialCount ? 'p' : 'f')
+      ..write(':')
+      ..write(selectedArtisanId ?? '-');
+
+    for (final cluster in clusters) {
+      buff
+        ..write('|')
+        ..write(cluster.count)
+        ..write('@')
+        ..write(cluster.center.latitude.toStringAsFixed(4))
+        ..write(',')
+        ..write(cluster.center.longitude.toStringAsFixed(4));
+      if (!cluster.isCluster) {
+        buff
+          ..write('#')
+          ..write(cluster.artisans.first.userId);
+      }
+    }
+
+    return buff.toString();
+  }
+
+  List<_MapCluster> _clusterArtisans(List<ArtisanModel> artisans, double zoom) {
+    if (artisans.isEmpty) {
+      return const [];
+    }
+
+    final cellSize = _clusterCellSizeForZoom(zoom);
+    if (cellSize <= 0) {
+      return _expandExactOverlaps(artisans, zoom);
+    }
+
+    final buckets = <String, List<ArtisanModel>>{};
+    for (final artisan in artisans) {
+      final lat = artisan.latitude!;
+      final lng = artisan.longitude!;
+      final key = '${(lat / cellSize).floor()}:${(lng / cellSize).floor()}';
+      buckets.putIfAbsent(key, () => <ArtisanModel>[]).add(artisan);
+    }
+
+    return buckets.values
+        .map((group) {
+          if (group.length == 1) {
+            final artisan = group.first;
+            return _MapCluster(
+              center: LatLng(artisan.latitude!, artisan.longitude!),
+              artisans: group,
+            );
+          }
+
+          var latSum = 0.0;
+          var lngSum = 0.0;
+          for (final artisan in group) {
+            latSum += artisan.latitude!;
+            lngSum += artisan.longitude!;
+          }
+
+          return _MapCluster(
+            center: LatLng(latSum / group.length, lngSum / group.length),
+            artisans: group,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  List<_MapCluster> _expandExactOverlaps(
+    List<ArtisanModel> artisans,
+    double zoom,
+  ) {
+    final groupedByCoordinate = <String, List<ArtisanModel>>{};
+
+    for (final artisan in artisans) {
+      final key =
+          '${artisan.latitude!.toStringAsFixed(6)}:${artisan.longitude!.toStringAsFixed(6)}';
+      groupedByCoordinate.putIfAbsent(key, () => <ArtisanModel>[]).add(artisan);
+    }
+
+    final expanded = <_MapCluster>[];
+    for (final group in groupedByCoordinate.values) {
+      if (group.length == 1) {
+        final artisan = group.first;
+        expanded.add(
+          _MapCluster(
+            center: LatLng(artisan.latitude!, artisan.longitude!),
+            artisans: [artisan],
+          ),
+        );
+        continue;
+      }
+
+      final centerLat = group.first.latitude!;
+      final centerLng = group.first.longitude!;
+      final radius = _overlapSpreadRadiusDegrees(zoom, group.length);
+      final latCos = math.cos(centerLat * math.pi / 180).abs();
+      final safeLngDivisor = latCos < 0.2 ? 0.2 : latCos;
+
+      for (var i = 0; i < group.length; i++) {
+        final angle = (2 * math.pi * i) / group.length;
+        final latOffset = math.sin(angle) * radius;
+        final lngOffset = (math.cos(angle) * radius) / safeLngDivisor;
+
+        expanded.add(
+          _MapCluster(
+            center: LatLng(centerLat + latOffset, centerLng + lngOffset),
+            artisans: [group[i]],
+          ),
+        );
+      }
+    }
+
+    return expanded;
+  }
+
+  double _overlapSpreadRadiusDegrees(double zoom, int groupSize) {
+    final zoomFactor = (_maxMapZoom / zoom).clamp(1.0, 1.35);
+    final countFactor = 1 + ((groupSize - 2).clamp(0, 8) * 0.16);
+    return 0.00010 * zoomFactor * countFactor;
+  }
+
+  List<ArtisanModel> _deduplicateArtisansByUserId(List<ArtisanModel> artisans) {
+    final seen = <String>{};
+    final unique = <ArtisanModel>[];
+
+    for (final artisan in artisans) {
+      if (artisan.userId.isEmpty) {
+        continue;
+      }
+      if (seen.add(artisan.userId)) {
+        unique.add(artisan);
+      }
+    }
+
+    return unique;
+  }
+
+  double _clusterCellSizeForZoom(double zoom) {
+    if (zoom >= 14.5) return 0;
+    if (zoom >= 13) return 0.008;
+    if (zoom >= 11.5) return 0.015;
+    if (zoom >= 10) return 0.025;
+    return 0.05;
+  }
+
+  Marker _buildClusterMarker(
+    _MapCluster cluster,
+    Color markerColor,
+    bool isPartialCount,
+    String? selectedArtisanId,
+  ) {
+    if (!cluster.isCluster) {
+      return _buildArtisanMarker(
+        cluster.artisans.first,
+        markerColor,
+        isSelected: selectedArtisanId == cluster.artisans.first.userId,
+      );
+    }
+
+    return Marker(
+      width: 52,
+      height: 52,
+      point: cluster.center,
+      child: InkWell(
+        onTap: () {
+          if (_selectedMapArtisanId != null) {
+            setState(() {
+              _selectedMapArtisanId = null;
+              _cachedMarkersKey = '';
+            });
+          }
+
+          if (_currentMapZoom >= (_maxMapZoom - 0.05)) {
+            return;
+          }
+
+          final targetZoom = (_currentMapZoom + _clusterTapZoomStep)
+              .clamp(_minMapZoom, _maxMapZoom)
+              .toDouble();
+          _mapController.move(cluster.center, targetZoom);
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: markerColor,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2.2),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x33000000),
+                blurRadius: 7,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            '${cluster.count}${isPartialCount ? '+' : ''}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  double _zoomUsagePercent(double zoom) {
+    final span = _maxMapZoom - _minMapZoom;
+    if (span <= 0) return 100;
+    final normalized = ((zoom - _minMapZoom) / span).clamp(0, 1);
+    return normalized * 100;
+  }
+
+  void _scheduleMapPrefetch(SearchState searchState) {
+    if (!searchState.hasMore ||
+        searchState.isLoading ||
+        searchState.isLoadingMore) {
+      return;
+    }
+
+    Future.microtask(() {
+      if (!mounted || !_showMap) return;
+      ref
+          .read(searchProvider.notifier)
+          .loadMore(latitude: _latitude, longitude: _longitude);
+    });
+  }
+
+  Marker _buildArtisanMarker(
+    ArtisanModel artisan,
+    Color markerColor, {
+    required bool isSelected,
+  }) {
+    final point = LatLng(artisan.latitude!, artisan.longitude!);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Marker(
+      width: isSelected ? 196 : 42,
+      height: isSelected ? 148 : 42,
+      point: point,
+      child: SizedBox.expand(
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            if (isSelected)
+              Positioned(
+                bottom: 50,
+                child: _buildMapArtisanPreviewCard(
+                  artisan,
+                  colorScheme,
+                  markerColor,
+                ),
+              ),
+            InkWell(
+              onTap: () => _handleArtisanMarkerTap(artisan),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: markerColor, width: 1.8),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.handyman_rounded,
+                  size: 20,
+                  color: markerColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _handleArtisanMarkerTap(ArtisanModel artisan) {
+    if (_selectedMapArtisanId == artisan.userId) {
+      context.push('/client/artisan/${artisan.userId}');
+      return;
+    }
+
+    setState(() {
+      _selectedMapArtisanId = artisan.userId;
+      _cachedMarkersKey = '';
+    });
+  }
+
+  Widget _buildMapArtisanPreviewCard(
+    ArtisanModel artisan,
+    ColorScheme colorScheme,
+    Color accentColor,
+  ) {
+    final fullName = '${artisan.firstName} ${artisan.lastName}'.trim();
+    final categoryText =
+        artisan.displayCategory ?? artisan.categoryName ?? 'Categorie';
+    final subcategoryText = artisan.displayTrade;
+    final distanceText = artisan.distance == null
+        ? '-- km'
+        : '${artisan.distance!.toStringAsFixed(1)} km';
+    final profilePhotoUrl = _safeHttpImageUrl(artisan.profilePhotoUrl);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => _handleArtisanMarkerTap(artisan),
+      child: Container(
+        width: 176,
+        padding: const EdgeInsets.fromLTRB(8, 7, 8, 6),
+        decoration: BoxDecoration(
+          color: colorScheme.surface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x26000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  backgroundImage: profilePhotoUrl != null
+                      ? NetworkImage(profilePhotoUrl)
+                      : null,
+                  child: profilePhotoUrl == null
+                      ? Icon(
+                          Icons.person,
+                          size: 14,
+                          color: colorScheme.onSurfaceVariant,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Text(
+                    fullName.isEmpty ? 'Artisan' : fullName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$categoryText • $subcategoryText',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                Icon(
+                  Icons.star_rounded,
+                  size: 13,
+                  color: Colors.amber.shade700,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  artisan.averageRating.toStringAsFixed(1),
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _statusPill(
+                  label: 'C',
+                  active: artisan.isCertified,
+                  accentColor: accentColor,
+                  colorScheme: colorScheme,
+                ),
+                const SizedBox(width: 4),
+                _statusPill(
+                  label: 'V',
+                  active: artisan.isVerified,
+                  accentColor: accentColor,
+                  colorScheme: colorScheme,
+                ),
+                const Spacer(),
+                Text(
+                  distanceText,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ],
@@ -769,39 +1335,185 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Marker _buildArtisanMarker(ArtisanModel artisan) {
-    final point = LatLng(artisan.latitude!, artisan.longitude!);
-
-    return Marker(
-      width: 42,
-      height: 42,
-      point: point,
-      child: InkWell(
-        onTap: () => context.push('/client/artisan/${artisan.userId}'),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary,
-              width: 1.5,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Icon(
-            Icons.handyman_rounded,
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+  Widget _statusPill({
+    required String label,
+    required bool active,
+    required Color accentColor,
+    required ColorScheme colorScheme,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.8),
+      decoration: BoxDecoration(
+        color: active
+            ? accentColor.withValues(alpha: 0.2)
+            : colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        active ? label : '$label-',
+        style: TextStyle(
+          color: active ? accentColor : colorScheme.onSurfaceVariant,
+          fontSize: 9.6,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
+  }
+
+  Marker _buildUserLocationMarker(LatLng center, Color markerColor) {
+    return Marker(
+      width: 56,
+      height: 56,
+      point: center,
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: markerColor.withValues(alpha: 0.2),
+              ),
+            ),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.95),
+                border: Border.all(color: markerColor, width: 2.4),
+              ),
+            ),
+            Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: markerColor,
+                border: Border.all(color: Colors.white, width: 1.2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _recenterToUserPosition() async {
+    if (_locationLoading) {
+      return;
+    }
+
+    final previousLatitude = _latitude;
+    final previousLongitude = _longitude;
+
+    final freshSnapshot = await _locationService.getCurrentLocation(
+      fallbackToAbidjan: false,
+      timeout: const Duration(seconds: 8),
+    );
+    if (freshSnapshot != null) {
+      _latitude = freshSnapshot.latitude;
+      _longitude = freshSnapshot.longitude;
+    }
+
+    if (_latitude == null || _longitude == null) {
+      await _initLocation();
+      if (!mounted || _latitude == null || _longitude == null) {
+        return;
+      }
+    }
+
+    final target = LatLng(_latitude!, _longitude!);
+    final targetZoom = _currentMapZoom.clamp(_initialMapZoom, _maxMapZoom);
+    _mapController.move(target, targetZoom);
+
+    final shouldRefreshSearch = _hasLocationChangedSignificantly(
+      previousLatitude: previousLatitude,
+      previousLongitude: previousLongitude,
+      currentLatitude: _latitude,
+      currentLongitude: _longitude,
+    );
+
+    if (shouldRefreshSearch) {
+      _search(silent: true, forceRefresh: true);
+    }
+
+    setState(() => _cachedMarkersKey = '');
+  }
+
+  bool _hasLocationChangedSignificantly({
+    required double? previousLatitude,
+    required double? previousLongitude,
+    required double? currentLatitude,
+    required double? currentLongitude,
+  }) {
+    if (previousLatitude == null ||
+        previousLongitude == null ||
+        currentLatitude == null ||
+        currentLongitude == null) {
+      return true;
+    }
+
+    final latDelta = (previousLatitude - currentLatitude).abs();
+    final lngDelta = (previousLongitude - currentLongitude).abs();
+
+    // ~55m threshold at equator to avoid noisy re-searches.
+    return latDelta > 0.0005 || lngDelta > 0.0005;
+  }
+
+  String? _safeHttpImageUrl(String? raw) {
+    final value = raw?.trim();
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+
+    final parsed = Uri.tryParse(value);
+    if (parsed == null) {
+      return null;
+    }
+
+    final scheme = parsed.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') {
+      return null;
+    }
+
+    return value;
+  }
+
+  void _search({bool silent = false, bool forceRefresh = false}) {
+    final queryText = _searchCtrl.text.trim();
+    final categories = ref.read(categoriesProvider).categories;
+    final resolved = _resolveQueryFilters(
+      categories,
+      queryText,
+      _selectedCategoryId,
+      _selectedSubcategoryId,
+    );
+
+    final effectiveCategoryId = resolved.categoryId;
+    final effectiveSubcategoryId = resolved.subcategoryId;
+
+    _mapRealtimeService.updateFilterRooms(
+      categoryId: effectiveCategoryId,
+      subcategoryId: effectiveSubcategoryId,
+    );
+
+    ref
+        .read(searchProvider.notifier)
+        .search(
+          latitude: _latitude,
+          longitude: _longitude,
+          radius: _radius,
+          categoryId: effectiveCategoryId,
+          subcategoryId: effectiveSubcategoryId,
+          query: queryText.isNotEmpty ? queryText : null,
+          sortBy: _sortBy,
+          minRating: _minRating,
+          silent: silent,
+          forceRefresh: forceRefresh,
+        );
   }
 
   void _showFilters() {
@@ -1027,6 +1739,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
     );
   }
+}
+
+class _MapCluster {
+  final LatLng center;
+  final List<ArtisanModel> artisans;
+
+  const _MapCluster({required this.center, required this.artisans});
+
+  bool get isCluster => artisans.length > 1;
+  int get count => artisans.length;
 }
 
 class _SheetPickerOption {
