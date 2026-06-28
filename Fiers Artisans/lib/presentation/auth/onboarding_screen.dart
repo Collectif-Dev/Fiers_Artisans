@@ -45,78 +45,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final themeMode = ref.watch(themeProvider);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Theme & Language selectors
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Theme toggle
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _ThemeOption(
-                          icon: Icons.brightness_auto_rounded,
-                          label: 'theme.system'.tr(),
-                          isSelected: themeMode == ThemeMode.system,
-                          onTap: () =>
-                              ref.read(themeProvider.notifier).setSystem(),
-                        ),
-                        const SizedBox(width: 12),
-                        _ThemeOption(
-                          icon: Icons.dark_mode_rounded,
-                          label: 'theme.dark'.tr(),
-                          isSelected: themeMode == ThemeMode.dark,
-                          onTap: () =>
-                              ref.read(themeProvider.notifier).setDark(),
-                        ),
-                        const SizedBox(width: 12),
-                        _ThemeOption(
-                          icon: Icons.light_mode_rounded,
-                          label: 'theme.light'.tr(),
-                          isSelected: themeMode == ThemeMode.light,
-                          onTap: () =>
-                              ref.read(themeProvider.notifier).setLight(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Language toggle
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _LanguageOption(
-                        flag: '🇫🇷',
-                        label: 'FR',
-                        isSelected:
-                            context.locale.languageCode == 'fr',
-                        onTap: () => ref
-                            .read(localeProvider.notifier)
-                            .setFrench(context),
-                      ),
-                      const SizedBox(width: 12),
-                      _LanguageOption(
-                        flag: '🇬🇧',
-                        label: 'EN',
-                        isSelected:
-                            context.locale.languageCode == 'en',
-                        onTap: () => ref
-                            .read(localeProvider.notifier)
-                            .setEnglish(context),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
             // PageView
             Expanded(
               child: PageView.builder(
@@ -193,13 +126,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   if (_currentPage == _pages.length - 1)
                     AppButton(
                       text: 'onboarding.get_started'.tr(),
-                      onPressed: _completeOnboarding,
+                      onPressed: () {
+                        _completeOnboarding();
+                      },
                     )
                   else
                     Row(
                       children: [
                         TextButton(
-                          onPressed: _completeOnboarding,
+                          onPressed: () {
+                            _completeOnboarding();
+                          },
                           child: Text('onboarding.skip'.tr()),
                         ),
                         const Spacer(),
@@ -224,8 +161,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  void _completeOnboarding() {
-    ref.read(onboardingCompletedProvider.notifier).complete();
+  Future<void> _completeOnboarding() async {
+    await ref.read(onboardingCompletedProvider.notifier).complete();
+    if (!mounted) {
+      return;
+    }
     context.go('/login');
   }
 }
@@ -240,111 +180,4 @@ class _OnboardingPage {
     required this.title,
     required this.subtitle,
   });
-}
-
-class _ThemeOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _ThemeOption({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppConstants.animNormal,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : theme.cardTheme.color,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : theme.dividerColor,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                size: 20,
-                color: isSelected
-                    ? theme.colorScheme.primary
-                    : theme.iconTheme.color),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isSelected ? theme.colorScheme.primary : null,
-                fontWeight: isSelected ? FontWeight.w600 : null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LanguageOption extends StatelessWidget {
-  final String flag;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _LanguageOption({
-    required this.flag,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: AppConstants.animNormal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : theme.cardTheme.color,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : theme.dividerColor,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(flag, style: const TextStyle(fontSize: 18)),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: isSelected ? FontWeight.w600 : null,
-                color: isSelected ? theme.colorScheme.primary : null,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../config/constants.dart';
 import '../presentation/auth/onboarding_screen.dart';
 import '../presentation/auth/login_screen.dart';
 import '../presentation/auth/register_choice_screen.dart';
@@ -54,14 +56,31 @@ CustomTransitionPage<void> _buildTransition(
   );
 }
 
+Future<bool> _isOnboardingCompleted() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool(AppConstants.keyOnboardingCompleted) ?? false;
+}
+
+Future<String> _resolveLaunchPath() async {
+  final completed = await _isOnboardingCompleted();
+  return completed ? '/login' : '/onboarding';
+}
+
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/onboarding',
+  initialLocation: '/',
   routes: [
-    GoRoute(path: '/', redirect: (context, state) => '/onboarding'),
+    GoRoute(
+      path: '/',
+      redirect: (context, state) async => _resolveLaunchPath(),
+    ),
 
     // Onboarding
     GoRoute(
       path: '/onboarding',
+      redirect: (context, state) async {
+        final completed = await _isOnboardingCompleted();
+        return completed ? '/login' : null;
+      },
       pageBuilder: (context, state) => _buildTransition(
         state,
         const OnboardingScreen(),
@@ -72,21 +91,37 @@ final GoRouter appRouter = GoRouter(
     // Auth
     GoRoute(
       path: '/login',
+      redirect: (context, state) async {
+        final completed = await _isOnboardingCompleted();
+        return completed ? null : '/onboarding';
+      },
       pageBuilder: (context, state) =>
           _buildTransition(state, const LoginScreen()),
     ),
     GoRoute(
       path: '/register',
+      redirect: (context, state) async {
+        final completed = await _isOnboardingCompleted();
+        return completed ? null : '/onboarding';
+      },
       pageBuilder: (context, state) =>
           _buildTransition(state, const RegisterChoiceScreen()),
     ),
     GoRoute(
       path: '/register/artisan',
+      redirect: (context, state) async {
+        final completed = await _isOnboardingCompleted();
+        return completed ? null : '/onboarding';
+      },
       pageBuilder: (context, state) =>
           _buildTransition(state, const RegisterArtisanScreen()),
     ),
     GoRoute(
       path: '/register/client',
+      redirect: (context, state) async {
+        final completed = await _isOnboardingCompleted();
+        return completed ? null : '/onboarding';
+      },
       pageBuilder: (context, state) =>
           _buildTransition(state, const RegisterClientScreen()),
     ),

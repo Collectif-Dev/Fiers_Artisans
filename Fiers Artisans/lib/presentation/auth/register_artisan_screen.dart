@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/categories_provider.dart';
 import '../../data/models/category_model.dart';
 import '../../services/location_service.dart';
+import 'widgets/auth_preferences_bar.dart';
 import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 import '../common/pin_code_field.dart';
@@ -204,7 +205,15 @@ class _RegisterArtisanScreenState extends ConsumerState<RegisterArtisanScreen> {
         selectedCategory?.subcategories ?? const [];
 
     return Scaffold(
-      appBar: AppBar(title: Text('auth.artisan'.tr())),
+      appBar: AppBar(
+        title: Text('auth.artisan'.tr()),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: AuthPreferencesBar(compact: true),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),

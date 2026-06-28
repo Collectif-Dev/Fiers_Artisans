@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
+import 'widgets/auth_preferences_bar.dart';
 
 class RegisterChoiceScreen extends StatelessWidget {
   const RegisterChoiceScreen({super.key});
@@ -14,6 +15,12 @@ class RegisterChoiceScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('auth.register'.tr()),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: AuthPreferencesBar(compact: true),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(

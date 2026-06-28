@@ -7,6 +7,7 @@ import '../../config/theme.dart';
 import '../../core/utils/phone_number.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/location_service.dart';
+import 'widgets/auth_preferences_bar.dart';
 import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 import '../common/pin_code_field.dart';
@@ -160,7 +161,15 @@ class _RegisterClientScreenState extends ConsumerState<RegisterClientScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('auth.client'.tr())),
+      appBar: AppBar(
+        title: Text('auth.client'.tr()),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: AuthPreferencesBar(compact: true),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),

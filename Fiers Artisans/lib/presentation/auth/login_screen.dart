@@ -8,6 +8,7 @@ import '../../config/theme.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/utils/phone_number.dart';
 import '../../providers/auth_provider.dart';
+import 'widgets/auth_preferences_bar.dart';
 import '../common/app_snackbar.dart';
 import '../common/app_button.dart';
 import '../common/pin_code_field.dart';
@@ -183,6 +184,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: AuthPreferencesBar(compact: true),
+                ),
                 const SizedBox(height: 40),
                 // Header
                 Center(
