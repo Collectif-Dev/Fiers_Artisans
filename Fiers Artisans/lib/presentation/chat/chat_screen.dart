@@ -13,6 +13,7 @@ import '../common/app_snackbar.dart';
 class ChatScreen extends ConsumerStatefulWidget {
   final String conversationId;
   final String? participantName;
+  final String? participantId;
   final String? participantAvatarUrl;
   final String? participantRole;
   final bool? participantIsAvailable;
@@ -21,6 +22,7 @@ class ChatScreen extends ConsumerStatefulWidget {
     super.key,
     required this.conversationId,
     this.participantName,
+    this.participantId,
     this.participantAvatarUrl,
     this.participantRole,
     this.participantIsAvailable,
@@ -35,18 +37,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _scrollCtrl = ScrollController();
   static final RegExp _conversationIdPattern = RegExp(r'^[a-fA-F0-9]{24}$');
   String? _currentUserId;
+  String? _activeConversationId;
   int _lastMessageCount = 0;
   bool _invalidConversationId = false;
+  bool _isSending = false;
 
   @override
   void initState() {
     super.initState();
     final conversationId = widget.conversationId.trim();
-    if (!_conversationIdPattern.hasMatch(conversationId)) {
-      _invalidConversationId = true;
+    if (_conversationIdPattern.hasMatch(conversationId)) {
+      _activeConversationId = conversationId;
+      Future.microtask(_bootstrapConversation);
       return;
     }
-    Future.microtask(_bootstrapConversation);
+
+    final participantId = widget.participantId?.trim() ?? '';
+    if (participantId.isNotEmpty) {
+      _activeConversationId = null;
+      return;
+    }
+
+    _invalidConversationId = true;
   }
 
   Future<void> _bootstrapConversation() async {
@@ -60,9 +72,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!mounted) return;
     setState(() {});
 
+    final conversationId = _activeConversationId;
+    if (conversationId == null) return;
+
     final notifier = ref.read(chatProvider.notifier);
-    await notifier.loadMessages(widget.conversationId);
-    await notifier.markAsRead(widget.conversationId);
+    await notifier.loadMessages(conversationId);
+    await notifier.markAsRead(conversationId);
     _scrollToBottom();
   }
 
@@ -88,8 +103,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final chatState = ref.watch(chatProvider);
-    final messages = chatState.messagesFor(widget.conversationId);
-    final conversation = chatState.conversationById(widget.conversationId);
+    final activeConversationId = _activeConversationId;
+    final messages = activeConversationId == null
+        ? const <MessageModel>[]
+        : chatState.messagesFor(activeConversationId);
+    final conversation = activeConversationId == null
+        ? null
+        : chatState.conversationById(activeConversationId);
     final hasKnownConversation = conversation != null;
 
     final resolvedName =
@@ -116,7 +136,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         resolvedParticipantIsAvailable == false;
 
     final isConversationLoading =
-        chatState.isMessagesLoading(widget.conversationId) && messages.isEmpty;
+        activeConversationId != null &&
+        chatState.isMessagesLoading(activeConversationId) &&
+        messages.isEmpty;
 
     if (_invalidConversationId) {
       return Scaffold(
@@ -323,6 +345,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _messageCtrl,
+                      enabled: !_isSending,
                       decoration: InputDecoration(
                         hintText: 'chat.type_message'.tr(),
                         border: InputBorder.none,
@@ -339,7 +362,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       Icons.send_rounded,
                       color: theme.colorScheme.primary,
                     ),
-                    onPressed: _send,
+                    onPressed: _isSending ? null : _send,
                   ),
                 ],
               ),
@@ -352,6 +375,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _send() async {
     if (_invalidConversationId) return;
+    if (_isSending) return;
+
     final text = _messageCtrl.text.trim();
     if (text.isEmpty) return;
 
@@ -362,32 +387,76 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return;
     }
 
-    _messageCtrl.clear();
+    setState(() => _isSending = true);
 
-    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
-
-    // Optimistic: add message to local list immediately
-    final optimistic = MessageModel(
-      id: tempId,
-      conversationId: widget.conversationId,
-      senderId: _currentUserId!,
-      content: text,
-      createdAt: DateTime.now(),
-    );
-    ref.read(chatProvider.notifier).addMessage(optimistic);
-    _scrollToBottom();
-
-    // Send via REST — replace temp on success, remove on failure
     try {
-      await ref
-          .read(chatProvider.notifier)
-          .sendMessage(
-            conversationId: widget.conversationId,
-            content: text,
-            tempId: tempId,
+      var conversationId = _activeConversationId;
+      if (conversationId == null) {
+        final participantId = widget.participantId?.trim() ?? '';
+        if (participantId.isEmpty) {
+          if (!mounted) return;
+          AppSnackBar.show(context, message: 'chat.start_error'.tr());
+          return;
+        }
+
+        try {
+          final convo = await ref
+              .read(chatProvider.notifier)
+              .createConversation(participantId);
+          if (!mounted) return;
+          setState(() {
+            _activeConversationId = convo.id;
+            _lastMessageCount = 0;
+          });
+          conversationId = convo.id;
+
+          final queryParams = Map<String, String>.from(
+            GoRouterState.of(context).uri.queryParameters,
+          )..remove('participantId');
+          final query = Uri(
+            queryParameters: queryParams.isEmpty ? null : queryParams,
+          ).query;
+          context.replace(
+            query.isEmpty ? '/chat/${convo.id}' : '/chat/${convo.id}?$query',
           );
-    } catch (_) {
-      ref.read(chatProvider.notifier).removeMessage(tempId);
+        } catch (_) {
+          if (!mounted) return;
+          AppSnackBar.show(context, message: 'chat.start_error'.tr());
+          return;
+        }
+      }
+
+      _messageCtrl.clear();
+
+      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+
+      // Optimistic: add message to local list immediately
+      final optimistic = MessageModel(
+        id: tempId,
+        conversationId: conversationId,
+        senderId: _currentUserId!,
+        content: text,
+        createdAt: DateTime.now(),
+      );
+      ref.read(chatProvider.notifier).addMessage(optimistic);
+      _scrollToBottom();
+
+      // Send via REST — replace temp on success, remove on failure
+      try {
+        await ref
+            .read(chatProvider.notifier)
+            .sendMessage(
+              conversationId: conversationId,
+              content: text,
+              tempId: tempId,
+            );
+      } catch (_) {
+        ref.read(chatProvider.notifier).removeMessage(tempId);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
     }
   }
 

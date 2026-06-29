@@ -8,6 +8,7 @@ import '../presentation/auth/login_screen.dart';
 import '../presentation/auth/register_choice_screen.dart';
 import '../presentation/auth/register_artisan_screen.dart';
 import '../presentation/auth/register_client_screen.dart';
+import '../presentation/auth/forgot_pin_phone_screen.dart';
 import '../presentation/auth/otp_verification_screen.dart';
 import '../presentation/auth/pin_setup_screen.dart';
 import '../presentation/client/client_dashboard.dart';
@@ -133,6 +134,11 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: '/forgot-pin',
+      pageBuilder: (context, state) =>
+          _buildTransition(state, const ForgotPinPhoneScreen()),
+    ),
+    GoRoute(
       path: '/setup-pin',
       pageBuilder: (context, state) => _buildTransition(
         state,
@@ -226,6 +232,7 @@ final GoRouter appRouter = GoRouter(
         ChatScreen(
           conversationId: state.pathParameters['conversationId']!,
           participantName: state.uri.queryParameters['name'],
+          participantId: state.uri.queryParameters['participantId'],
           participantAvatarUrl: state.uri.queryParameters['avatar'],
           participantRole: state.uri.queryParameters['participantRole'],
           participantIsAvailable:

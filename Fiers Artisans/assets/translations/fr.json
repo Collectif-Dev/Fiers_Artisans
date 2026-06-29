@@ -45,6 +45,7 @@
     "city": "Ville",
     "commune": "Commune",
     "forgot_password": "Mot de passe oublié ?",
+    "forgot_pin": "Code PIN oublié ?",
     "no_account": "Pas encore de compte ?",
     "has_account": "Déjà un compte ?",
     "register_as": "S'inscrire en tant que",
@@ -64,10 +65,22 @@
     "description": "Description",
     "pin_setup": {
       "title": "Configurer votre code PIN",
-      "subtitle": "Votre compte utilise l'ancienne méthode. Entrez le code OTP reçu au {phone} puis définissez un PIN à 5 chiffres.",
+      "subtitle": "Entrez le code OTP reçu au {phone}, puis définissez un nouveau code PIN à 5 chiffres.",
       "otp_label": "Code OTP",
+      "new_pin_label": "Entrez votre nouveau code PIN",
       "otp_6_digits": "Le code OTP doit contenir 6 chiffres.",
       "cta": "Activer mon PIN"
+    },
+    "forgot_pin_flow": {
+      "title": "Réinitialiser mon code PIN",
+      "subtitle": "Saisissez le numéro utilisé lors de votre inscription.",
+      "attestation": "J'atteste que ce numéro m'appartient et que je demande cette réinitialisation.",
+      "attestation_required": "Veuillez confirmer que ce numéro vous appartient.",
+      "confirm_title": "Confirmer le numéro",
+      "confirm_message": "Vous allez réinitialiser le code PIN du numéro {phone}. Confirmez-vous ?",
+      "confirm_edit": "Modifier",
+      "confirm_continue": "Confirmer",
+      "cta": "Continuer"
     },
     "otp": {
       "title": "Vérification",

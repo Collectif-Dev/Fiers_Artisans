@@ -11,7 +11,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../config/app_config.dart';
-import '../../providers/chat_provider.dart';
 import '../../providers/artisan_provider.dart';
 import '../../providers/favorites_provider.dart';
 import '../../core/utils/formatters.dart';
@@ -35,7 +34,6 @@ class ArtisanProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
-  bool _isOpeningChat = false;
   final ScrollController _portfolioScrollController = ScrollController();
   Timer? _portfolioAutoScrollTimer;
   Timer? _portfolioAutoScrollResumeTimer;
@@ -378,7 +376,6 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
                       final chatButton = AppButton(
                         text: 'artisan.contact.chat'.tr(),
                         icon: Icons.chat_bubble_outline,
-                        isLoading: _isOpeningChat,
                         onPressed: () => _openChatWithArtisan(
                           participantUserId: artisan.userId,
                           participantName: artisan.fullName,
@@ -777,35 +774,23 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
     String? participantRole,
     bool? participantIsAvailable,
   }) async {
-    if (_isOpeningChat) return;
-    setState(() => _isOpeningChat = true);
-    try {
-      final convo = await ref
-          .read(chatProvider.notifier)
-          .createConversation(participantUserId);
-      if (!mounted) return;
-      final queryParams = <String, String>{'name': participantName};
-      final role = participantRole?.trim();
-      if (role != null && role.isNotEmpty) {
-        queryParams['participantRole'] = role;
-      }
-      if (participantIsAvailable != null) {
-        queryParams['participantIsAvailable'] = '$participantIsAvailable';
-      }
-      final avatar = participantAvatarUrl?.trim();
-      if (avatar != null && avatar.isNotEmpty) {
-        queryParams['avatar'] = avatar;
-      }
-      final query = Uri(queryParameters: queryParams).query;
-      context.push('/chat/${convo.id}?$query');
-    } catch (_) {
-      if (!mounted) return;
-      AppSnackBar.show(context, message: 'chat.start_error'.tr());
-    } finally {
-      if (mounted) {
-        setState(() => _isOpeningChat = false);
-      }
+    final queryParams = <String, String>{
+      'name': participantName,
+      'participantId': participantUserId,
+    };
+    final role = participantRole?.trim();
+    if (role != null && role.isNotEmpty) {
+      queryParams['participantRole'] = role;
     }
+    if (participantIsAvailable != null) {
+      queryParams['participantIsAvailable'] = '$participantIsAvailable';
+    }
+    final avatar = participantAvatarUrl?.trim();
+    if (avatar != null && avatar.isNotEmpty) {
+      queryParams['avatar'] = avatar;
+    }
+    final query = Uri(queryParameters: queryParams).query;
+    context.push('/chat/new?$query');
   }
 
   Future<void> _toggleFavorite(ArtisanModel artisan) async {

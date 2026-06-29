@@ -166,6 +166,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void _startForgotPinFlow() {
+    _dismissKeyboard();
+    context.push('/forgot-pin');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -267,6 +272,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     }
                     return null;
                   },
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    onPressed: _isLoading ? null : _startForgotPinFlow,
+                    child: Text('auth.forgot_pin'.tr()),
+                  ),
                 ),
                 const SizedBox(height: 32),
 

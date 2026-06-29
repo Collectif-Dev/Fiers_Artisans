@@ -163,7 +163,7 @@ class _PinSetupScreenState extends ConsumerState<PinSetupScreen> {
                 const SizedBox(height: 16),
                 AppTextField(
                   controller: _pinCtrl,
-                  label: 'auth.pin'.tr(),
+                  label: 'auth.pin_setup.new_pin_label'.tr(),
                   hint: '•••••',
                   prefixIcon: Icons.lock_outline,
                   obscureText: true,

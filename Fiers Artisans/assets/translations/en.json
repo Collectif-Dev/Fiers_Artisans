@@ -45,6 +45,7 @@
     "city": "City",
     "commune": "District",
     "forgot_password": "Forgot password?",
+    "forgot_pin": "Forgot PIN code?",
     "no_account": "Don't have an account?",
     "has_account": "Already have an account?",
     "register_as": "Register as",
@@ -64,10 +65,22 @@
     "description": "Description",
     "pin_setup": {
       "title": "Set up your PIN",
-      "subtitle": "Your account still uses the legacy method. Enter the OTP sent to {phone}, then define your 5-digit PIN.",
+      "subtitle": "Enter the OTP sent to {phone}, then set a new 5-digit PIN code.",
       "otp_label": "OTP code",
+      "new_pin_label": "Enter your new PIN code",
       "otp_6_digits": "OTP must be exactly 6 digits.",
       "cta": "Enable my PIN"
+    },
+    "forgot_pin_flow": {
+      "title": "Reset my PIN code",
+      "subtitle": "Enter the phone number used during your registration.",
+      "attestation": "I confirm that this phone number belongs to me and I request this reset.",
+      "attestation_required": "Please confirm that this phone number belongs to you.",
+      "confirm_title": "Confirm number",
+      "confirm_message": "You are about to reset the PIN code for {phone}. Do you confirm?",
+      "confirm_edit": "Edit",
+      "confirm_continue": "Confirm",
+      "cta": "Continue"
     },
     "otp": {
       "title": "Verification",
