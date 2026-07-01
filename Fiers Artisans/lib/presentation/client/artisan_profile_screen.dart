@@ -33,7 +33,8 @@ class ArtisanProfileScreen extends ConsumerStatefulWidget {
       _ArtisanProfileScreenState();
 }
 
-class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
+class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen>
+  with WidgetsBindingObserver {
   final ScrollController _portfolioScrollController = ScrollController();
   Timer? _portfolioAutoScrollTimer;
   Timer? _portfolioAutoScrollResumeTimer;
@@ -50,6 +51,7 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       await Future.wait([
         ref.read(artisanDetailProvider.notifier).loadArtisan(widget.userId),
@@ -61,7 +63,16 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(artisanDetailProvider.notifier).loadArtisan(widget.userId);
+      ref.read(favoritesProvider.notifier).refreshFavoriteStatus(widget.userId);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _portfolioAutoScrollTimer?.cancel();
     _portfolioAutoScrollResumeTimer?.cancel();
     _portfolioScrollController.dispose();
@@ -398,6 +409,12 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
                             icon: Icons.message_outlined, // WhatsApp
                             tooltip: 'contact.whatsapp'.tr(),
                             onTap: () => _launchWhatsApp(artisan.phone),
+                          ),
+                          const SizedBox(width: 8),
+                          _ContactIcon(
+                            icon: Icons.sms_outlined,
+                            tooltip: 'contact.sms'.tr(),
+                            onTap: () => _launchSms(artisan.phone),
                           ),
                         ],
                       );
@@ -764,6 +781,41 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen> {
           message: 'artisan.contact.whatsapp_browser_fallback'.tr(),
         );
       }
+    }
+  }
+
+  Future<void> _launchSms(String phone) async {
+    _analytics.logEvent(
+      action: 'CONTACT_CLICK',
+      targetId: widget.userId,
+      metadata: {'method': 'sms'},
+    );
+
+    final normalized = _normalizePhoneWithPrefix(phone);
+    if (normalized.isEmpty) {
+      if (mounted) {
+        AppSnackBar.show(
+          context,
+          message: 'artisan.contact.invalid_phone'.tr(),
+        );
+      }
+      return;
+    }
+
+    final uri = Uri(
+      scheme: 'sms',
+      path: '+$normalized',
+      queryParameters: {'body': 'artisan.contact.sms_prefill'.tr()},
+    );
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      AppSnackBar.show(
+        context,
+        message: kIsWeb
+            ? 'artisan.contact.sms_unavailable_web'.tr()
+            : 'artisan.contact.sms_unavailable'.tr(),
+      );
     }
   }
 

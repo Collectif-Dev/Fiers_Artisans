@@ -14,6 +14,7 @@ import '../../data/models/manual_payment_model.dart';
 import '../../data/repositories/artisan_repository.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/payment_manual_provider.dart';
+import '../../providers/profile_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/verification_provider.dart';
 import '../../providers/chat_provider.dart';
@@ -76,7 +77,9 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
     await _loadAvailability();
     await Future.wait([
       ref.read(subscriptionProvider.notifier).loadStatus(),
-      ref.read(paymentManualProvider.notifier).loadCurrentTransaction(refresh: true),
+      ref
+          .read(paymentManualProvider.notifier)
+          .loadCurrentTransaction(refresh: true),
       ref.read(chatProvider.notifier).loadConversations(),
       ref.read(verificationProvider.notifier).refresh(),
       _syncAvailabilityFromBackend(),
@@ -101,6 +104,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
 
     try {
       await _api.put(ApiEndpoints.artisanProfile, data: {'is_available': val});
+      ref.invalidate(artisanOwnProfileProvider);
       if (val) {
         _syncLocationToBackend();
       }
@@ -108,10 +112,7 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
       await prefs.setBool('artisan_available', previous);
       if (mounted) {
         setState(() => _isAvailable = previous);
-        AppSnackBar.show(
-          context,
-          message: mapException(error).userMessage,
-        );
+        AppSnackBar.show(context, message: mapException(error).userMessage);
       }
     }
   }
@@ -211,7 +212,8 @@ class _ArtisanDashboardState extends ConsumerState<ArtisanDashboard>
         _avgRating = profile.averageRating;
         _totalReviews = profile.totalReviews;
         _experienceYears = profile.experienceYears;
-        _isLocationMissing = profile.latitude == null || profile.longitude == null;
+        _isLocationMissing =
+            profile.latitude == null || profile.longitude == null;
         _categoryName = categoryName;
         _subcategoryName = subcategoryName;
         _businessName = businessName;
@@ -1181,9 +1183,7 @@ class _LocationSyncCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppTheme.warning.withValues(alpha: 0.55),
-          ),
+          border: Border.all(color: AppTheme.warning.withValues(alpha: 0.55)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

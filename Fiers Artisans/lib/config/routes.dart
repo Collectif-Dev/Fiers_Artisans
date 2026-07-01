@@ -24,6 +24,9 @@ import '../presentation/chat/conversations_list.dart';
 import '../presentation/chat/chat_screen.dart';
 import '../presentation/shared/notifications_screen.dart';
 import '../presentation/shared/settings_screen.dart';
+import '../presentation/shared/client_profile_screen.dart';
+import '../presentation/shared/my_artisan_profile_screen.dart';
+import '../presentation/shared/about_screen.dart';
 
 // Shell keys for bottom nav
 final _clientShellKey = GlobalKey<NavigatorState>(debugLabel: 'clientShell');
@@ -251,6 +254,21 @@ final GoRouter appRouter = GoRouter(
       path: '/settings',
       pageBuilder: (context, state) =>
           _buildTransition(state, const SettingsScreen()),
+    ),
+    GoRoute(
+      path: '/profile/client',
+      pageBuilder: (context, state) =>
+          _buildTransition(state, const ClientProfileScreen()),
+    ),
+    GoRoute(
+      path: '/profile/artisan',
+      pageBuilder: (context, state) =>
+          _buildTransition(state, const MyArtisanProfileScreen()),
+    ),
+    GoRoute(
+      path: '/about',
+      pageBuilder: (context, state) =>
+          _buildTransition(state, const AboutScreen()),
     ),
   ],
 );

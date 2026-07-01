@@ -167,6 +167,44 @@ Les invariants suivants doivent etre preserves sauf validation humaine explicite
 - aucune modification destructive de Docker, volumes, reseaux, bases ou assets sans validation
 - aucune fermeture de tache sans verification et sans test proportionne au risque
 
+## Principe De Langage Produit Et De Non Exposition Des Concepts Internes
+
+Les interfaces destinees aux clients, artisans et utilisateurs finaux doivent employer un langage produit clair, rassurant et comprehensible sans connaissance technique.
+
+En consequence :
+
+- aucun libelle, badge, message, confirmation ou statut visible dans l'application ne doit exposer un jargon destine aux developpeurs
+- les termes internes comme `OTP`, `DTO`, `payload`, `webhook`, `cache`, `token`, `JSON`, `endpoint`, `status code`, `cron`, `worker` ou tout identifiant technique equivalent ne doivent pas apparaitre dans l'UX utilisateur finale sauf besoin legal ou reglementaire explicite
+- un message utilisateur doit decrire le benefice, l'etat reel ou l'action attendue du point de vue de la personne qui utilise l'application
+- si une verification technique existe en coulisse, l'UX doit afficher une formulation metier comprensible comme `numero verifie`, `identite en cours d'examen`, `paiement confirme` ou `information manquante`
+- les details techniques, traces de debug, causes internes, noms de champs, statuts machine et raccourcis de developpement doivent rester confines aux logs, ecrans d'administration, runbooks et documents techniques
+
+Avant de valider un changement UI, l'agent doit verifier explicitement :
+
+- que chaque texte visible parle a un utilisateur final et non a un developpeur
+- qu'aucune formulation ne suppose une connaissance technique prealable
+- qu'aucun statut interne n'est expose brut dans les profils, paiements, notifications, verifications ou parcours sensibles
+- que le choix des mots reste coherent avec l'image de confiance et de serieux du produit
+
+## Principe De Maitrise De Charge Et D'Ephemeralite Des Donnees Temporaires
+
+Les parcours frequents et les donnees temporaires issues d'actions utilisateur doivent etre traites avec une discipline explicite de performance et de confidentialite.
+
+En consequence :
+
+- aucun ecran ne doit provoquer des refetchs reseau evitables simplement parce qu'un listener UI a ete recree ou perdu sans changement metier reel
+- les providers, caches et mecanismes de rafraichissement doivent viser un comportement stable, proportionne et soutenable sous hausse de trafic
+- toute generation locale de fichier temporaire contenant des donnees utilisateur, une carte partageable, une image de profil, un justificatif ou une preuve doit etre nettoyee des que son usage est termine
+- aucun fichier temporaire sensible ne doit etre laisse durablement sur disque sans raison metier explicite, sans duree de retention definie et sans validation humaine
+
+Avant de valider une fonctionnalite qui lit ou materialise des donnees, l'agent doit verifier explicitement :
+
+- que les requetes declenchees en navigation nominale ne se multiplient pas inutilement
+- que la strategie de cache ou de conservation en memoire est coherente avec la charge attendue
+- que toute mutation metier reussie invalide ou rafraichit explicitement les donnees derivees devenues obsoletes
+- que les artefacts temporaires locaux sont supprimes ou expires de maniere fiable
+- que la performance ne degrade ni la stabilite utilisateur ni la surface d'exposition des donnees
+
 ## Regles Fondamentales Non Negociables
 
 ### 1. Interdiction Des Changements Aveugles

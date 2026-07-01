@@ -8,6 +8,8 @@ class ArtisanModel {
   final String profession;
   final String? businessName;
   final String? description;
+  final String? address;
+  final String? whatsappNumber;
   final int experienceYears;
   final String city;
   final String commune;
@@ -38,6 +40,8 @@ class ArtisanModel {
     required this.profession,
     this.businessName,
     this.description,
+    this.address,
+    this.whatsappNumber,
     this.experienceYears = 0,
     required this.city,
     required this.commune,
@@ -119,6 +123,12 @@ class ArtisanModel {
           profile['description'] ??
           json['bio'] ??
           json['description'],
+      address: profile['address']?.toString() ?? json['address']?.toString(),
+      whatsappNumber:
+          profile['whatsapp_number']?.toString() ??
+          profile['whatsappNumber']?.toString() ??
+          user['whatsapp_number']?.toString() ??
+          json['whatsapp_number']?.toString(),
       experienceYears:
           _toInt(
             profile['years_experience'] ??
@@ -263,6 +273,8 @@ class ArtisanModel {
     String? profession,
     String? businessName,
     String? description,
+    String? address,
+    String? whatsappNumber,
     int? experienceYears,
     String? city,
     String? commune,
@@ -293,6 +305,8 @@ class ArtisanModel {
       profession: profession ?? this.profession,
       businessName: businessName ?? this.businessName,
       description: description ?? this.description,
+      address: address ?? this.address,
+      whatsappNumber: whatsappNumber ?? this.whatsappNumber,
       experienceYears: experienceYears ?? this.experienceYears,
       city: city ?? this.city,
       commune: commune ?? this.commune,

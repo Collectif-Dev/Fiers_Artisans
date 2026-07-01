@@ -29,7 +29,7 @@ dependencies:
   connectivity_plus: ^6.1.4
 
   # Storage
-  flutter_secure_storage: ^9.2.4
+  flutter_secure_storage: ^10.3.1
   shared_preferences: ^2.5.3
 
   # UI & Design
@@ -65,6 +65,8 @@ dependencies:
   flutter_dotenv: ^6.0.0
   web: ^1.1.1
   visibility_detector: ^0.4.0+2
+  share_plus: ^13.2.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

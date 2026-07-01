@@ -14,6 +14,7 @@ import '../../core/network/api_endpoints.dart';
 import '../../data/repositories/artisan_repository.dart';
 import '../../providers/app_providers.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/profile_provider.dart';
 import '../../services/location_service.dart';
 import '../../services/push_notification_service.dart';
 import '../common/app_button.dart';
@@ -78,7 +79,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _SettingsTile(
                 icon: Icons.person_outline,
                 title: 'settings.profile'.tr(),
-                onTap: () {},
+                onTap: () {
+                  final role = ref.read(authProvider).user?.role.toLowerCase();
+                  context.push(
+                    role == 'artisan' ? '/profile/artisan' : '/profile/client',
+                  );
+                },
               ),
               _SettingsTile(
                 icon: Icons.my_location_rounded,
@@ -92,7 +98,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: 'settings.version'.tr(
                   namedArgs: {'version': AppConfig.appVersion},
                 ),
-                onTap: () {},
+                onTap: () => context.push('/about'),
               ),
               const Divider(height: 32),
               _SettingsTile(
@@ -447,9 +453,7 @@ class _LocationUpdateSheetState extends ConsumerState<_LocationUpdateSheet> {
       if (snapshot == null) {
         AppSnackBar.show(
           context,
-          message:
-              result.message ??
-              'location.error_position_failed'.tr(),
+          message: result.message ?? 'location.error_position_failed'.tr(),
         );
         setState(() => _isUpdating = false);
         return;
@@ -474,6 +478,11 @@ class _LocationUpdateSheetState extends ConsumerState<_LocationUpdateSheet> {
         commune: commune,
         throwOnError: true,
       );
+      if (_isArtisan) {
+        ref.invalidate(artisanOwnProfileProvider);
+      } else {
+        ref.invalidate(clientProfileProvider);
+      }
 
       final next = _LocationProfileSnapshot(
         city: city,
@@ -505,10 +514,7 @@ class _LocationUpdateSheetState extends ConsumerState<_LocationUpdateSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _isUpdating = false);
-      AppSnackBar.show(
-        context,
-        message: mapException(error).userMessage,
-      );
+      AppSnackBar.show(context, message: mapException(error).userMessage);
     }
   }
 

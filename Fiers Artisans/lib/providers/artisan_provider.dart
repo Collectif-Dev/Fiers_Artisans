@@ -82,10 +82,14 @@ class ArtisanDetailNotifier extends StateNotifier<ArtisanDetailState> {
   }
 
   Future<void> loadArtisan(String userId) async {
-    state = const ArtisanDetailState(isLoading: true);
+    final hasCurrentData = state.artisan != null;
+    state = state.copyWith(
+      isLoading: !hasCurrentData,
+      error: null,
+    );
     try {
       final artisan = await _repo.getArtisan(userId);
-      state = state.copyWith(artisan: artisan, isLoading: false);
+      state = state.copyWith(artisan: artisan, isLoading: false, error: null);
       // Load reviews and portfolio in parallel
       await Future.wait([_loadReviews(artisan.id), _loadPortfolio(artisan.id)]);
     } catch (e) {
