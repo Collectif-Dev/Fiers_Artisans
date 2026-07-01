@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,17 +34,6 @@ class ArtisanProfileScreen extends ConsumerStatefulWidget {
 class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen>
   with WidgetsBindingObserver {
   final ScrollController _portfolioScrollController = ScrollController();
-  Timer? _portfolioAutoScrollTimer;
-  Timer? _portfolioAutoScrollResumeTimer;
-  bool _portfolioUserInteracting = false;
-  double _portfolioScrollStep = 300;
-  int _portfolioItemCount = 0;
-
-  static const Duration _portfolioAutoScrollInterval = Duration(seconds: 4);
-  static const Duration _portfolioResumeDelay = Duration(seconds: 5);
-
-  bool get _reduceMotionRequested =>
-      MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
   @override
   void initState() {
@@ -73,91 +60,8 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _portfolioAutoScrollTimer?.cancel();
-    _portfolioAutoScrollResumeTimer?.cancel();
     _portfolioScrollController.dispose();
     super.dispose();
-  }
-
-  void _syncPortfolioAutoScrollConfig({
-    required int itemCount,
-    required double cardWidth,
-  }) {
-    _portfolioItemCount = itemCount;
-    _portfolioScrollStep = cardWidth + 12;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _updatePortfolioAutoScrollTimer();
-    });
-  }
-
-  void _updatePortfolioAutoScrollTimer() {
-    final canRun =
-        _portfolioItemCount > 1 &&
-        !_portfolioUserInteracting &&
-        !_reduceMotionRequested &&
-        _portfolioScrollController.hasClients &&
-        _portfolioScrollController.position.maxScrollExtent > 0;
-
-    if (!canRun) {
-      _portfolioAutoScrollTimer?.cancel();
-      _portfolioAutoScrollTimer = null;
-      return;
-    }
-
-    _portfolioAutoScrollTimer ??= Timer.periodic(
-      _portfolioAutoScrollInterval,
-      (_) => _autoScrollPortfolioOnce(),
-    );
-  }
-
-  Future<void> _autoScrollPortfolioOnce() async {
-    if (!mounted || _portfolioUserInteracting) return;
-    if (!_portfolioScrollController.hasClients) return;
-
-    final position = _portfolioScrollController.position;
-    if (position.maxScrollExtent <= 0) return;
-
-    final target = (position.pixels + _portfolioScrollStep).clamp(
-      0.0,
-      position.maxScrollExtent,
-    );
-    final shouldLoop = target >= position.maxScrollExtent - 2;
-    final nextOffset = shouldLoop ? 0.0 : target;
-
-    await _portfolioScrollController.animateTo(
-      nextOffset,
-      duration: const Duration(milliseconds: 420),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  void _registerPortfolioInteraction() {
-    _portfolioUserInteracting = true;
-    _portfolioAutoScrollTimer?.cancel();
-    _portfolioAutoScrollTimer = null;
-    _portfolioAutoScrollResumeTimer?.cancel();
-
-    _portfolioAutoScrollResumeTimer = Timer(_portfolioResumeDelay, () {
-      if (!mounted) return;
-      _portfolioUserInteracting = false;
-      _updatePortfolioAutoScrollTimer();
-    });
-  }
-
-  bool _handlePortfolioScrollNotification(ScrollNotification notification) {
-    if (notification.metrics.axis != Axis.horizontal) return false;
-
-    if (notification is ScrollStartNotification &&
-        notification.dragDetails != null) {
-      _registerPortfolioInteraction();
-    } else if (notification is ScrollUpdateNotification &&
-        notification.dragDetails != null) {
-      _registerPortfolioInteraction();
-    }
-
-    return false;
   }
 
   @override
@@ -464,10 +368,6 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen>
                             : (maxWidth * 0.76).clamp(220.0, 300.0);
                         final cardHeight = textScale > 1.15 ? 280.0 : 260.0;
                         const scrollAreaExtraHeight = 24.0;
-                        _syncPortfolioAutoScrollConfig(
-                          itemCount: state.portfolio.length,
-                          cardWidth: cardWidth,
-                        );
                         final styledScrollbarTheme = theme.scrollbarTheme
                             .copyWith(
                               thumbVisibility: const WidgetStatePropertyAll(
@@ -518,31 +418,25 @@ class _ArtisanProfileScreenState extends ConsumerState<ArtisanProfileScreen>
                                     ScrollbarOrientation.bottom,
                                 child: Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
-                                  child:
-                                      NotificationListener<ScrollNotification>(
-                                        onNotification:
-                                            _handlePortfolioScrollNotification,
-                                        child: ListView.separated(
-                                          controller:
-                                              _portfolioScrollController,
-                                          scrollDirection: Axis.horizontal,
-                                          physics:
-                                              const BouncingScrollPhysics(),
-                                          itemCount: state.portfolio.length,
-                                          separatorBuilder: (context, index) =>
-                                              const SizedBox(width: 12),
-                                          itemBuilder: (ctx, i) {
-                                            final item = state.portfolio[i];
-                                            return SizedBox(
-                                              width: cardWidth,
-                                              child: PortfolioItemCard(
-                                                key: ValueKey(item.id),
-                                                item: item,
-                                              ),
-                                            );
-                                          },
+                                  child: ListView.separated(
+                                    controller: _portfolioScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const BouncingScrollPhysics(),
+                                    itemCount: state.portfolio.length,
+                                    separatorBuilder: (context, index) =>
+                                        const SizedBox(width: 12),
+                                    itemBuilder: (ctx, i) {
+                                      final item = state.portfolio[i];
+                                      return SizedBox(
+                                        width: cardWidth,
+                                        child: PortfolioItemCard(
+                                          key: ValueKey(item.id),
+                                          item: item,
+                                          enableAutoSlide: false,
                                         ),
-                                      ),
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
                             ),

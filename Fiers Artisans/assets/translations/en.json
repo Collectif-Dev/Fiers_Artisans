@@ -216,6 +216,7 @@
     "item_price": "Price (FCFA)",
     "item_images": "Photos",
     "item_images_with_limit": "Photos (max {count})",
+    "reorder_hint": "Press and drag to set photo order.",
     "empty": "Your portfolio is empty. Add your projects!",
     "images_required": "Add at least one photo.",
     "max_images_reached": "You can add at most {count} photos per project.",

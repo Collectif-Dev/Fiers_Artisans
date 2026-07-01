@@ -107,7 +107,15 @@ class ArtisanDetailNotifier extends StateNotifier<ArtisanDetailState> {
   Future<void> _loadPortfolio(String artisanId) async {
     try {
       final portfolio = await _repo.getPortfolio(artisanId);
-      state = state.copyWith(portfolio: portfolio);
+      final sorted = List<PortfolioModel>.from(portfolio)
+        ..sort((a, b) {
+          final bDate = b.createdAt?.millisecondsSinceEpoch ?? -1;
+          final aDate = a.createdAt?.millisecondsSinceEpoch ?? -1;
+          final dateCompare = bDate.compareTo(aDate);
+          if (dateCompare != 0) return dateCompare;
+          return b.id.compareTo(a.id);
+        });
+      state = state.copyWith(portfolio: sorted);
     } catch (_) {}
   }
 

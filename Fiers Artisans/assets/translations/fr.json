@@ -216,6 +216,7 @@
     "item_price": "Prix (FCFA)",
     "item_images": "Photos",
     "item_images_with_limit": "Photos (max {count})",
+    "reorder_hint": "Maintenez puis glissez pour definir l'ordre des photos.",
     "empty": "Votre portfolio est vide. Ajoutez vos réalisations !",
     "images_required": "Ajoutez au moins une photo.",
     "max_images_reached": "Vous pouvez ajouter au maximum {count} photos par réalisation.",

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:image_picker/image_picker.dart';
@@ -46,18 +46,39 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
     super.dispose();
   }
 
-  Future<void> _loadPortfolio() async {
-    setState(() {
-      _loading = true;
-      _error = null;
+  List<PortfolioModel> _sortPortfolioItems(List<PortfolioModel> source) {
+    final sorted = List<PortfolioModel>.from(source);
+    sorted.sort((a, b) {
+      final bDate = b.createdAt?.millisecondsSinceEpoch ?? -1;
+      final aDate = a.createdAt?.millisecondsSinceEpoch ?? -1;
+      final dateCompare = bDate.compareTo(aDate);
+      if (dateCompare != 0) return dateCompare;
+      return b.id.compareTo(a.id);
     });
+    return sorted;
+  }
+
+  Future<void> _loadPortfolio({bool showLoader = true}) async {
+    if (showLoader) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    } else {
+      setState(() {
+        _error = null;
+      });
+    }
     try {
       final response = await _api.get(ApiEndpoints.portfolio);
       final list = response.data is List
           ? response.data
           : response.data['data'] ?? [];
+      final parsed = (list as List)
+          .map((e) => PortfolioModel.fromJson(e))
+          .toList();
       setState(() {
-        _items = (list as List).map((e) => PortfolioModel.fromJson(e)).toList();
+        _items = _sortPortfolioItems(parsed);
         _loading = false;
       });
     } catch (e) {
@@ -107,7 +128,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
           imageObjects.add({'bucket': bucket, 'objectKey': objectKey});
         }
       } catch (e) {
-        debugPrint('[Portfolio] Upload failed: $e');
+        if (kDebugMode) {
+          debugPrint('[Portfolio] Upload failed: $e');
+        }
         throw _PortfolioUploadException();
       }
 
@@ -121,7 +144,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
           imageUrls: imageUrls,
         );
       } catch (e) {
-        debugPrint('[Portfolio] Create portfolio item failed: $e');
+        if (kDebugMode) {
+          debugPrint('[Portfolio] Create portfolio item failed: $e');
+        }
         throw _PortfolioCreateException();
       }
 
@@ -145,7 +170,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         );
       }
     } on DioException catch (e) {
-      debugPrint('[Portfolio] Network error: ${e.message}');
+      if (kDebugMode) {
+        debugPrint('[Portfolio] Network error: ${e.message}');
+      }
       setState(() => _loading = false);
       if (mounted) {
         AppSnackBar.show(
@@ -155,7 +182,9 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         );
       }
     } catch (e) {
-      debugPrint('[Portfolio] Unexpected error: $e');
+      if (kDebugMode) {
+        debugPrint('[Portfolio] Unexpected error: $e');
+      }
       setState(() => _loading = false);
       if (mounted) {
         AppSnackBar.show(
@@ -213,7 +242,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
         artisanUserId != null && artisanUserId == currentUserId;
 
     if (event.event == 'artisanPortfolioUpdated' && isCurrentArtisan) {
-      _loadPortfolio();
+      _loadPortfolio(showLoader: false);
     }
   }
 
@@ -247,7 +276,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
               onAction: _showAddDialog,
             )
           : RefreshIndicator(
-              onRefresh: _loadPortfolio,
+              onRefresh: () => _loadPortfolio(showLoader: false),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final textScale = MediaQuery.textScalerOf(context).scale(1);
@@ -276,6 +305,7 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen> {
                         key: ValueKey(item.id),
                         item: item,
                         showDeleteAction: true,
+                        enableAutoSlide: false,
                         onDelete: () => _deleteItem(item),
                       );
                     },
@@ -389,6 +419,17 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
     }
   }
 
+  void _reorderImages(int oldIndex, int newIndex) {
+    setState(() {
+      var targetIndex = newIndex;
+      if (oldIndex < targetIndex) {
+        targetIndex -= 1;
+      }
+      final moved = _images.removeAt(oldIndex);
+      _images.insert(targetIndex, moved);
+    });
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     if (_images.isEmpty) {
@@ -489,71 +530,94 @@ class _AddPortfolioSheetState extends State<_AddPortfolioSheet> {
                 style: theme.textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ..._images.asMap().entries.map((entry) {
-                    return Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.memory(
-                            entry.value.bytes,
-                            width: 72,
-                            height: 72,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, e, s) => Container(
-                              width: 72,
-                              height: 72,
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              child: const Icon(Icons.image, size: 24),
-                            ),
-                          ),
+              if (_images.isNotEmpty)
+                SizedBox(
+                  height: 80,
+                  child: ReorderableListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    buildDefaultDragHandles: false,
+                    onReorderItem: _reorderImages,
+                    itemCount: _images.length,
+                    itemBuilder: (context, index) {
+                      final image = _images[index];
+                      return Container(
+                        key: ValueKey('${image.filename}-$index'),
+                        margin: EdgeInsets.only(
+                          right: index == _images.length - 1 ? 0 : 8,
                         ),
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: GestureDetector(
-                            onTap: () =>
-                                setState(() => _images.removeAt(entry.key)),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                size: 16,
-                                color: Colors.white,
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.memory(
+                                image.bytes,
+                                width: 72,
+                                height: 72,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, e, s) => Container(
+                                  width: 72,
+                                  height: 72,
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  child: const Icon(Icons.image, size: 24),
+                                ),
                               ),
                             ),
-                          ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: () =>
+                                    setState(() => _images.removeAt(index)),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 2,
+                              bottom: 2,
+                              child: ReorderableDragStartListener(
+                                index: index,
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: const Icon(
+                                    Icons.drag_indicator,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    );
-                  }),
-                  GestureDetector(
-                    onTap: imageLimitReached ? null : _pickImages,
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: theme.dividerColor),
-                        borderRadius: BorderRadius.circular(8),
-                        color: imageLimitReached
-                            ? theme.colorScheme.surfaceContainerHighest
-                            : null,
-                      ),
-                      child: Icon(
-                        Icons.add_photo_alternate_outlined,
-                        color: imageLimitReached
-                            ? theme.disabledColor
-                            : theme.colorScheme.primary,
-                      ),
-                    ),
+                      );
+                    },
                   ),
-                ],
+                ),
+              if (_images.isNotEmpty) const SizedBox(height: 8),
+              if (_images.isNotEmpty)
+                Text(
+                  'portfolio.reorder_hint'.tr(),
+                  style: theme.textTheme.labelSmall,
+                ),
+              if (_images.isNotEmpty) const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: imageLimitReached ? null : _pickImages,
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: Text('portfolio.item_images'.tr()),
               ),
               const SizedBox(height: 24),
 
