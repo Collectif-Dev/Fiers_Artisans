@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { initializeApp, cert } from 'firebase-admin';
 import { getMessaging } from 'firebase-admin/messaging';
 
+type PushSendOptions = {
+  badgeCount?: number;
+  androidNotificationCount?: number;
+};
+
 @Injectable()
 export class FcmProvider implements OnModuleInit {
   private readonly logger = new Logger(FcmProvider.name);
@@ -42,10 +47,15 @@ export class FcmProvider implements OnModuleInit {
     title: string,
     body: string,
     data?: Record<string, string>,
+    options?: PushSendOptions,
   ): Promise<boolean> {
     if (!this.initialized || !fcmToken) return false;
 
     try {
+      const badgeCount =
+        options?.badgeCount ??
+        options?.androidNotificationCount ??
+        1;
       await getMessaging().send({
         token: fcmToken,
         notification: { title, body },
@@ -57,6 +67,8 @@ export class FcmProvider implements OnModuleInit {
             sound: 'default',
             defaultSound: true,
             defaultVibrateTimings: true,
+            notificationCount:
+              options?.androidNotificationCount ?? badgeCount,
           },
         },
         apns: {
@@ -64,7 +76,7 @@ export class FcmProvider implements OnModuleInit {
           payload: {
             aps: {
               sound: 'default',
-              badge: 1,
+              badge: badgeCount,
               contentAvailable: true,
             },
           },

@@ -15,6 +15,10 @@ import { ChatService } from './chat.service';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { ChatEventsBridge } from './chat-events.bridge';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../users/entities/user.entity';
+import { FcmProvider } from '../notifications/providers/fcm.provider';
 
 const WS_ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
   'https://fiers-artisans.ci',
@@ -53,6 +57,9 @@ export class ChatGateway
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly chatEventsBridge: ChatEventsBridge,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly fcmProvider: FcmProvider,
   ) {}
 
   afterInit(server: Server): void {
@@ -142,6 +149,36 @@ export class ChatGateway
         );
       });
 
+    const recipientIds = await this.chatService.findConversationRecipientIds(
+      data.conversationId,
+      senderId,
+    );
+
+    await Promise.allSettled(
+      recipientIds.map(async (recipientId) => {
+        const badgeCounts = await this.chatService.getUnreadBadgeSummary(
+          recipientId,
+        );
+
+        await this.emitUserSyncEvent(
+          recipientId,
+          'badgeCountsUpdated',
+          badgeCounts,
+        );
+
+        if (this.userSockets.has(recipientId)) {
+          return;
+        }
+
+        await this.dispatchNewMessagePush(
+          recipientId,
+          data.conversationId,
+          senderId,
+          badgeCounts,
+        );
+      }),
+    );
+
     return payload;
   }
 
@@ -166,6 +203,9 @@ export class ChatGateway
           `Failed to fan-out messagesRead across instances: ${error}`,
         );
       });
+
+    const badgeCounts = await this.chatService.getUnreadBadgeSummary(userId);
+    await this.emitUserSyncEvent(userId, 'badgeCountsUpdated', badgeCounts);
   }
 
   async emitParticipantAvailabilityUpdated(
@@ -259,5 +299,45 @@ export class ChatGateway
       throw new WsException('Unauthorized socket connection.');
     }
     return userId;
+  }
+
+  private async dispatchNewMessagePush(
+    userId: string,
+    conversationId: string,
+    senderId: string,
+    badgeCounts: {
+      messagesUnread: number;
+      notificationsUnread: number;
+      totalUnread: number;
+    },
+  ): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['fcm_token'],
+    });
+
+    if (!user?.fcm_token) {
+      return;
+    }
+
+    const payload = {
+      type: 'NEW_MESSAGE',
+      conversationId,
+      senderId,
+      badgeTotal: String(badgeCounts.totalUnread),
+      badgeMessages: String(badgeCounts.messagesUnread),
+      badgeNotifications: String(badgeCounts.notificationsUnread),
+    };
+
+    await this.fcmProvider.sendToDevice(
+      user.fcm_token,
+      'Nouveau message',
+      'Vous avez reçu un nouveau message.',
+      payload,
+      {
+        badgeCount: badgeCounts.totalUnread,
+        androidNotificationCount: badgeCounts.totalUnread,
+      },
+    );
   }
 }

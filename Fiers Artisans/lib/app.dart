@@ -5,6 +5,7 @@ import 'dart:async';
 import 'config/theme.dart';
 import 'config/routes.dart';
 import 'providers/app_providers.dart';
+import 'providers/badge_counts_provider.dart';
 import 'providers/payment_manual_provider.dart';
 import 'services/app_icon_service.dart';
 import 'services/chat_realtime_service.dart';
@@ -84,6 +85,9 @@ class _FiersArtisansAppState extends ConsumerState<FiersArtisansApp>
     }
     _isForeground = isForeground;
     PushNotificationService().setAppInForeground(isForeground);
+    if (isForeground) {
+      ref.read(badgeCountsProvider.notifier).refresh();
+    }
   }
 
   void _handleRealtimeEvent(ChatRealtimeEvent event) {

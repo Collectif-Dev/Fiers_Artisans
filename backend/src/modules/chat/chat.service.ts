@@ -12,11 +12,18 @@ import { Message, MessageType } from './schemas/message.schema';
 import { User, UserRole } from '../users/entities/user.entity';
 import { ArtisanProfile } from '../users/entities/artisan-profile.entity';
 import { ClientProfile } from '../users/entities/client-profile.entity';
+import { Notification } from '../notifications/schemas/notification.schema';
 
 type ParticipantMeta = {
   name: string;
   role: UserRole | string;
   isAvailable: boolean | null;
+};
+
+export type UnreadBadgeSummary = {
+  messagesUnread: number;
+  notificationsUnread: number;
+  totalUnread: number;
 };
 
 @Injectable()
@@ -26,6 +33,8 @@ export class ChatService {
     private readonly conversationModel: Model<Conversation>,
     @InjectModel(Message.name)
     private readonly messageModel: Model<Message>,
+    @InjectModel(Notification.name)
+    private readonly notificationModel: Model<Notification>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(ArtisanProfile)
@@ -263,6 +272,55 @@ export class ChatService {
 
     participantIds.add(userId);
     return Array.from(participantIds);
+  }
+
+  async findConversationRecipientIds(
+    conversationId: string,
+    userId: string,
+  ): Promise<string[]> {
+    const conversation = await this.getConversationForParticipant(
+      conversationId,
+      userId,
+    );
+    return (conversation.participants ?? []).filter((id) => id !== userId);
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    const conversations = await this.conversationModel
+      .find({ participants: userId })
+      .select({ _id: 1 })
+      .lean()
+      .exec();
+
+    const conversationIds = conversations.map((conversation) =>
+      conversation._id.toString(),
+    );
+
+    if (conversationIds.length === 0) {
+      return 0;
+    }
+
+    return this.messageModel.countDocuments({
+      conversationId: { $in: conversationIds },
+      senderId: { $ne: userId },
+      isRead: false,
+    });
+  }
+
+  async getUnreadBadgeSummary(userId: string): Promise<UnreadBadgeSummary> {
+    const [messagesUnread, notificationsUnread] = await Promise.all([
+      this.getUnreadMessageCount(userId),
+      this.notificationModel.countDocuments({
+        userId,
+        isRead: false,
+      }),
+    ]);
+
+    return {
+      messagesUnread,
+      notificationsUnread,
+      totalUnread: messagesUnread + notificationsUnread,
+    };
   }
 
   async ensureParticipant(

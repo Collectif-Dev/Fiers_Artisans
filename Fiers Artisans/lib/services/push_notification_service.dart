@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_endpoints.dart';
+import 'app_icon_service.dart';
 
 class PushNotificationService {
   static const String _notificationChannelId =
@@ -93,6 +94,10 @@ class PushNotificationService {
     if (!_isAppInForeground) {
       return;
     }
+    final badgeCount = _extractBadgeCount(message);
+    if (badgeCount != null) {
+      unawaited(AppIconService.syncBadgeCount(badgeCount));
+    }
     debugPrint('FCM foreground: ${message.notification?.title}');
     unawaited(_showForegroundAndroidNotification(message));
     final type = message.data['type'] as String?;
@@ -114,6 +119,10 @@ class PushNotificationService {
   }
 
   void _handleMessageOpenedApp(RemoteMessage message) {
+    final badgeCount = _extractBadgeCount(message);
+    if (badgeCount != null) {
+      unawaited(AppIconService.syncBadgeCount(badgeCount));
+    }
     onNotificationTapped?.call();
   }
 
@@ -184,12 +193,13 @@ class PushNotificationService {
     }
 
     try {
+      final badgeCount = _extractBadgeCount(message);
       await _ensureLocalNotificationsInitialized();
       await _localNotifications.show(
         message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch,
         title ?? 'Fiers Artisans',
         body ?? '',
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
             _notificationChannelId,
             _notificationChannelName,
@@ -197,6 +207,7 @@ class PushNotificationService {
             importance: Importance.high,
             priority: Priority.high,
             icon: '@mipmap/ic_launcher',
+            number: badgeCount,
           ),
         ),
         payload: message.data['type']?.toString(),
@@ -204,5 +215,27 @@ class PushNotificationService {
     } catch (e) {
       debugPrint('FCM foreground local notification failed: $e');
     }
+  }
+
+  int? _extractBadgeCount(RemoteMessage message) {
+    final candidates = [
+      message.data['badgeTotal'],
+      message.data['totalUnread'],
+      message.data['badge_count'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate is int) {
+        return candidate;
+      }
+      if (candidate is String) {
+        final parsed = int.tryParse(candidate);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+
+    return null;
   }
 }

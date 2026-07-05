@@ -34,6 +34,45 @@ class NotificationRepository {
     return 0;
   }
 
+  Future<({int messagesUnread, int notificationsUnread, int totalUnread})>
+  getBadgeCounts() async {
+    final response = await _api.get(ApiEndpoints.notificationsBadgeCounts);
+    final raw = response.data;
+    if (raw is Map) {
+      final messagesUnread = _readInt(
+        raw['messagesUnread'] ?? raw['badgeMessages'],
+      );
+      final notificationsUnread = _readInt(
+        raw['notificationsUnread'] ?? raw['badgeNotifications'],
+      );
+      final totalUnread = _readOptionalInt(
+        raw['totalUnread'] ?? raw['badgeTotal'],
+      );
+      return (
+        messagesUnread: messagesUnread,
+        notificationsUnread: notificationsUnread,
+        totalUnread: totalUnread ?? messagesUnread + notificationsUnread,
+      );
+    }
+    return (
+      messagesUnread: 0,
+      notificationsUnread: 0,
+      totalUnread: 0,
+    );
+  }
+
+  int _readInt(Object? value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  int? _readOptionalInt(Object? value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
   Future<void> markAsRead(String id) async {
     await _api.put(ApiEndpoints.notificationRead(id));
   }

@@ -110,6 +110,7 @@ class ChatRealtimeService {
     _bindDomainEvent(socket, 'notificationCreated');
     _bindDomainEvent(socket, 'notificationRead');
     _bindDomainEvent(socket, 'notificationsReadAll');
+    _bindDomainEvent(socket, 'badgeCountsUpdated');
     _bindDomainEvent(socket, 'userProfileUpdated');
     _bindDomainEvent(socket, 'favoriteStatusUpdated');
     _bindDomainEvent(socket, 'artisanProfileUpdated');

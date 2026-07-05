@@ -8,7 +8,7 @@ const POLL_INTERVAL = 30_000;
 const SSE_RECONNECT_DELAY = 3_000;
 const MIN_REFRESH_INTERVAL_MS = 800;
 
-type AdminRealtimeEvent = {
+export type AdminRealtimeEvent = {
   type?: string;
   payload?: Record<string, unknown>;
   timestamp?: string;
@@ -17,6 +17,7 @@ type AdminRealtimeEvent = {
 type UseAdminSSEOptions = {
   eventTypes?: string[];
   minRefreshIntervalMs?: number;
+  onRealtimeEvent?: (event: AdminRealtimeEvent) => void;
 };
 
 /**
@@ -99,10 +100,17 @@ export function useAdminSSE(onEvent: () => void, options?: UseAdminSSEOptions) {
       return filter.includes(eventType);
     };
 
-    const fire = (eventType?: string) => {
-      const normalizedEventType = normalizeEventType(eventType);
+    const fire = (event?: AdminRealtimeEvent | null) => {
+      const normalizedEventType = normalizeEventType(event?.type);
       if (!shouldHandleEventType(normalizedEventType)) {
         return;
+      }
+
+      if (event && optionsRef.current?.onRealtimeEvent) {
+        optionsRef.current.onRealtimeEvent({
+          ...event,
+          type: normalizedEventType,
+        });
       }
 
       const minInterval =
@@ -164,22 +172,23 @@ export function useAdminSSE(onEvent: () => void, options?: UseAdminSSEOptions) {
       clearReconnect();
     };
 
-    const extractEventType = (eventBlock: string): string | undefined => {
+    const extractRealtimeEvent = (
+      eventBlock: string,
+    ): AdminRealtimeEvent | null => {
       const dataLines = eventBlock
         .split('\n')
         .filter((line) => line.startsWith('data:'))
         .map((line) => line.slice(5).trimStart());
 
       if (dataLines.length === 0) {
-        return undefined;
+        return null;
       }
 
       try {
         const parsed = JSON.parse(dataLines.join('\n'));
-        const normalized = normalizeEvent(parsed);
-        return normalized?.type;
+        return normalizeEvent(parsed);
       } catch {
-        return undefined;
+        return null;
       }
     };
 
@@ -198,7 +207,7 @@ export function useAdminSSE(onEvent: () => void, options?: UseAdminSSEOptions) {
           .some((line) => line.startsWith('data:'));
 
         if (hasData) {
-          fire(extractEventType(eventBlock));
+          fire(extractRealtimeEvent(eventBlock));
         }
       }
 

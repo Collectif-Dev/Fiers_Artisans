@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTranslations } from '@/hooks/use-translations';
+import { useAdminNavBadges } from '@/providers/admin-nav-badge-provider';
+import { NavBadge } from './nav-badge';
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -32,6 +34,7 @@ export function MobileSidebar() {
   const pathname = usePathname();
   const { t } = useTranslations('nav');
   const { t: tApp } = useTranslations('app');
+  const badgeCounts = useAdminNavBadges();
 
   return (
     <div className="flex flex-col h-full">
@@ -60,6 +63,7 @@ export function MobileSidebar() {
             >
               <item.icon className="h-4 w-4" />
               {t(item.key)}
+              <NavBadge count={badgeCounts[item.key as keyof typeof badgeCounts] ?? 0} />
             </Link>
           );
         })}

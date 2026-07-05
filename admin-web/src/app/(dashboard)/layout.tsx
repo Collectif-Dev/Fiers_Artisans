@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { Topbar } from '@/components/dashboard/topbar';
+import { AdminNavBadgeProvider } from '@/providers/admin-nav-badge-provider';
 
 export default function DashboardLayout({
   children,
@@ -31,14 +32,16 @@ export default function DashboardLayout({
   if (!isAuthenticated) return null;
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-muted/30">
-          {children}
-        </main>
+    <AdminNavBadgeProvider>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Topbar />
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-muted/30">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </AdminNavBadgeProvider>
   );
 }

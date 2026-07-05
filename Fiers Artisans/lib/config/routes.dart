@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/constants.dart';
+import '../presentation/common/count_badged_icon.dart';
+import '../providers/badge_counts_provider.dart';
 import '../presentation/auth/onboarding_screen.dart';
 import '../presentation/auth/login_screen.dart';
 import '../presentation/auth/register_choice_screen.dart';
@@ -274,13 +277,14 @@ final GoRouter appRouter = GoRouter(
 );
 
 // ──────────── Client Shell with Bottom Nav ────────────
-class _ClientShell extends StatelessWidget {
+class _ClientShell extends ConsumerWidget {
   final Widget child;
   const _ClientShell({required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.toString();
+    final badgeCounts = ref.watch(badgeCountsProvider);
 
     int currentIndex = 0;
     if (location.contains('/chat')) currentIndex = 1;
@@ -310,13 +314,25 @@ class _ClientShell extends StatelessWidget {
             label: 'nav.home'.tr(),
           ),
           NavigationDestination(
-            icon: const Icon(Icons.chat_bubble_outline),
-            selectedIcon: const Icon(Icons.chat_bubble),
+            icon: CountBadgedIcon(
+              count: badgeCounts.messagesUnread,
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
+            selectedIcon: CountBadgedIcon(
+              count: badgeCounts.messagesUnread,
+              child: const Icon(Icons.chat_bubble),
+            ),
             label: 'nav.messages'.tr(),
           ),
           NavigationDestination(
-            icon: const Icon(Icons.notifications_none_rounded),
-            selectedIcon: const Icon(Icons.notifications_rounded),
+            icon: CountBadgedIcon(
+              count: badgeCounts.notificationsUnread,
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
+            selectedIcon: CountBadgedIcon(
+              count: badgeCounts.notificationsUnread,
+              child: const Icon(Icons.notifications_rounded),
+            ),
             label: 'nav.notifications'.tr(),
           ),
           NavigationDestination(
@@ -331,13 +347,14 @@ class _ClientShell extends StatelessWidget {
 }
 
 // ──────────── Artisan Shell with Bottom Nav ────────────
-class _ArtisanShell extends StatelessWidget {
+class _ArtisanShell extends ConsumerWidget {
   final Widget child;
   const _ArtisanShell({required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).uri.toString();
+    final badgeCounts = ref.watch(badgeCountsProvider);
 
     int currentIndex = 0;
     if (location.contains('/chat')) currentIndex = 1;
@@ -367,13 +384,25 @@ class _ArtisanShell extends StatelessWidget {
             label: 'nav.dashboard'.tr(),
           ),
           NavigationDestination(
-            icon: const Icon(Icons.chat_bubble_outline),
-            selectedIcon: const Icon(Icons.chat_bubble),
+            icon: CountBadgedIcon(
+              count: badgeCounts.messagesUnread,
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
+            selectedIcon: CountBadgedIcon(
+              count: badgeCounts.messagesUnread,
+              child: const Icon(Icons.chat_bubble),
+            ),
             label: 'nav.messages'.tr(),
           ),
           NavigationDestination(
-            icon: const Icon(Icons.notifications_none_rounded),
-            selectedIcon: const Icon(Icons.notifications_rounded),
+            icon: CountBadgedIcon(
+              count: badgeCounts.notificationsUnread,
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
+            selectedIcon: CountBadgedIcon(
+              count: badgeCounts.notificationsUnread,
+              child: const Icon(Icons.notifications_rounded),
+            ),
             label: 'nav.notifications'.tr(),
           ),
           NavigationDestination(

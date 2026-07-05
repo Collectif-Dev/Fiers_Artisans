@@ -12,11 +12,20 @@ final class AppIconPlugin: NSObject, FlutterPlugin {
   }
 
   func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-    guard call.method == "setThemeIcon" else {
-      result(FlutterMethodNotImplemented)
+    if call.method == "setThemeIcon" {
+      handleThemeIcon(call, result: result)
       return
     }
 
+    if call.method == "setBadgeCount" {
+      handleBadgeCount(call, result: result)
+      return
+    }
+
+    result(FlutterMethodNotImplemented)
+  }
+
+  private func handleThemeIcon(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     guard #available(iOS 10.3, *) else {
       result(nil)
       return
@@ -48,6 +57,16 @@ final class AppIconPlugin: NSObject, FlutterPlugin {
       } else {
         result(nil)
       }
+    }
+  }
+
+  private func handleBadgeCount(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any]
+    let count = (args?["count"] as? Int) ?? 0
+
+    DispatchQueue.main.async {
+      UIApplication.shared.applicationIconBadgeNumber = max(0, count)
+      result(nil)
     }
   }
 }

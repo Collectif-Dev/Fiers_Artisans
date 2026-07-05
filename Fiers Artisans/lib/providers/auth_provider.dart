@@ -6,6 +6,7 @@ import '../core/utils/phone_number.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';
 import 'session_scope_provider.dart';
+import '../services/app_icon_service.dart';
 import '../services/chat_realtime_service.dart';
 import '../services/push_notification_service.dart';
 
@@ -69,12 +70,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // Back to explicit-login mode: no automatic session restoration on app start.
     // Guard with timeout so startup cannot stay blocked on storage edge cases.
     try {
+      await PushNotificationService().unregisterCurrentUserToken().timeout(
+        const Duration(seconds: 3),
+      );
+    } catch (e) {
+      debugPrint('[Auth] checkAuth token detach skipped: $e');
+    }
+    try {
       await SecureStorage.clearAuthSession().timeout(
         const Duration(seconds: 3),
       );
     } catch (e) {
       debugPrint('[Auth] checkAuth fallback after storage error/timeout: $e');
     }
+    await AppIconService.clearBadgeCount();
     _rotateSessionScope();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
@@ -380,6 +389,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     // Now update UI and disconnect services
     ChatRealtimeService().disconnect();
+    await AppIconService.clearBadgeCount();
     _rotateSessionScope();
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
@@ -418,6 +428,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     ChatRealtimeService().disconnect();
     await PushNotificationService().unregisterCurrentUserToken();
     await SecureStorage.clearAuthSession();
+    await AppIconService.clearBadgeCount();
     _rotateSessionScope();
   }
 }

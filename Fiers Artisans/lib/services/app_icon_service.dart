@@ -15,4 +15,18 @@ class AppIconService {
       // Ignore platform errors to avoid blocking app startup.
     }
   }
+
+  static Future<void> syncBadgeCount(int count) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return;
+
+    try {
+      await _channel.invokeMethod('setBadgeCount', {'count': count});
+    } catch (_) {
+      // Ignore platform errors to avoid blocking badge sync.
+    }
+  }
+
+  static Future<void> clearBadgeCount() async {
+    await syncBadgeCount(0);
+  }
 }

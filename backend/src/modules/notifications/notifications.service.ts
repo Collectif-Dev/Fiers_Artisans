@@ -7,6 +7,7 @@ import { Notification } from './schemas/notification.schema';
 import { FcmProvider } from './providers/fcm.provider';
 import { User } from '../users/entities/user.entity';
 import { ChatGateway } from '../chat/chat.gateway';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class NotificationsService {
@@ -19,6 +20,7 @@ export class NotificationsService {
     private readonly userRepository: Repository<User>,
     private readonly fcmProvider: FcmProvider,
     private readonly chatGateway: ChatGateway,
+    private readonly chatService: ChatService,
   ) {}
 
   async create(data: {
@@ -29,18 +31,24 @@ export class NotificationsService {
     data?: Record<string, any>;
   }): Promise<Notification> {
     const notification = await this.notificationModel.create(data);
-    const unreadCount = await this.getUnreadCount(data.userId);
+    const badgeCounts = await this.chatService.getUnreadBadgeSummary(
+      data.userId,
+    );
 
     this.chatGateway
       .emitUserSyncEvent(data.userId, 'notificationCreated', {
         notification: this.toClientNotification(notification),
-        unreadCount,
+        unreadCount: badgeCounts.notificationsUnread,
+        badgeCounts,
       })
+      .catch(() => {});
+    this.chatGateway
+      .emitUserSyncEvent(data.userId, 'badgeCountsUpdated', badgeCounts)
       .catch(() => {});
 
     // Offload push dispatch outside the critical HTTP path.
     setImmediate(() => {
-      this.dispatchPushNotification(data).catch((error) => {
+      this.dispatchPushNotification(data, badgeCounts).catch((error) => {
         this.logger.warn(`FCM push failed for ${data.userId}: ${error}`);
       });
     });
@@ -54,6 +62,10 @@ export class NotificationsService {
     title: string;
     body: string;
     data?: Record<string, any>;
+  }, badgeCounts: {
+    messagesUnread: number;
+    notificationsUnread: number;
+    totalUnread: number;
   }): Promise<void> {
     const user = await this.userRepository.findOne({
       where: { id: data.userId },
@@ -70,12 +82,19 @@ export class NotificationsService {
       }
     }
     stringData.type = data.type;
+    stringData.badgeTotal = String(badgeCounts.totalUnread);
+    stringData.badgeMessages = String(badgeCounts.messagesUnread);
+    stringData.badgeNotifications = String(badgeCounts.notificationsUnread);
 
     await this.fcmProvider.sendToDevice(
       user.fcm_token,
       data.title,
       data.body,
       stringData,
+      {
+        badgeCount: badgeCounts.totalUnread,
+        androidNotificationCount: badgeCounts.totalUnread,
+      },
     );
   }
 
@@ -101,12 +120,16 @@ export class NotificationsService {
       { _id: notificationId, userId },
       { isRead: true },
     );
-    const unreadCount = await this.getUnreadCount(userId);
+    const badgeCounts = await this.chatService.getUnreadBadgeSummary(userId);
     this.chatGateway
       .emitUserSyncEvent(userId, 'notificationRead', {
         notificationId,
-        unreadCount,
+        unreadCount: badgeCounts.notificationsUnread,
+        badgeCounts,
       })
+      .catch(() => {});
+    this.chatGateway
+      .emitUserSyncEvent(userId, 'badgeCountsUpdated', badgeCounts)
       .catch(() => {});
   }
 
@@ -115,10 +138,15 @@ export class NotificationsService {
       { userId, isRead: false },
       { isRead: true },
     );
+    const badgeCounts = await this.chatService.getUnreadBadgeSummary(userId);
     this.chatGateway
       .emitUserSyncEvent(userId, 'notificationsReadAll', {
         unreadCount: 0,
+        badgeCounts,
       })
+      .catch(() => {});
+    this.chatGateway
+      .emitUserSyncEvent(userId, 'badgeCountsUpdated', badgeCounts)
       .catch(() => {});
   }
 
@@ -127,6 +155,10 @@ export class NotificationsService {
       userId,
       isRead: false,
     });
+  }
+
+  async getBadgeCounts(userId: string) {
+    return this.chatService.getUnreadBadgeSummary(userId);
   }
 
   private toClientNotification(

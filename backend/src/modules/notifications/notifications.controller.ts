@@ -27,6 +27,11 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(userId);
   }
 
+  @Get('badge-counts')
+  getBadgeCounts(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getBadgeCounts(userId);
+  }
+
   @Put(':id/read')
   markAsRead(
     @CurrentUser('id') userId: string,
