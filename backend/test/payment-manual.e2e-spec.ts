@@ -457,6 +457,9 @@ function createHarness() {
     paymentRealtimeService,
     {
       get: jest.fn((key: string) => {
+        if (key === 'PAYMENT_ORANGE_RECIPIENT') return '0700000001';
+        if (key === 'PAYMENT_MTN_RECIPIENT') return '0500000002';
+        if (key === 'PAYMENT_WAVE_RECIPIENT') return '0700000003';
         if (key === 'PAYMENT_MANUAL_AMOUNT_FCFA') return 5000;
         if (key === 'PAYMENT_MANUAL_EXPIRY_HOURS') return 72;
         if (key === 'minio.buckets.paymentProofs') return 'payment-proofs';
