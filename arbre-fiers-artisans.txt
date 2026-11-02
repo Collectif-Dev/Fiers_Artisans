@@ -1,0 +1,235 @@
+.
+├── fiers-artisans-lot1-tests
+│   ├── backend
+│   │   └── test
+│   │       └── artisan-public.e2e-spec.ts
+│   ├── simulation
+│   │   ├── comportement-actuel.cjs
+│   │   └── contrats-securite.test.cjs
+│   ├── README.md
+│   └── resultats-simulation.txt
+├── scripts
+│   └── seed_abidjan_artisans_dev.js
+├── src
+│   ├── common
+│   │   ├── decorators
+│   │   │   ├── current-user.decorator.ts
+│   │   │   ├── index.ts
+│   │   │   └── roles.decorator.ts
+│   │   ├── dto
+│   │   │   ├── index.ts
+│   │   │   └── pagination.dto.ts
+│   │   ├── exceptions
+│   │   │   ├── business.exception.ts
+│   │   │   └── index.ts
+│   │   ├── filters
+│   │   │   ├── global-exception.filter.ts
+│   │   │   └── index.ts
+│   │   ├── guards
+│   │   │   ├── index.ts
+│   │   │   ├── phone-verified.guard.ts
+│   │   │   └── roles.guard.ts
+│   │   ├── interceptors
+│   │   │   ├── index.ts
+│   │   │   ├── logging.interceptor.ts
+│   │   │   └── transform.interceptor.ts
+│   │   ├── push
+│   │   │   └── push.module.ts
+│   │   ├── realtime
+│   │   │   ├── admin-realtime.events.ts
+│   │   │   ├── admin-realtime.module.ts
+│   │   │   └── admin-realtime.service.ts
+│   │   └── utils
+│   │       └── phone-number.util.ts
+│   ├── config
+│   │   ├── app.config.ts
+│   │   ├── database-mongo.config.ts
+│   │   ├── database-postgres.config.ts
+│   │   ├── index.ts
+│   │   ├── jwt.config.ts
+│   │   ├── minio.config.ts
+│   │   ├── providers.config.ts
+│   │   ├── redis.config.ts
+│   │   ├── wave.config.ts
+│   │   └── whatsapp.config.ts
+│   ├── database
+│   │   ├── migrations
+│   │   │   ├── AddPaymentManualReplacement1710000000002.ts
+│   │   │   ├── AddPaymentManualRequestNumberAndCooldown1710000000000.ts
+│   │   │   ├── AddPaymentManualSubscriptionRequestIndex1710000000001.ts
+│   │   │   └── CreatePaymentManual1699999999999.ts
+│   │   └── seeds
+│   │       ├── categories.seed.ts
+│   │       └── run-seed.ts
+│   ├── modules
+│   │   ├── admin
+│   │   │   ├── admin.controller.ts
+│   │   │   ├── admin.module.ts
+│   │   │   └── admin.service.ts
+│   │   ├── analytics
+│   │   │   ├── schemas
+│   │   │   │   └── activity-log.schema.ts
+│   │   │   ├── analytics.controller.ts
+│   │   │   ├── analytics.module.ts
+│   │   │   └── analytics.service.ts
+│   │   ├── auth
+│   │   │   ├── dto
+│   │   │   │   ├── auth.dto.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── otp
+│   │   │   │   ├── otp.service.spec.ts
+│   │   │   │   ├── otp.service.ts
+│   │   │   │   └── whatsapp-otp.provider.ts
+│   │   │   ├── strategies
+│   │   │   │   ├── jwt-refresh.strategy.ts
+│   │   │   │   └── jwt.strategy.ts
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── auth.module.ts
+│   │   │   ├── auth.service.ts
+│   │   │   └── pin-login-guard.service.ts
+│   │   ├── categories
+│   │   │   ├── entities
+│   │   │   │   ├── category.entity.ts
+│   │   │   │   └── subcategory.entity.ts
+│   │   │   ├── categories.controller.ts
+│   │   │   ├── categories.module.ts
+│   │   │   └── categories.service.ts
+│   │   ├── chat
+│   │   │   ├── schemas
+│   │   │   │   ├── conversation.schema.ts
+│   │   │   │   └── message.schema.ts
+│   │   │   ├── chat.controller.ts
+│   │   │   ├── chat-events.bridge.ts
+│   │   │   ├── chat.gateway.ts
+│   │   │   ├── chat.module.ts
+│   │   │   └── chat.service.ts
+│   │   ├── dev
+│   │   │   ├── dev.module.ts
+│   │   │   └── dev-otp.controller.ts
+│   │   ├── health
+│   │   │   ├── indicators
+│   │   │   │   └── payment-minio.indicator.ts
+│   │   │   ├── health.controller.ts
+│   │   │   ├── health.module.ts
+│   │   │   ├── metrics.controller.ts
+│   │   │   └── metrics.service.ts
+│   │   ├── media
+│   │   │   ├── schemas
+│   │   │   │   └── media-file.schema.ts
+│   │   │   ├── media.controller.ts
+│   │   │   ├── media.module.ts
+│   │   │   └── media.service.ts
+│   │   ├── notifications
+│   │   │   ├── providers
+│   │   │   │   └── fcm.provider.ts
+│   │   │   ├── schemas
+│   │   │   │   └── notification.schema.ts
+│   │   │   ├── notifications.controller.ts
+│   │   │   ├── notifications.module.ts
+│   │   │   └── notifications.service.ts
+│   │   ├── payment-manual
+│   │   │   ├── controllers
+│   │   │   │   ├── payment-manual-admin.controller.ts
+│   │   │   │   ├── payment-manual.controller.spec.ts
+│   │   │   │   └── payment-manual.controller.ts
+│   │   │   ├── cron
+│   │   │   │   └── payment-expiration.cron.ts
+│   │   │   ├── dto
+│   │   │   │   ├── admin-filter.dto.ts
+│   │   │   │   ├── create-payment-manual.dto.ts
+│   │   │   │   ├── reject-proof.dto.ts
+│   │   │   │   ├── reopen-proof.dto.ts
+│   │   │   │   ├── submit-proof.dto.ts
+│   │   │   │   └── validate-proof.dto.ts
+│   │   │   ├── entities
+│   │   │   │   ├── payment-manual.entity.ts
+│   │   │   │   └── payment-proof.entity.ts
+│   │   │   ├── events
+│   │   │   │   ├── payment.events.ts
+│   │   │   │   └── payment-realtime.service.ts
+│   │   │   ├── services
+│   │   │   │   ├── exif-extractor.service.spec.ts
+│   │   │   │   ├── exif-extractor.service.ts
+│   │   │   │   ├── fraud-detection.service.ts
+│   │   │   │   ├── payment-manual.service.spec.ts
+│   │   │   │   ├── payment-manual.service.ts
+│   │   │   │   ├── proof-validation.service.spec.ts
+│   │   │   │   └── proof-validation.service.ts
+│   │   │   └── payment-manual.module.ts
+│   │   ├── portfolio
+│   │   │   ├── schemas
+│   │   │   │   └── portfolio-item.schema.ts
+│   │   │   ├── portfolio.controller.ts
+│   │   │   ├── portfolio.module.ts
+│   │   │   └── portfolio.service.ts
+│   │   ├── reviews
+│   │   │   ├── dto
+│   │   │   │   ├── create-review.dto.ts
+│   │   │   │   └── reply-review.dto.ts
+│   │   │   ├── entities
+│   │   │   │   └── review.entity.ts
+│   │   │   ├── reviews.controller.ts
+│   │   │   ├── reviews.module.ts
+│   │   │   └── reviews.service.ts
+│   │   ├── search
+│   │   │   ├── dto
+│   │   │   │   └── search-artisans.dto.ts
+│   │   │   ├── search.controller.ts
+│   │   │   ├── search.module.ts
+│   │   │   └── search.service.ts
+│   │   ├── subscription
+│   │   │   ├── entities
+│   │   │   │   ├── payment.entity.ts
+│   │   │   │   └── subscription.entity.ts
+│   │   │   ├── providers
+│   │   │   │   └── wave.provider.ts
+│   │   │   ├── payment-providers.config.ts
+│   │   │   ├── subscription.controller.ts
+│   │   │   ├── subscription.module.ts
+│   │   │   ├── subscription.service.spec.ts
+│   │   │   └── subscription.service.ts
+│   │   ├── users
+│   │   │   ├── dto
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── update-artisan-profile.dto.ts
+│   │   │   │   ├── update-client-profile.dto.ts
+│   │   │   │   └── update-location.dto.ts
+│   │   │   ├── entities
+│   │   │   │   ├── artisan-profile.entity.ts
+│   │   │   │   ├── client-profile.entity.ts
+│   │   │   │   ├── favorite-artisan.entity.ts
+│   │   │   │   ├── index.ts
+│   │   │   │   └── user.entity.ts
+│   │   │   ├── map-visibility.gateway.ts
+│   │   │   ├── users.controller.ts
+│   │   │   ├── users.module.ts
+│   │   │   └── users.service.ts
+│   │   └── verification
+│   │       ├── dto
+│   │       │   ├── review-document.dto.ts
+│   │       │   └── submit-document.dto.ts
+│   │       ├── entities
+│   │       │   ├── verification-document.entity.ts
+│   │       │   └── verification-document-page.entity.ts
+│   │       ├── verification.controller.ts
+│   │       ├── verification.module.ts
+│   │       └── verification.service.ts
+│   ├── app.module.ts
+│   ├── load-env.ts
+│   └── main.ts
+├── test
+│   ├── app.e2e-spec.ts
+│   ├── artisan-public.e2e-spec.ts
+│   ├── jest-e2e.json
+│   └── payment-manual.e2e-spec.ts
+├── Dockerfile
+├── .dockerignore
+├── eslint.config.mjs
+├── nest-cli.json
+├── package.json
+├── package-lock.json
+├── .prettierrc
+├── tsconfig.build.json
+└── tsconfig.json
+
+65 directories, 168 files

@@ -1,0 +1,83 @@
+TAP version 13
+# Subtest: BASELINE : accepte l ID du profil
+ok 1 - BASELINE : accepte l ID du profil
+  ---
+  duration_ms: 1.517366
+  type: 'test'
+  ...
+# Subtest: BASELINE : accepte l ID utilisateur (Flutter)
+ok 2 - BASELINE : accepte l ID utilisateur (Flutter)
+  ---
+  duration_ms: 0.33347
+  type: 'test'
+  ...
+# Subtest: BASELINE : refuse un profil absent
+ok 3 - BASELINE : refuse un profil absent
+  ---
+  duration_ms: 0.861382
+  type: 'test'
+  ...
+# Subtest: CIBLE S01 : le JSON public n expose aucun secret (rouge attendu)
+not ok 4 - CIBLE S01 : le JSON public n expose aucun secret (rouge attendu)
+  ---
+  duration_ms: 1.351297
+  type: 'test'
+  location: '/mnt/data/fiers-artisans-lot1-tests/simulation/contrats-securite.test.cjs:35:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    pin_hash divulgué dans la réponse simulée
+    
+    true !== false
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: false
+  actual: true
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/mnt/data/fiers-artisans-lot1-tests/simulation/contrats-securite.test.cjs:38:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: CIBLE S02 : compte désactivé interdit en public (rouge attendu)
+not ok 5 - CIBLE S02 : compte désactivé interdit en public (rouge attendu)
+  ---
+  duration_ms: 1.554782
+  type: 'test'
+  location: '/mnt/data/fiers-artisans-lot1-tests/simulation/contrats-securite.test.cjs:41:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected rejection.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    status: 404
+  operator: 'rejects'
+  stack: |-
+    async TestContext.<anonymous> (/mnt/data/fiers-artisans-lot1-tests/simulation/contrats-securite.test.cjs:42:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: CIBLE V01 : profil accessible sans abonnement (rouge attendu)
+not ok 6 - CIBLE V01 : profil accessible sans abonnement (rouge attendu)
+  ---
+  duration_ms: 0.216865
+  type: 'test'
+  location: '/mnt/data/fiers-artisans-lot1-tests/simulation/contrats-securite.test.cjs:44:1'
+  failureType: 'testCodeFailure'
+  error: 'Artisan non trouvé ou non actif.'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    ExtraitUsersService.getArtisanPublicProfile (/mnt/data/fiers-artisans-lot1-tests/simulation/comportement-actuel.cjs:23:25)
+    async TestContext.<anonymous> (/mnt/data/fiers-artisans-lot1-tests/simulation/contrats-securite.test.cjs:45:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 3
+# fail 3
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 72.05087
