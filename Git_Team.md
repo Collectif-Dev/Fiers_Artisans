@@ -1479,7 +1479,7 @@ modifications -- git stash --> stash -- git stash pop --> restaure
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [Semantic Versioning](https://semver.org/)
 - `SECURITY_ARCHITECTURE.md` — Politique de sécurité et préservation
-- `instructions-agent-ia-v2.md` — Guide operationnel agent IA
+- `AGENTS.md` — Protocole opérationnel unique des agents IA
 
 ---
 
