@@ -184,7 +184,7 @@ export class UsersService {
         relations: ['category', 'subcategory', 'user'],
       });
     }
-    if (!profile) {
+    if (!profile || profile.user?.is_active !== true) {
       throw new NotFoundException('Artisan non trouvé ou non actif.');
     }
 
