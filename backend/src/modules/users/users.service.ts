@@ -172,7 +172,7 @@ export class UsersService {
     return this.attachLocationSnapshot(profile);
   }
 
-  async getArtisanPublicProfile(artisanId: string): Promise<ArtisanProfile> {
+  async getArtisanPublicProfile(artisanId: string) {
     // Try by profile ID first, then by user ID (mobile sends userId)
     let profile = await this.artisanProfileRepository.findOne({
       where: { id: artisanId, is_subscription_active: true },
@@ -196,7 +196,16 @@ export class UsersService {
       })
       .catch(() => {});
 
-    return this.attachLocationSnapshot(profile);
+    return this.attachLocationSnapshot({
+      ...profile,
+      user: profile.user
+        ? {
+            id: profile.user.id,
+            phone_number: profile.user.phone_number,
+            verification_status: profile.user.verification_status,
+          }
+        : null,
+    });
   }
 
   async updateArtisanProfile(
