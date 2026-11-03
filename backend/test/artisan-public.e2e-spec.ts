@@ -141,8 +141,10 @@ describe('Lot 1 — GET /api/v1/artisan/:id', () => {
 
   it('CIBLE S02 / SECURITE : refuse un profil dont le compte est desactive', async () => {
     profil = profilFictif({ compteActif: false });
-    const r = await request(app.getHttpServer()).get(`/api/v1/artisan/${ID_UTILISATEUR}`);
-    expect(r.status).toBe(404);
+    for (const identifiant of [ID_PROFIL, ID_UTILISATEUR]) {
+      const reponse = await request(app.getHttpServer()).get(`/api/v1/artisan/${identifiant}`);
+      expect(reponse.status).toBe(404);
+    }
   });
 
   it('CIBLE V01 / GRATUITE : le profil public fonctionne sans abonnement', async () => {
